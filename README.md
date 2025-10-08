@@ -45,16 +45,12 @@ This mod consists of two main components:
    - Extract to your PEAK game directory
    - Run the game once to generate BepInEx folders
 
-2. **Install Archipelago.MultiClient.Net**:
-   - Download the Archipelago.MultiClient.Net DLL
-   - Place in `BepInEx/plugins/` directory
+2. **Install the Plugin**:
+   - Download the `PeakArchipelagoPluginDLL` folder from the releases
+   - Drag the entire `PeakArchipelagoPluginDLL` folder into your `BepInEx/plugins/` directory
+   - The folder contains all necessary DLLs including the plugin and Archipelago.MultiClient.Net
 
-3. **Install the Plugin**:
-   - Compile `PeakArchipelagoPlugin.cs` or use the pre-built DLL
-   - Place the compiled DLL in `BepInEx/plugins/`
-   - Include `BadgeManager.cs` and `StateManager.cs` in the same assembly
-
-4. **Launch the Game**:
+3. **Launch the Game**:
    - Start PEAK - the plugin will create a configuration file on first run
    - Configure your connection settings (see Configuration section)
 
