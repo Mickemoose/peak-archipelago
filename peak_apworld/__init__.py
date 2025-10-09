@@ -104,12 +104,16 @@ class PeakWorld(World):
         apply_rules(self)
 
         # Set completion condition
-        def peak_completion(state: CollectionState):
-            # Complete when receiving the Peak Badge item (event location)
-            # Optionally, could require all ascents: return all(state.has(f"Ascent {i} Completed", self.player) for i in range(1, 8))
-            return state.has("Peak Badge", self.player)
-        
-        self.multiworld.completion_condition[self.player] = peak_completion
+        if options.Goal.value == 0:
+            ascent_num = options.AscentCount.value
+            if 1 <= ascent_num <= 7:
+                multiworld.completion_condition[player] = (
+                    lambda state, n=ascent_num: state.has(f"Ascent {n} Completed", player)
+                )
+            else:
+                continue
+        else:
+            continue
 
         final_locations = [loc for loc in self.multiworld.get_locations() if loc.player == self.player]
         current_items = [item for item in self.multiworld.itempool if item.player == self.player]
