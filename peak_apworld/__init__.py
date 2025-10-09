@@ -103,23 +103,37 @@ class PeakWorld(World):
 
         apply_rules(self)
 
-        # Set completion condition
-        if options.Goal.value == 0:
-            ascent_num = options.AscentCount.value
+        # Access options directly via self.options
+        goal = self.options.goal.value
+        ascent_num = self.options.ascent_count.value
+
+        # Set completion condition based on goal type
+        if goal == 0:  # Reach Peak
             if 1 <= ascent_num <= 7:
-                multiworld.completion_condition[player] = (
-                    lambda state, n=ascent_num: state.has(f"Ascent {n} Completed", player)
+                self.multiworld.completion_condition[self.player] = (
+                    lambda state, n=ascent_num: state.has(f"Ascent {n} Completed", self.player)
                 )
             else:
-                continue
-        else:
-            continue
+                return  # Invalid ascent count, exit early
 
+        elif goal == 1:  # Complete All Badges
+            self.multiworld.completion_condition[self.player] = (
+                lambda state: state.has("Peak Badge", self.player)
+            )
+
+        else:
+            return  # Unsupported goal type, exit early
+
+        # Ensure item pool matches number of locations
         final_locations = [loc for loc in self.multiworld.get_locations() if loc.player == self.player]
         current_items = [item for item in self.multiworld.itempool if item.player == self.player]
         missing = len(final_locations) - len(current_items)
+
         if missing > 0:
-            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Item pool is short by {missing} items. Adding filler items.")
+            logging.debug(
+                f"[Player {self.multiworld.player_name[self.player]}] "
+                f"Item pool is short by {missing} items. Adding filler items."
+            )
             for _ in range(missing):
                 filler_name = self.get_filler_item_name()
                 self.multiworld.itempool.append(self.create_item(filler_name))
