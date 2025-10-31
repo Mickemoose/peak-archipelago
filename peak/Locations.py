@@ -107,13 +107,13 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Faerie Lantern": 76226,
     "Acquire Aloe Vera": 76227,  # [Locked behind Mesa]
     "Acquire Sunscreen": 76228,  # [Locked behind Mesa]
-    "Acquire Ancient Effigy": 76229,
+    "Acquire Scout Effigy": 76229,
     "Acquire Cursed Skull": 76230,
     "Acquire Pandora's Lunchbox": 76231,
     "Acquire Ancient Idol": 76232,  # [Locked behind Mesa]
     "Acquire Bugle of Friendship": 76233,
     "Acquire Bugle": 76234,
-    "Acquire Remedy Shroom": 76235,
+    "Acquire Remedy Fungus": 76235,
     "Acquire Shelf Shroom": 76236,
     "Acquire Bounce Shroom": 76237,
     "Acquire Trail Mix": 76238,
@@ -142,6 +142,8 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Yellow Berrynana": 76261,
     "Acquire Orange Winterberry": 76262,  # [Locked behind Alpine]
     "Acquire Yellow Winterberry": 76263,
+    "Acquire Medicinal Root": 76264,
+    "Acquire Guidebook": 76265,
     
     # Peak Badge
     "Peak Badge": 76305,

@@ -21,7 +21,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.yourname.peak.ap", "Peak Archipelago", "0.3.0")]
+    [BepInPlugin("com.yourname.peak.ap", "Peak Archipelago", "0.3.1")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin
     {
         // ===== BepInEx / logging =====
@@ -101,7 +101,7 @@ namespace Peak.AP
                 _instance = this;
 
                 // Debug log to confirm plugin is loading
-                _log.LogInfo("[Peak↔AP] Plugin is initializing...");
+                _log.LogInfo("[PeakPelago] Plugin is initializing...");
 
                 cfgServer = Config.Bind("Connection", "Server", "archipelago.gg", "Host, or host:port");
                 cfgPort = Config.Bind("Connection", "Port", 38281, "Port (ignored if Server already contains :port)");
@@ -123,44 +123,44 @@ namespace Peak.AP
                 InitializeItemMapping();
 
                 // Initialize item effect handlers
-                _log.LogInfo("[Peak↔AP] About to initialize item effect handlers...");
+                _log.LogInfo("[PeakPelago] About to initialize item effect handlers...");
                 InitializeItemEffectHandlers();
-                _log.LogInfo("[Peak↔AP] Item effect handlers initialized successfully");
+                _log.LogInfo("[PeakPelago] Item effect handlers initialized successfully");
 
                 // Subscribe to achievement events for badge checking
-                _log.LogInfo("[Peak↔AP] Subscribing to achievement events...");
+                _log.LogInfo("[PeakPelago] Subscribing to achievement events...");
                 GlobalEvents.OnAchievementThrown += OnAchievementThrown;
-                _log.LogInfo("[Peak↔AP] Achievement events subscribed successfully");
+                _log.LogInfo("[PeakPelago] Achievement events subscribed successfully");
 
                 // Subscribe to item acquisition events
-                _log.LogInfo("[Peak↔AP] Subscribing to item acquisition events...");
+                _log.LogInfo("[PeakPelago] Subscribing to item acquisition events...");
                 GlobalEvents.OnItemRequested += OnItemRequested;
-                _log.LogInfo("[Peak↔AP] Item acquisition events subscribed successfully");
+                _log.LogInfo("[PeakPelago] Item acquisition events subscribed successfully");
 
                 // Apply Harmony patches
-                _log.LogInfo("[Peak↔AP] About to apply Harmony patches...");
+                _log.LogInfo("[PeakPelago] About to apply Harmony patches...");
                 _harmony = new Harmony("com.yourname.peak.ap");
                 _harmony.PatchAll();
-                _log.LogInfo("[Peak↔AP] Harmony patches applied successfully");
+                _log.LogInfo("[PeakPelago] Harmony patches applied successfully");
 
                 // Hide existing badges after a short delay to let the game initialize
-                _log.LogInfo("[Peak↔AP] About to schedule badge hiding...");
+                _log.LogInfo("[PeakPelago] About to schedule badge hiding...");
                 Invoke(nameof(HideExistingBadges), 1f);
-                _log.LogInfo("[Peak↔AP] Badge hiding scheduled");
+                _log.LogInfo("[PeakPelago] Badge hiding scheduled");
 
                 // Store original ascent level
-                _log.LogInfo("[Peak↔AP] About to schedule ascent storage...");
+                _log.LogInfo("[PeakPelago] About to schedule ascent storage...");
                 Invoke(nameof(StoreOriginalAscent), 1f);
-                _log.LogInfo("[Peak↔AP] Ascent storage scheduled");
+                _log.LogInfo("[PeakPelago] Ascent storage scheduled");
 
                 _status = "Ready";
-                _log.LogInfo("[Peak↔AP] Plugin ready.");
-                _log.LogInfo("[Peak↔AP] GUI should be visible - press F10 to toggle");
+                _log.LogInfo("[PeakPelago] Plugin ready.");
+                _log.LogInfo("[PeakPelago] GUI should be visible - press F10 to toggle");
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] CRITICAL ERROR during plugin initialization: " + ex.Message);
-                _log.LogError("[Peak↔AP] Stack trace: " + ex.StackTrace);
+                _log.LogError("[PeakPelago] CRITICAL ERROR during plugin initialization: " + ex.Message);
+                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
             }
         }
 
@@ -186,7 +186,7 @@ namespace Peak.AP
         {
             if (_session == null || !cfgDeathLink.Value)
             {
-                _log.LogDebug("[Peak↔AP] Cannot send death link - not connected or disabled");
+                _log.LogDebug("[PeakPelago] Cannot send death link - not connected or disabled");
                 return;
             }
 
@@ -195,7 +195,7 @@ namespace Peak.AP
                 // Prevent spam - only send one death link per 5 seconds
                 if (DateTime.Now - _lastDeathLinkSent < TimeSpan.FromSeconds(5))
                 {
-                    _log.LogDebug("[Peak↔AP] Death link throttled - too recent");
+                    _log.LogDebug("[PeakPelago] Death link throttled - too recent");
                     return;
                 }
 
@@ -215,11 +215,11 @@ namespace Peak.AP
                 _session.Socket.SendPacket(bouncePacket);
                 _lastDeathLinkSent = DateTime.Now;
 
-                _log.LogInfo("[Peak↔AP] *** DEATH LINK SENT ***: " + cause + " from " + cfgSlot.Value);
+                _log.LogInfo("[PeakPelago] *** DEATH LINK SENT ***: " + cause + " from " + cfgSlot.Value);
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to send death link: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to send death link: " + ex.Message);
             }
         }
 
@@ -228,7 +228,7 @@ namespace Peak.AP
         {
             if (!cfgDeathLink.Value)
             {
-                _log.LogDebug("[Peak↔AP] Death link received but disabled");
+                _log.LogDebug("[PeakPelago] Death link received but disabled");
                 return;
             }
 
@@ -241,14 +241,14 @@ namespace Peak.AP
                 // Don't process our own death links
                 if (source == cfgSlot.Value)
                 {
-                    _log.LogDebug("[Peak↔AP] Ignoring own death link");
+                    _log.LogDebug("[PeakPelago] Ignoring own death link");
                     return;
                 }
 
                 // Prevent spam - only process one death link per 5 seconds
                 if (DateTime.Now - _lastDeathLinkReceived < TimeSpan.FromSeconds(5))
                 {
-                    _log.LogDebug("[Peak↔AP] Death link throttled - too recent");
+                    _log.LogDebug("[PeakPelago] Death link throttled - too recent");
                     return;
                 }
 
@@ -257,14 +257,14 @@ namespace Peak.AP
                 _lastDeathLinkCause = cause;
                 _deathLinkReceivedThisSession = true;
 
-                _log.LogInfo("[Peak↔AP] *** DEATH LINK RECEIVED ***: " + cause + " from " + source);
+                _log.LogInfo("[PeakPelago] *** DEATH LINK RECEIVED ***: " + cause + " from " + source);
 
                 // Kill the local player
                 KillLocalPlayerFromDeathLink(cause, source);
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to handle death link: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to handle death link: " + ex.Message);
             }
         }
 
@@ -275,11 +275,11 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null)
                 {
-                    _log.LogDebug("[Peak↔AP] Cannot respawn player - no local character");
+                    _log.LogDebug("[PeakPelago] Cannot respawn player - no local character");
                     return;
                 }
 
-                _log.LogInfo("[Peak↔AP] Respawning local player due to death link from " + source + " (" + cause + ")");
+                _log.LogInfo("[PeakPelago] Respawning local player due to death link from " + source + " (" + cause + ")");
 
                 // Get the player's last spawn point (campfire/checkpoint)
                 Vector3 respawnPosition = GetLastCheckpointPosition();
@@ -288,11 +288,11 @@ namespace Peak.AP
                 // This will revive the player if they're dead, or just teleport them if they're alive
                 Character.localCharacter.photonView.RPC("RPCA_ReviveAtPosition", RpcTarget.All, respawnPosition, true);
 
-                _log.LogInfo("[Peak↔AP] Player respawned at checkpoint: " + respawnPosition);
+                _log.LogInfo("[PeakPelago] Player respawned at checkpoint: " + respawnPosition);
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to respawn player from death link: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to respawn player from death link: " + ex.Message);
             }
         }
 
@@ -310,7 +310,7 @@ namespace Peak.AP
                 if (Character.localCharacter.data.spawnPoint != null)
                 {
                     Vector3 spawnPos = Character.localCharacter.data.spawnPoint.position;
-                    _log.LogDebug("[Peak↔AP] Using character spawn point: " + spawnPos);
+                    _log.LogDebug("[PeakPelago] Using character spawn point: " + spawnPos);
                     return spawnPos;
                 }
 
@@ -346,7 +346,7 @@ namespace Peak.AP
                                             if (positionProperty != null)
                                             {
                                                 Vector3 campfirePos = (Vector3)positionProperty.GetValue(transform);
-                                                _log.LogDebug("[Peak↔AP] Using current segment campfire: " + campfirePos);
+                                                _log.LogDebug("[PeakPelago] Using current segment campfire: " + campfirePos);
                                                 return campfirePos;
                                             }
                                         }
@@ -387,7 +387,7 @@ namespace Peak.AP
                                             if (positionProperty != null)
                                             {
                                                 Vector3 reconnectPos = (Vector3)positionProperty.GetValue(transform);
-                                                _log.LogDebug("[Peak↔AP] Using reconnect spawn position: " + reconnectPos);
+                                                _log.LogDebug("[PeakPelago] Using reconnect spawn position: " + reconnectPos);
                                                 return reconnectPos;
                                             }
                                         }
@@ -402,16 +402,16 @@ namespace Peak.AP
                 if (SpawnPoint.allSpawnPoints != null && SpawnPoint.allSpawnPoints.Count > 0)
                 {
                     Vector3 fallbackPos = SpawnPoint.allSpawnPoints[0].transform.position;
-                    _log.LogDebug("[Peak↔AP] Using fallback spawn point: " + fallbackPos);
+                    _log.LogDebug("[PeakPelago] Using fallback spawn point: " + fallbackPos);
                     return fallbackPos;
                 }
 
-                _log.LogWarning("[Peak↔AP] No checkpoint found, using zero position");
+                _log.LogWarning("[PeakPelago] No checkpoint found, using zero position");
                 return Vector3.zero;
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error getting checkpoint position: " + ex.Message);
+                _log.LogError("[PeakPelago] Error getting checkpoint position: " + ex.Message);
                 return Vector3.zero;
             }
         }
@@ -438,7 +438,7 @@ namespace Peak.AP
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to get MapHandler: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to get MapHandler: " + ex.Message);
             }
             return null;
         }
@@ -458,7 +458,7 @@ namespace Peak.AP
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to get map segments: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to get map segments: " + ex.Message);
             }
             return null;
         }
@@ -469,10 +469,10 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[Peak↔AP] HideExistingBadges called");
+                _log.LogInfo("[PeakPelago] HideExistingBadges called");
                 if (_hasHiddenBadges)
                 {
-                    _log.LogInfo("[Peak↔AP] Badges already hidden, skipping");
+                    _log.LogInfo("[PeakPelago] Badges already hidden, skipping");
                     return;
                 }
 
@@ -500,12 +500,12 @@ namespace Peak.AP
 
                 _badgesHidden = true;
                 _hasHiddenBadges = true;
-                _log.LogInfo("[Peak↔AP] Hidden " + _originalUnlockedBadges.Count + " existing badges");
-                _log.LogInfo("[Peak↔AP] Badge hiding completed - _badgesHidden = " + _badgesHidden);
+                _log.LogInfo("[PeakPelago] Hidden " + _originalUnlockedBadges.Count + " existing badges");
+                _log.LogInfo("[PeakPelago] Badge hiding completed - _badgesHidden = " + _badgesHidden);
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to hide existing badges: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to hide existing badges: " + ex.Message);
             }
         }
 
@@ -531,7 +531,7 @@ namespace Peak.AP
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to get AchievementManager: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to get AchievementManager: " + ex.Message);
             }
             return null;
         }
@@ -549,13 +549,13 @@ namespace Peak.AP
                     if (getMaxAscentMethod != null)
                     {
                         _originalMaxAscent = (int)getMaxAscentMethod.Invoke(achievementManager, null);
-                        _log.LogInfo("[Peak↔AP] Stored original max ascent: " + _originalMaxAscent);
+                        _log.LogInfo("[PeakPelago] Stored original max ascent: " + _originalMaxAscent);
                     }
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to store original ascent: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to store original ascent: " + ex.Message);
             }
         }
 
@@ -624,7 +624,7 @@ namespace Peak.AP
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] CheckLuggageAchievements error: " + ex.Message);
+                _log.LogError("[PeakPelago] CheckLuggageAchievements error: " + ex.Message);
             }
         }
 
@@ -632,7 +632,7 @@ namespace Peak.AP
         {
             if (currentCount >= requiredCount)
             {
-                _log.LogInfo("[Peak↔AP] Reporting achievement: " + achievementName + " (count: " + currentCount + ")");
+                _log.LogInfo("[PeakPelago] Reporting achievement: " + achievementName + " (count: " + currentCount + ")");
                 ReportCheckByName(achievementName);
             }
         }
@@ -644,7 +644,7 @@ namespace Peak.AP
         {
             if (_session == null)
             {
-                _log.LogWarning("[Peak↔AP] Not connected; cannot report checks.");
+                _log.LogWarning("[PeakPelago] Not connected; cannot report checks.");
                 return;
             }
 
@@ -656,7 +656,7 @@ namespace Peak.AP
                 // Some versions return -1 when the name isn't found
                 if (id <= 0)
                 {
-                    _log.LogWarning("[Peak↔AP] Unknown AP location: " + locationName);
+                    _log.LogWarning("[PeakPelago] Unknown AP location: " + locationName);
                     return;
                 }
 
@@ -664,17 +664,17 @@ namespace Peak.AP
                 {
                     // Use the long[] overload (works across client versions)
                     _session.Locations.CompleteLocationChecks(new long[] { id });
-                    _log.LogInfo("[Peak↔AP] Reported check: " + locationName + " (ID " + id + ")");
+                    _log.LogInfo("[PeakPelago] Reported check: " + locationName + " (ID " + id + ")");
                     SaveState();
                 }
                 else
                 {
-                    _log.LogDebug("[Peak↔AP] Check already reported: " + locationName);
+                    _log.LogDebug("[PeakPelago] Check already reported: " + locationName);
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] ReportCheckByName failed: " + ex.Message);
+                _log.LogError("[PeakPelago] ReportCheckByName failed: " + ex.Message);
             }
         }
 
@@ -683,18 +683,18 @@ namespace Peak.AP
         {
             if (_session == null)
             {
-                _log.LogWarning("[Peak↔AP] Not connected; cannot send goal.");
+                _log.LogWarning("[PeakPelago] Not connected; cannot send goal.");
                 return;
             }
             try
             {
                 var pkt = new StatusUpdatePacket { Status = ArchipelagoClientState.ClientGoal };
                 _session.Socket.SendPacket(pkt);
-                _log.LogInfo("[Peak↔AP] Goal sent.");
+                _log.LogInfo("[PeakPelago] Goal sent.");
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Goal send failed: " + ex.Message);
+                _log.LogError("[PeakPelago] Goal send failed: " + ex.Message);
             }
         }
 
@@ -737,6 +737,8 @@ namespace Peak.AP
                 { "BALLOON", "Acquire Balloon" },
                 { "BalloonBunch", "Acquire BalloonBunch" },
                 { "SCOUT CANNON", "Acquire Scout Cannon" },
+                { "FLYING DISC", "Acquire Flying Disc" },
+                { "GUIDEBOOK", "Acquire Guidebook" },
                 
                 // Fire/light items
                 { "PortableStovetopItem", "Acquire PortableStovetopItem" },
@@ -751,7 +753,6 @@ namespace Peak.AP
                 { "COMPASS", "Acquire Compass" },
                 { "Pirate Compass", "Acquire Pirate Compass" },
                 { "BINOCULARS", "Acquire Binoculars" },
-                { "Frisbee", "Acquire Frisbee" },
                 
                 // Medical items
                 { "BANDAGES", "Acquire Bandages" },
@@ -760,11 +761,12 @@ namespace Peak.AP
                 { "HEAT PACK", "Acquire Heat Pack" },
                 { "CURE-ALL", "Acquire Cure-All" },
                 { "REMEDY FUNGUS", "Acquire Remedy Fungus" },
+                { "MEDICINAL ROOT", "Acquire Medicinal Root" },
                 { "ALOE VERA", "Acquire Aloe Vera" },
                 { "SUNSCREEN", "Acquire Sunscreen" },
                 
                 // Special objects
-                { "ANCIENT EFFIGY", "Acquire Ancient Effigy" },
+                { "SCOUT EFFIGY", "Acquire Scout Effigy" },
                 { "CURSED SKULL", "Acquire Cursed Skull" },
                 { "PANDORA'S LUNCHBOX", "Acquire Pandora's Lunchbox" },
                 { "ANCIENT IDOL", "Acquire Ancient Idol" },
@@ -774,7 +776,6 @@ namespace Peak.AP
                 { "BUGLE", "Acquire Bugle" },
                 
                 // Mushrooms
-                { "REMEDY SHROOM", "Acquire Remedy Shroom" },
                 { "SHELF SHROOM", "Acquire Shelf Shroom" },
                 { "BOUNCE SHROOM", "Acquire Bounce Shroom" },
                 { "BUTTON SHROOM", "Acquire Button Shroom" },
@@ -811,12 +812,12 @@ namespace Peak.AP
                 { "YELLOW WINTERBERRY", "Acquire Yellow Winterberry" }
             };
 
-            _log.LogInfo("[Peak↔AP] Initialized item mapping with " + _itemToLocationMapping.Count + " items");
+            _log.LogInfo("[PeakPelago] Initialized item mapping with " + _itemToLocationMapping.Count + " items");
         }
 
         private void InitializeItemEffectHandlers()
         {
-            _log.LogInfo("[Peak↔AP] Starting item effect handlers initialization...");
+            _log.LogInfo("[PeakPelago] Starting item effect handlers initialization...");
             _itemEffectHandlers = new Dictionary<string, System.Action>
             {
                 // Physical Game Items (77000-77064) - Spawn directly
@@ -847,16 +848,17 @@ namespace Peak.AP
                 { "Heat Pack", () => SpawnPhysicalItem("Heat Pack") },
                 { "Cure-All", () => SpawnPhysicalItem("Cure-All") },
                 { "Faerie Lantern", () => SpawnPhysicalItem("Lantern_Faerie") },
-                { "Remedy Fungus", () => SpawnPhysicalItem("MedicinalRoot") }, // best guess mapping
+                { "Medicinal Root", () => SpawnPhysicalItem("MedicinalRoot") }, // best guess mapping
+                { "Guidebook", () => SpawnPhysicalItem("Guidebook") },
                 { "Aloe Vera", () => SpawnPhysicalItem("AloeVera") },
                 { "Sunscreen", () => SpawnPhysicalItem("Sunscreen") },
-                { "Ancient Effigy", () => SpawnPhysicalItem("ScoutEffigy") },
+                { "Scout Effigy", () => SpawnPhysicalItem("ScoutEffigy") },
                 { "Cursed Skull", () => SpawnPhysicalItem("Cursed Skull") },
                 { "Pandora's Lunchbox", () => SpawnPhysicalItem("PandorasBox") },
                 { "Ancient Idol", () => SpawnPhysicalItem("AncientIdol") },
                 { "Bugle of Friendship", () => SpawnPhysicalItem("Bugle_Magic") }, // "friendship" -> magic bugle
                 { "Bugle", () => SpawnPhysicalItem("Bugle") },
-                { "Remedy Shroom", () => SpawnPhysicalItem("HealingPuffShroom") }, // best guess
+                { "Remedy Fungus", () => SpawnPhysicalItem("HealingPuffShroom") }, // best guess
                 { "Shelf Shroom", () => SpawnPhysicalItem("ShelfShroom") },
                 { "Bounce Shroom", () => SpawnPhysicalItem("BounceShroom") },
                 { "Trail Mix", () => SpawnPhysicalItem("TrailMix") },
@@ -901,6 +903,11 @@ namespace Peak.AP
                 { "Spawn Lightning", () => SpawnLightning() },
                 { "Destroy Held Item", () => DestroyHeldItem() },
                 { "Blue Berrynana Peel", () => SpawnPhysicalItem("Berrynana Peel Blue Variant") },
+                { "Minor Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Minor, _log) },
+                { "Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Normal, _log) },
+                { "Deadly Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Deadly, _log) },
+                { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
+                { "Nap Time Trap", () => NapTimeTrapEffect.ApplyNapTrap(_log) },
 
                 // Special Effect Items
                 { "Clear All Effects", () => ClearAllEffects() },
@@ -914,7 +921,7 @@ namespace Peak.AP
                 { "Chain Launcher", () => SpawnPhysicalItem("ChainShooter") }
             };
 
-            _log.LogInfo("[Peak↔AP] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
+            _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
         }
 
         // Item Effect Implementation Methods
@@ -924,7 +931,7 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Cannot spawn item - no local character");
+                    _log.LogWarning("[PeakPelago] Cannot spawn item - no local character");
                     return;
                 }
 
@@ -932,15 +939,15 @@ namespace Peak.AP
                 Item itemToSpawn = null;
 
                 // DEBUG: Log all available items in the database
-                //_log.LogInfo("[Peak↔AP] === AVAILABLE ITEMS IN DATABASE ===");
+                //_log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
                 //for (ushort itemID = 1; itemID < 300; itemID++) // Limit to first 200 for now
                 //{
                 //    if (ItemDatabase.TryGetItem(itemID, out Item item))
                 //    {
-                //        _log.LogInfo("[Peak↔AP] Item ID " + itemID + ": " + item.name);
+                //        _log.LogInfo("[PeakPelago] Item ID " + itemID + ": " + item.name);
                 //    }
                 //}
-                //_log.LogInfo("[Peak↔AP] === END OF AVAILABLE ITEMS ===");
+                //_log.LogInfo("[PeakPelago] === END OF AVAILABLE ITEMS ===");
 
                 for (ushort itemID = 1; itemID < 1000; itemID++)
                 {
@@ -956,7 +963,7 @@ namespace Peak.AP
 
                 if (itemToSpawn == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Could not find item in database: " + itemName);
+                    _log.LogWarning("[PeakPelago] Could not find item in database: " + itemName);
                     return;
                 }
 
@@ -966,11 +973,11 @@ namespace Peak.AP
 
                 // Spawn the item prefab directly without calling RequestPickup
                 GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
-                _log.LogInfo("[Peak↔AP] Spawned item: " + itemName + " at position " + spawnPosition);
+                _log.LogInfo("[PeakPelago] Spawned item: " + itemName + " at position " + spawnPosition);
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error spawning physical item " + itemName + ": " + ex.Message);
+                _log.LogError("[PeakPelago] Error spawning physical item " + itemName + ": " + ex.Message);
             }
         }
 
@@ -978,7 +985,7 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[Peak↔AP] Unlocking Ascent " + ascentLevel);
+                _log.LogInfo("[PeakPelago] Unlocking Ascent " + ascentLevel);
 
                 // Track the unlocked ascent
                 _unlockedAscents.Add(ascentLevel);
@@ -991,25 +998,25 @@ namespace Peak.AP
                     if (unlockMethod != null)
                     {
                         unlockMethod.Invoke(null, new object[] { ascentLevel });
-                        _log.LogInfo("[Peak↔AP] Successfully unlocked Ascent " + ascentLevel);
+                        _log.LogInfo("[PeakPelago] Successfully unlocked Ascent " + ascentLevel);
 
                         // Log all currently unlocked ascents
                         var sortedAscents = _unlockedAscents.OrderBy(x => x).ToList();
-                        _log.LogInfo("[Peak↔AP] All unlocked ascents: " + string.Join(", ", sortedAscents));
+                        _log.LogInfo("[PeakPelago] All unlocked ascents: " + string.Join(", ", sortedAscents));
                     }
                     else
                     {
-                        _log.LogWarning("[Peak↔AP] Could not find UnlockAscent method");
+                        _log.LogWarning("[PeakPelago] Could not find UnlockAscent method");
                     }
                 }
                 else
                 {
-                    _log.LogWarning("[Peak↔AP] Could not find Ascents class");
+                    _log.LogWarning("[PeakPelago] Could not find Ascents class");
                 }
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error unlocking ascent " + ascentLevel + ": " + ex.Message);
+                _log.LogError("[PeakPelago] Error unlocking ascent " + ascentLevel + ": " + ex.Message);
             }
         }
 
@@ -1019,7 +1026,7 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Cannot spawn bee swarm - no local character");
+                    _log.LogWarning("[PeakPelago] Cannot spawn bee swarm - no local character");
                     return;
                 }
 
@@ -1031,12 +1038,12 @@ namespace Peak.AP
                 var beeSwarm = PhotonNetwork.Instantiate("BeeSwarm", spawnPosition, Quaternion.identity, 0);
                 if (beeSwarm != null)
                 {
-                    _log.LogInfo("[Peak↔AP] Spawned bee swarm at position " + spawnPosition);
+                    _log.LogInfo("[PeakPelago] Spawned bee swarm at position " + spawnPosition);
                 }
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error spawning bee swarm: " + ex.Message);
+                _log.LogError("[PeakPelago] Error spawning bee swarm: " + ex.Message);
             }
         }
 
@@ -1046,7 +1053,7 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Cannot spawn lightning - no local character");
+                    _log.LogWarning("[PeakPelago] Cannot spawn lightning - no local character");
                     return;
                 }
 
@@ -1058,12 +1065,12 @@ namespace Peak.AP
                 var lightning = PhotonNetwork.Instantiate("Lightning", spawnPosition, Quaternion.identity, 0);
                 if (lightning != null)
                 {
-                    _log.LogInfo("[Peak↔AP] Spawned lightning at position " + spawnPosition);
+                    _log.LogInfo("[PeakPelago] Spawned lightning at position " + spawnPosition);
                 }
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error spawning lightning: " + ex.Message);
+                _log.LogError("[PeakPelago] Error spawning lightning: " + ex.Message);
             }
         }
 
@@ -1073,17 +1080,17 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null || Character.localCharacter.refs.items == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Cannot destroy held item - no local character or items");
+                    _log.LogWarning("[PeakPelago] Cannot destroy held item - no local character or items");
                     return;
                 }
 
                 // Use the existing destroy held item system
                 Character.localCharacter.refs.items.photonView.RPC("DestroyHeldItemRpc", RpcTarget.All);
-                _log.LogInfo("[Peak↔AP] Destroyed held item");
+                _log.LogInfo("[PeakPelago] Destroyed held item");
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error destroying held item: " + ex.Message);
+                _log.LogError("[PeakPelago] Error destroying held item: " + ex.Message);
             }
         }
 
@@ -1093,7 +1100,7 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null || Character.localCharacter.refs.afflictions == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Cannot clear effects - no local character or afflictions");
+                    _log.LogWarning("[PeakPelago] Cannot clear effects - no local character or afflictions");
                     return;
                 }
 
@@ -1106,16 +1113,16 @@ namespace Peak.AP
                 if (clearAllMethod != null)
                 {
                     clearAllMethod.Invoke(afflictions, null);
-                    _log.LogInfo("[Peak↔AP] Cleared all status effects");
+                    _log.LogInfo("[PeakPelago] Cleared all status effects");
                 }
                 else
                 {
-                    _log.LogWarning("[Peak↔AP] Could not find ClearAll method for afflictions");
+                    _log.LogWarning("[PeakPelago] Could not find ClearAll method for afflictions");
                 }
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error clearing all effects: " + ex.Message);
+                _log.LogError("[PeakPelago] Error clearing all effects: " + ex.Message);
             }
         }
 
@@ -1125,7 +1132,7 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Cannot apply speed upgrade - no local character");
+                    _log.LogWarning("[PeakPelago] Cannot apply speed upgrade - no local character");
                     return;
                 }
 
@@ -1137,14 +1144,14 @@ namespace Peak.AP
                 // Increase speed by 50% for 30 seconds
                 movement.movementModifier += 0.5f;
 
-                _log.LogInfo("[Peak↔AP] Applied speed upgrade (50% boost)");
+                _log.LogInfo("[PeakPelago] Applied speed upgrade (50% boost)");
 
                 // Start coroutine to restore original speed after 30 seconds
                 StartCoroutine(RestoreSpeedAfterDelay(character, originalModifier, 30f));
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error applying speed upgrade: " + ex.Message);
+                _log.LogError("[PeakPelago] Error applying speed upgrade: " + ex.Message);
             }
         }
 
@@ -1154,7 +1161,7 @@ namespace Peak.AP
             if (character != null && character.refs.movement != null)
             {
                 character.refs.movement.movementModifier = originalModifier;
-                _log.LogInfo("[Peak↔AP] Restored original speed");
+                _log.LogInfo("[PeakPelago] Restored original speed");
             }
         }
 
@@ -1164,7 +1171,7 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null)
                 {
-                    _log.LogWarning("[Peak↔AP] Cannot spawn luggage - no local character");
+                    _log.LogWarning("[PeakPelago] Cannot spawn luggage - no local character");
                     return;
                 }
 
@@ -1176,12 +1183,12 @@ namespace Peak.AP
                 var luggage = PhotonNetwork.Instantiate("SmallLuggage", spawnPosition, Quaternion.identity, 0);
                 if (luggage != null)
                 {
-                    _log.LogInfo("[Peak↔AP] Spawned small luggage at position " + spawnPosition);
+                    _log.LogInfo("[PeakPelago] Spawned small luggage at position " + spawnPosition);
                 }
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error spawning small luggage: " + ex.Message);
+                _log.LogError("[PeakPelago] Error spawning small luggage: " + ex.Message);
             }
         }
 
@@ -1189,28 +1196,28 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[Peak↔AP] Applying effect for item: " + itemName);
+                _log.LogInfo("[PeakPelago] Applying effect for item: " + itemName);
 
                 // Track the received item for debug purposes
                 _itemsReceivedFromAP++;
                 _lastReceivedItemName = itemName;
                 _lastReceivedItemTime = DateTime.Now;
-                _log.LogInfo("[Peak↔AP] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
+                _log.LogInfo("[PeakPelago] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
 
                 // Check if we have a handler for this item
                 if (_itemEffectHandlers.ContainsKey(itemName))
                 {
                     _itemEffectHandlers[itemName].Invoke();
-                    _log.LogInfo("[Peak↔AP] Successfully applied effect for: " + itemName);
+                    _log.LogInfo("[PeakPelago] Successfully applied effect for: " + itemName);
                 }
                 else
                 {
-                    _log.LogWarning("[Peak↔AP] No effect handler found for item: " + itemName);
+                    _log.LogWarning("[PeakPelago] No effect handler found for item: " + itemName);
                 }
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error applying item effect for " + itemName + ": " + ex.Message);
+                _log.LogError("[PeakPelago] Error applying item effect for " + itemName + ": " + ex.Message);
             }
         }
 
@@ -1223,14 +1230,14 @@ namespace Peak.AP
                 _lastReceivedItemName = itemName;
                 _lastReceivedItemTime = DateTime.Now;
 
-                _log.LogInfo("[Peak↔AP] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
+                _log.LogInfo("[PeakPelago] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
 
                 // Apply the item effect
                 ApplyItemEffect(itemName);
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error tracking received item: " + ex.Message);
+                _log.LogError("[PeakPelago] Error tracking received item: " + ex.Message);
             }
         }
 
@@ -1265,7 +1272,7 @@ namespace Peak.AP
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] CheckItemAcquisitionAchievements error: " + ex.Message);
+                _log.LogError("[PeakPelago] CheckItemAcquisitionAchievements error: " + ex.Message);
             }
         }
 
@@ -1273,7 +1280,7 @@ namespace Peak.AP
         {
             if (currentCount >= requiredCount)
             {
-                _log.LogInfo("[Peak↔AP] Reporting item achievement: " + achievementName + " (count: " + currentCount + ")");
+                _log.LogInfo("[PeakPelago] Reporting item achievement: " + achievementName + " (count: " + currentCount + ")");
                 ReportCheckByName(achievementName);
             }
         }
@@ -1297,17 +1304,17 @@ namespace Peak.AP
                 _itemAcquisitionCountsThisRun[itemName] = 0;
             _itemAcquisitionCountsThisRun[itemName]++;
 
-            _log.LogInfo("[Peak↔AP] Item acquired: " + itemName + " (ID: " + itemId + ", Total: " + _itemAcquisitionCounts[itemName] + ", This run: " + _itemAcquisitionCountsThisRun[itemName] + ")");
+            _log.LogInfo("[PeakPelago] Item acquired: " + itemName + " (ID: " + itemId + ", Total: " + _itemAcquisitionCounts[itemName] + ", This run: " + _itemAcquisitionCountsThisRun[itemName] + ")");
 
             // Check if this item has an Archipelago location to report
             if (_itemToLocationMapping.TryGetValue(itemName.ToUpper(), out string locationName))
             {
-                _log.LogInfo("[Peak↔AP] Reporting Archipelago check: " + locationName);
+                _log.LogInfo("[PeakPelago] Reporting Archipelago check: " + locationName);
                 ReportCheckByName(locationName);
             }
             else
             {
-                _log.LogDebug("[Peak↔AP] No Archipelago location found for item: " + itemName);
+                _log.LogDebug("[PeakPelago] No Archipelago location found for item: " + itemName);
             }
 
             // Check and report achievements
@@ -1322,7 +1329,7 @@ namespace Peak.AP
         {
             _luggageOpenedThisRun = 0;
             _itemAcquisitionCountsThisRun.Clear();
-            _log.LogInfo("[Peak↔AP] Run counters reset for new run");
+            _log.LogInfo("[PeakPelago] Run counters reset for new run");
         }
 
         /// <summary>Handle ascent-specific badge awards when reaching peaks</summary>
@@ -1330,7 +1337,7 @@ namespace Peak.AP
         {
             if (_session == null) 
             {
-                _log.LogDebug("[Peak↔AP] HandleAscentPeakReached: No session, skipping");
+                _log.LogDebug("[PeakPelago] HandleAscentPeakReached: No session, skipping");
                 return;
             }
 
@@ -1338,76 +1345,76 @@ namespace Peak.AP
             {
                 // Get current ascent level using reflection
                 int currentAscent = GetCurrentAscentLevel();
-                _log.LogInfo("[Peak↔AP] HandleAscentPeakReached: Peak=" + peakName + ", CurrentAscent=" + currentAscent);
-                _log.LogInfo("[Peak↔AP] DEBUG: currentAscent=" + currentAscent + " corresponds to Ascent " + currentAscent);
+                _log.LogInfo("[PeakPelago] HandleAscentPeakReached: Peak=" + peakName + ", CurrentAscent=" + currentAscent);
+                _log.LogInfo("[PeakPelago] DEBUG: currentAscent=" + currentAscent + " corresponds to Ascent " + currentAscent);
                 
                 if (currentAscent < 1) 
                 {
-                    _log.LogInfo("[Peak↔AP] HandleAscentPeakReached: Current ascent < 1, skipping badge award");
+                    _log.LogInfo("[PeakPelago] HandleAscentPeakReached: Current ascent < 1, skipping badge award");
                     return; // Only award for ascents 1+ (currentAscent is 1-indexed)
                 }
 
-                _log.LogInfo("[Peak↔AP] Player reached " + peakName + " on Ascent " + currentAscent);
+                _log.LogInfo("[PeakPelago] Player reached " + peakName + " on Ascent " + currentAscent);
 
                 // Award ascent-specific badges based on peak and ascent level
                 string badgeLocation = GetAscentBadgeLocation(peakName, currentAscent);
-                _log.LogInfo("[Peak↔AP] GetAscentBadgeLocation returned: " + (badgeLocation ?? "null"));
-                _log.LogInfo("[Peak↔AP] DEBUG: For currentAscent=" + currentAscent + ", Roman numeral=" + GetRomanNumeral(currentAscent + 1) + ", Ascent number=" + currentAscent);
+                _log.LogInfo("[PeakPelago] GetAscentBadgeLocation returned: " + (badgeLocation ?? "null"));
+                _log.LogInfo("[PeakPelago] DEBUG: For currentAscent=" + currentAscent + ", Roman numeral=" + GetRomanNumeral(currentAscent + 1) + ", Ascent number=" + currentAscent);
                 
                 if (!string.IsNullOrEmpty(badgeLocation))
                 {
                     string badgeKey = badgeLocation + "_" + currentAscent;
-                    _log.LogInfo("[Peak↔AP] Generated badge key: " + badgeKey);
+                    _log.LogInfo("[PeakPelago] Generated badge key: " + badgeKey);
                     
                     if (!_awardedAscentBadges.Contains(badgeKey))
                     {
-                        _log.LogInfo("[Peak↔AP] Reporting ascent badge: " + badgeLocation);
+                        _log.LogInfo("[PeakPelago] Reporting ascent badge: " + badgeLocation);
                         ReportCheckByName(badgeLocation);
                         _awardedAscentBadges.Add(badgeKey);
-                        _log.LogInfo("[Peak↔AP] Added badge key to awarded set. Total awarded: " + _awardedAscentBadges.Count);
+                        _log.LogInfo("[PeakPelago] Added badge key to awarded set. Total awarded: " + _awardedAscentBadges.Count);
                     }
                     else
                     {
-                        _log.LogInfo("[Peak↔AP] Badge already awarded for key: " + badgeKey);
+                        _log.LogInfo("[PeakPelago] Badge already awarded for key: " + badgeKey);
                     }
                 }
                 else
                 {
-                    _log.LogWarning("[Peak↔AP] No badge location found for peak: " + peakName);
+                    _log.LogWarning("[PeakPelago] No badge location found for peak: " + peakName);
                 }
 
                 // Award scout sash only when reaching the final peak (PEAK) - this means escaping/completing the ascent
                 if (peakName.ToUpper() == "PEAK")
                 {
                     string sashLocation = GetScoutSashLocation(currentAscent);
-                    _log.LogInfo("[Peak↔AP] GetScoutSashLocation returned: " + (sashLocation ?? "null"));
+                    _log.LogInfo("[PeakPelago] GetScoutSashLocation returned: " + (sashLocation ?? "null"));
                     
                     if (!string.IsNullOrEmpty(sashLocation))
                     {
                         string sashKey = sashLocation + "_" + currentAscent;
-                        _log.LogInfo("[Peak↔AP] Generated sash key: " + sashKey);
+                        _log.LogInfo("[PeakPelago] Generated sash key: " + sashKey);
                         
                         if (!_awardedAscentBadges.Contains(sashKey))
                         {
-                            _log.LogInfo("[Peak↔AP] Reporting scout sash: " + sashLocation);
+                            _log.LogInfo("[PeakPelago] Reporting scout sash: " + sashLocation);
                             ReportCheckByName(sashLocation);
                             _awardedAscentBadges.Add(sashKey);
-                            _log.LogInfo("[Peak↔AP] Added sash key to awarded set. Total awarded: " + _awardedAscentBadges.Count);
+                            _log.LogInfo("[PeakPelago] Added sash key to awarded set. Total awarded: " + _awardedAscentBadges.Count);
                         }
                         else
                         {
-                            _log.LogInfo("[Peak↔AP] Sash already awarded for key: " + sashKey);
+                            _log.LogInfo("[PeakPelago] Sash already awarded for key: " + sashKey);
                         }
                     }
                 }
                 else
                 {
-                    _log.LogInfo("[Peak↔AP] Not awarding scout sash - not at final peak (PEAK), currently at: " + peakName);
+                    _log.LogInfo("[PeakPelago] Not awarding scout sash - not at final peak (PEAK), currently at: " + peakName);
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error handling ascent peak reached: " + ex.Message);
+                _log.LogError("[PeakPelago] Error handling ascent peak reached: " + ex.Message);
             }
         }
 
@@ -1428,14 +1435,14 @@ namespace Peak.AP
                 
                 if (ascentsType != null)
                 {
-                    _log.LogDebug("[Peak↔AP] Found Ascents class: " + ascentsType.FullName);
+                    _log.LogDebug("[PeakPelago] Found Ascents class: " + ascentsType.FullName);
                     
                     // Try the internal field first (like AscentUI does)
                     var field = ascentsType.GetField("_currentAscent", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
                     if (field != null)
                     {
                         int ascent = (int)field.GetValue(null);
-                        _log.LogDebug("[Peak↔AP] Got current ascent via _currentAscent field: " + ascent);
+                        _log.LogDebug("[PeakPelago] Got current ascent via _currentAscent field: " + ascent);
                         return ascent;
                     }
                     
@@ -1444,17 +1451,17 @@ namespace Peak.AP
                     if (property != null)
                     {
                         int ascent = (int)property.GetValue(null);
-                        _log.LogDebug("[Peak↔AP] Got current ascent via currentAscent property: " + ascent);
+                        _log.LogDebug("[PeakPelago] Got current ascent via currentAscent property: " + ascent);
                         return ascent;
                     }
                 }
                 
-                _log.LogWarning("[Peak↔AP] Could not find or access Ascents class");
+                _log.LogWarning("[PeakPelago] Could not find or access Ascents class");
                 return -1;
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error getting current ascent level: " + ex.Message);
+                _log.LogError("[PeakPelago] Error getting current ascent level: " + ex.Message);
                 return -1;
             }
         }
@@ -1475,7 +1482,7 @@ namespace Peak.AP
                 case "THE KILN":
                     return "Volcanology " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 default:
-                    _log.LogWarning("[Peak↔AP] Unknown peak name for ascent badge: " + peakName);
+                    _log.LogWarning("[PeakPelago] Unknown peak name for ascent badge: " + peakName);
                     return null;
             }
         }
@@ -1493,7 +1500,7 @@ namespace Peak.AP
                 case 6: return "Wolf Scout sashe (Ascent 6)";
                 case 7: return "Goat Scout sashe (Ascent 7)";
                 default: 
-                    _log.LogWarning("[Peak↔AP] Unknown ascent level for scout sash: " + ascentLevel);
+                    _log.LogWarning("[PeakPelago] Unknown ascent level for scout sash: " + ascentLevel);
                     return null;
             }
         }
@@ -1558,7 +1565,7 @@ namespace Peak.AP
                             }
                         }
 
-                        _instance._log.LogInfo("[Peak↔AP] Local player opened luggage: " + luggageName);
+                        _instance._log.LogInfo("[PeakPelago] Local player opened luggage: " + luggageName);
 
                         // Mark that we've opened luggage this session
                         _instance._hasOpenedLuggageThisSession = true;
@@ -1568,7 +1575,7 @@ namespace Peak.AP
                         _instance._luggageOpenedThisRun++;
                         _instance._totalLuggageOpened++;
 
-                        _instance._log.LogInfo("[Peak↔AP] Luggage opened - Total: " + _instance._totalLuggageOpened + ", This run: " + _instance._luggageOpenedThisRun);
+                        _instance._log.LogInfo("[PeakPelago] Luggage opened - Total: " + _instance._totalLuggageOpened + ", This run: " + _instance._luggageOpenedThisRun);
 
                         // Check and report all luggage-related achievements
                         _instance.CheckLuggageAchievements();
@@ -1581,7 +1588,7 @@ namespace Peak.AP
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[Peak↔AP] Luggage patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] Luggage patch error: " + ex.Message);
                     }
                 }
             }
@@ -1596,17 +1603,17 @@ namespace Peak.AP
                 {
                     if (_instance == null)
                     {
-                        UnityEngine.Debug.Log("[Peak↔AP] ThrowAchievementPatch: _instance is null");
+                        UnityEngine.Debug.Log("[PeakPelago] ThrowAchievementPatch: _instance is null");
                         return true;
                     }
 
                     if (!_instance._badgesHidden)
                     {
-                        UnityEngine.Debug.Log("[Peak↔AP] ThrowAchievementPatch: badges not hidden, _badgesHidden = " + _instance._badgesHidden);
+                        UnityEngine.Debug.Log("[PeakPelago] ThrowAchievementPatch: badges not hidden, _badgesHidden = " + _instance._badgesHidden);
                         return true;
                     }
 
-                    UnityEngine.Debug.Log("[Peak↔AP] ThrowAchievementPatch: Processing badge " + type);
+                    UnityEngine.Debug.Log("[PeakPelago] ThrowAchievementPatch: Processing badge " + type);
 
                     // Check if this badge was originally unlocked
                     bool wasOriginallyUnlocked = _instance._originalUnlockedBadges.Contains(type);
@@ -1615,7 +1622,7 @@ namespace Peak.AP
                     var badgeMapping = _instance.GetBadgeToLocationMapping();
                     if (badgeMapping.TryGetValue(type, out string locationName))
                     {
-                        _instance._log.LogInfo("[Peak↔AP] Badge condition met: " + locationName);
+                        _instance._log.LogInfo("[PeakPelago] Badge condition met: " + locationName);
 
                         // Report the check to Archipelago
                         _instance.ReportCheckByName(locationName);
@@ -1623,12 +1630,12 @@ namespace Peak.AP
                         // If it was originally unlocked, also award the badge normally
                         if (wasOriginallyUnlocked)
                         {
-                            _instance._log.LogInfo("[Peak↔AP] Re-awarding originally unlocked badge: " + locationName);
+                            _instance._log.LogInfo("[PeakPelago] Re-awarding originally unlocked badge: " + locationName);
                             return true; // Allow normal badge awarding
                         }
                         else
                         {
-                            _instance._log.LogInfo("[Peak↔AP] New badge earned: " + locationName);
+                            _instance._log.LogInfo("[PeakPelago] New badge earned: " + locationName);
                             return true; // Allow normal badge awarding for new badges too
                         }
                     }
@@ -1637,7 +1644,7 @@ namespace Peak.AP
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[Peak↔AP] Badge patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] Badge patch error: " + ex.Message);
                     }
                 }
 
@@ -1680,7 +1687,7 @@ namespace Peak.AP
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[Peak↔AP] IsAchievementUnlocked patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] IsAchievementUnlocked patch error: " + ex.Message);
                     }
                 }
 
@@ -1719,14 +1726,14 @@ namespace Peak.AP
                         }
 
                         __result = maxConsecutiveAscent;
-                        _instance._log.LogDebug("[Peak↔AP] GetMaxAscent returning: " + __result + " (AP unlocked: " + string.Join(", ", sortedAscents) + ", consecutive up to: " + maxConsecutiveAscent + ")");
+                        _instance._log.LogDebug("[PeakPelago] GetMaxAscent returning: " + __result + " (AP unlocked: " + string.Join(", ", sortedAscents) + ", consecutive up to: " + maxConsecutiveAscent + ")");
                         return false; // Skip original method
                     }
                     else
                     {
                         // No ascents unlocked via AP yet, return 0 (only base ascent available)
                         __result = 0;
-                        _instance._log.LogDebug("[Peak↔AP] GetMaxAscent returning: 0 (no AP ascents unlocked)");
+                        _instance._log.LogDebug("[PeakPelago] GetMaxAscent returning: 0 (no AP ascents unlocked)");
                         return false; // Skip original method
                     }
                 }
@@ -1734,7 +1741,7 @@ namespace Peak.AP
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[Peak↔AP] GetMaxAscent patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] GetMaxAscent patch error: " + ex.Message);
                     }
                 }
 
@@ -1751,11 +1758,11 @@ namespace Peak.AP
                 {
                     if (_instance == null)
                     {
-                        UnityEngine.Debug.Log("[Peak↔AP] TestRequestedItemPatch: _instance is null");
+                        UnityEngine.Debug.Log("[PeakPelago] TestRequestedItemPatch: _instance is null");
                         return;
                     }
 
-                    UnityEngine.Debug.Log("[Peak↔AP] TestRequestedItemPatch: Patch is working! Item: " + (item?.name ?? "null"));
+                    UnityEngine.Debug.Log("[PeakPelago] TestRequestedItemPatch: Patch is working! Item: " + (item?.name ?? "null"));
 
                     // Check if this is the local player
                     bool isLocalPlayer = false;
@@ -1785,18 +1792,18 @@ namespace Peak.AP
                         try
                         {
                             // Debug: Log the item type
-                            _instance._log.LogDebug("[Peak↔AP] Item type: " + item.GetType().Name);
+                            _instance._log.LogDebug("[PeakPelago] Item type: " + item.GetType().Name);
 
                             // Try to get the item name using the GetName() method first
                             var getNameMethod = item.GetType().GetMethod("GetName");
                             if (getNameMethod != null)
                             {
                                 itemName = (string)getNameMethod.Invoke(item, null) ?? "Unknown";
-                                _instance._log.LogDebug("[Peak↔AP] Got item name via GetName(): " + itemName);
+                                _instance._log.LogDebug("[PeakPelago] Got item name via GetName(): " + itemName);
                             }
                             else
                             {
-                                _instance._log.LogDebug("[Peak↔AP] GetName() method not found, trying UIData");
+                                _instance._log.LogDebug("[PeakPelago] GetName() method not found, trying UIData");
                                 // Fallback to UIData.itemName
                                 var uidDataField = item.GetType().GetField("UIData");
                                 if (uidDataField != null)
@@ -1808,21 +1815,21 @@ namespace Peak.AP
                                         if (itemNameField != null)
                                         {
                                             itemName = (string)itemNameField.GetValue(uidData) ?? "Unknown";
-                                            _instance._log.LogDebug("[Peak↔AP] Got item name via UIData: " + itemName);
+                                            _instance._log.LogDebug("[PeakPelago] Got item name via UIData: " + itemName);
                                         }
                                         else
                                         {
-                                            _instance._log.LogDebug("[Peak↔AP] itemName field not found in UIData");
+                                            _instance._log.LogDebug("[PeakPelago] itemName field not found in UIData");
                                         }
                                     }
                                     else
                                     {
-                                        _instance._log.LogDebug("[Peak↔AP] UIData is null");
+                                        _instance._log.LogDebug("[PeakPelago] UIData is null");
                                     }
                                 }
                                 else
                                 {
-                                    _instance._log.LogDebug("[Peak↔AP] UIData field not found");
+                                    _instance._log.LogDebug("[PeakPelago] UIData field not found");
                                 }
                             }
 
@@ -1831,19 +1838,19 @@ namespace Peak.AP
                             if (itemIdField != null)
                             {
                                 itemId = (ushort)itemIdField.GetValue(item);
-                                _instance._log.LogDebug("[Peak↔AP] Got item ID: " + itemId);
+                                _instance._log.LogDebug("[PeakPelago] Got item ID: " + itemId);
                             }
                             else
                             {
-                                _instance._log.LogDebug("[Peak↔AP] itemID field not found");
+                                _instance._log.LogDebug("[PeakPelago] itemID field not found");
                             }
                         }
                         catch (Exception ex)
                         {
-                            _instance._log.LogError("[Peak↔AP] Error getting item info: " + ex.Message);
+                            _instance._log.LogError("[PeakPelago] Error getting item info: " + ex.Message);
                         }
 
-                        _instance._log.LogInfo("[Peak↔AP] Local player requested item: " + itemName + " (ID: " + itemId + ")");
+                        _instance._log.LogInfo("[PeakPelago] Local player requested item: " + itemName + " (ID: " + itemId + ")");
                         _instance.TrackItemAcquisition(itemName, itemId);
                     }
                 }
@@ -1851,7 +1858,7 @@ namespace Peak.AP
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[Peak↔AP] TestRequestedItem patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] TestRequestedItem patch error: " + ex.Message);
                     }
                 }
             }
@@ -1880,7 +1887,7 @@ namespace Peak.AP
                             }
                         }
 
-                        _instance._log.LogInfo("[Peak↔AP] Local player reached peak: " + peakName);
+                        _instance._log.LogInfo("[PeakPelago] Local player reached peak: " + peakName);
                         _instance.HandleAscentPeakReached(peakName);
                     }
                 }
@@ -1888,7 +1895,7 @@ namespace Peak.AP
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[Peak↔AP] CheckAreaAchievement patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] CheckAreaAchievement patch error: " + ex.Message);
                     }
                 }
             }
@@ -1922,7 +1929,7 @@ namespace Peak.AP
             }
         }
 
-        private async void Connect()
+        private void Connect()
         {
             if (_isConnecting) return;
 
@@ -1937,7 +1944,7 @@ namespace Peak.AP
                 string host = cfgServer.Value;
                 string url = host.Contains(":") ? host : (host + ":" + cfgPort.Value);
 
-                _log.LogInfo("[Peak↔AP] Connecting to " + url + " as " + cfgSlot.Value + " (game=" + cfgGameId.Value + ")");
+                _log.LogInfo("[PeakPelago] Connecting to " + url + " as " + cfgSlot.Value + " (game=" + cfgGameId.Value + ")");
 
                 _session = ArchipelagoSessionFactory.CreateSession(url);
 
@@ -1947,7 +1954,7 @@ namespace Peak.AP
                 // Correct signature: one string argument (reason)
                 _session.Socket.SocketClosed += reason =>
                 {
-                    _log.LogWarning("[Peak↔AP] Socket closed: " + reason);
+                    _log.LogWarning("[PeakPelago] Socket closed: " + reason);
                     _status = "Disconnected";
                     if (cfgAutoReconnect.Value)
                     {
@@ -1955,32 +1962,29 @@ namespace Peak.AP
                     }
                 };
 
-                // Open socket
-                await _session.ConnectAsync();
-
-                // Ask for datapackage for our game so helper name<->id lookups work
-                _session.Socket.SendPacket(new GetDataPackagePacket { Games = new[] { cfgGameId.Value } }); // string[] ! 
-
-                // Login
-                var result = await _session.LoginAsync(
+                // Use TryConnectAndLogin instead of ConnectAsync/LoginAsync
+                var result = _session.TryConnectAndLogin(
                     cfgGameId.Value,
                     cfgSlot.Value,
-                    ItemsHandlingFlags.AllItems, // include remote + own + starting items
+                    ItemsHandlingFlags.AllItems,
                     null,                        // version
                     null,                        // tags
                     null,                        // uuid
-                    string.IsNullOrEmpty(cfgPassword.Value) ? null : cfgPassword.Value
+                    string.IsNullOrEmpty(cfgPassword.Value) ? null : cfgPassword.Value,
+                    true                         // requestSlotData
                 );
 
                 if (!result.Successful)
                 {
                     string msg = (result is LoginFailure lf) ? lf.Errors?.FirstOrDefault() ?? "Login failed." : "Login failed.";
                     _status = "Login failed";
-                    _log.LogError("[Peak↔AP] " + msg);
+                    _log.LogError("[PeakPelago] " + msg);
                     TryCloseSession();
                     return;
                 }
-                ;
+
+                // Ask for datapackage for our game so helper name<->id lookups work
+                _session.Socket.SendPacket(new GetDataPackagePacket { Games = new[] { cfgGameId.Value } });
 
                 // Handle incoming items (helper gives a queue of ItemInfo)
                 _session.Items.ItemReceived += helper =>
@@ -1996,14 +2000,14 @@ namespace Peak.AP
                         _lastProcessedItemIndex = Mathf.Max(_lastProcessedItemIndex, helper.Index);
                         SaveState();
 
-                        _log.LogInfo("[Peak↔AP] Received: " + itemName + " from " + fromName);
+                        _log.LogInfo("[PeakPelago] Received: " + itemName + " from " + fromName);
 
                         // Apply item effects using the comprehensive item effect system
                         _instance.ApplyItemEffect(itemName);
                     }
                     catch (Exception ex)
                     {
-                        _log.LogError("[Peak↔AP] ItemReceived handler error: " + ex.Message);
+                        _log.LogError("[PeakPelago] ItemReceived handler error: " + ex.Message);
                     }
                 };
 
@@ -2014,22 +2018,22 @@ namespace Peak.AP
                     try
                     {
                         _session.Locations.CompleteLocationChecks(_reportedChecks.ToArray());
-                        _log.LogInfo("[Peak↔AP] Resubmitted " + _reportedChecks.Count + " previously checked locations.");
+                        _log.LogInfo("[PeakPelago] Resubmitted " + _reportedChecks.Count + " previously checked locations.");
                     }
                     catch (Exception ex)
                     {
-                        _log.LogWarning("[Peak↔AP] Resubmit checks failed: " + ex.Message);
+                        _log.LogWarning("[PeakPelago] Resubmit checks failed: " + ex.Message);
                     }
                 }
 
                 _status = "Connected";
                 _wantReconnect = false;
-                _log.LogInfo("[Peak↔AP] Connected.");
+                _log.LogInfo("[PeakPelago] Connected.");
             }
             catch (Exception ex)
             {
                 _status = "Error";
-                _log.LogError("[Peak↔AP] Connect error: " + ex.GetBaseException().Message);
+                _log.LogError("[PeakPelago] Connect error: " + ex.GetBaseException().Message);
                 TryCloseSession();
             }
             finally
@@ -2045,7 +2049,7 @@ namespace Peak.AP
                 if (_session != null)
                 {
                     _session.MessageLog.OnMessageReceived -= OnApMessage;
-                    _session.Socket?.DisconnectAsync();
+                    _session.Socket?.Disconnect();
                 }
             }
             catch { /* ignore */ }
@@ -2079,16 +2083,16 @@ namespace Peak.AP
                 {
                     if (!string.IsNullOrEmpty(_currentPort))
                     {
-                        _log.LogInfo("[Peak↔AP] Port changed from " + _currentPort + " to " + currentPort + " - clearing cache");
+                        _log.LogInfo("[PeakPelago] Port changed from " + _currentPort + " to " + currentPort + " - clearing cache");
                         ClearCacheForPortChange();
                     }
                     _currentPort = currentPort;
-                    _log.LogInfo("[Peak↔AP] Now using port-specific cache for: " + _currentPort);
+                    _log.LogInfo("[PeakPelago] Now using port-specific cache for: " + _currentPort);
                 }
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error checking port change: " + ex.Message);
+                _log.LogError("[PeakPelago] Error checking port change: " + ex.Message);
             }
         }
 
@@ -2108,11 +2112,11 @@ namespace Peak.AP
                 _awardedAscentBadges.Clear();
                 _unlockedAscents.Clear();
 
-                _log.LogInfo("[Peak↔AP] Cleared all cached data for port change");
+                _log.LogInfo("[PeakPelago] Cleared all cached data for port change");
             }
             catch (System.Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error clearing cache for port change: " + ex.Message);
+                _log.LogError("[PeakPelago] Error clearing cache for port change: " + ex.Message);
             }
         }
 
@@ -2125,10 +2129,10 @@ namespace Peak.AP
 
                 if (!File.Exists(StateFilePath))
                 {
-                    _log.LogInfo("[Peak↔AP] No state file found for port " + _currentPort + " - starting fresh");
+                    _log.LogInfo("[PeakPelago] No state file found for port " + _currentPort + " - starting fresh");
                     return;
                 }
-                _log.LogInfo("[Peak↔AP] Loading state from port-specific file: " + _currentPort);
+                _log.LogInfo("[PeakPelago] Loading state from port-specific file: " + _currentPort);
                 string[] lines = File.ReadAllLines(StateFilePath);
 
                 // Load item index
@@ -2180,7 +2184,7 @@ namespace Peak.AP
             }
             catch (Exception ex)
             {
-                _log.LogWarning("[Peak↔AP] Failed to load state file: " + ex.Message);
+                _log.LogWarning("[PeakPelago] Failed to load state file: " + ex.Message);
             }
         }
 
@@ -2193,11 +2197,11 @@ namespace Peak.AP
                 string line3 = _totalLuggageOpened.ToString();
                 string line4 = string.Join(",", _itemAcquisitionCounts.Select(kvp => kvp.Key + ":" + kvp.Value).ToArray());
                 File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4 });
-                _log.LogDebug("[Peak↔AP] Saved state to port-specific file: " + _currentPort);
+                _log.LogDebug("[PeakPelago] Saved state to port-specific file: " + _currentPort);
             }
             catch (Exception ex)
             {
-                _log.LogWarning("[Peak↔AP] Failed to save state file: " + ex.Message);
+                _log.LogWarning("[PeakPelago] Failed to save state file: " + ex.Message);
             }
         }
 
@@ -2208,7 +2212,7 @@ namespace Peak.AP
             if (Input.GetKeyDown(KeyCode.F10))
             {
                 _showUI = !_showUI;
-                _log.LogInfo("[Peak↔AP] F10 pressed - GUI toggled to: " + _showUI);
+                _log.LogInfo("[PeakPelago] F10 pressed - GUI toggled to: " + _showUI);
             }
 
             // Auto-reconnect tick
@@ -2241,7 +2245,7 @@ namespace Peak.AP
             // Debug log to confirm OnGUI is being called
             if (Time.frameCount % 300 == 0) // Log every 5 seconds at 60fps
             {
-                _log.LogDebug("[Peak↔AP] OnGUI is being called, _showUI = " + _showUI);
+                _log.LogDebug("[PeakPelago] OnGUI is being called, _showUI = " + _showUI);
             }
 
             EnsureWindowOnScreen();
@@ -2357,7 +2361,7 @@ namespace Peak.AP
                 {
                     _luggageOpenedThisRun = 0;
                     _itemAcquisitionCountsThisRun.Clear();
-                    _log.LogInfo("[Peak↔AP] Manually reset run counters");
+                    _log.LogInfo("[PeakPelago] Manually reset run counters");
                 }
 
                 if (GUILayout.Button("Reset All Data"))
@@ -2420,11 +2424,11 @@ namespace Peak.AP
                 // Clear current port to force re-initialization
                 _currentPort = "";
 
-                _log.LogInfo("[Peak↔AP] All cached data has been reset");
+                _log.LogInfo("[PeakPelago] All cached data has been reset");
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Failed to reset cached data: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to reset cached data: " + ex.Message);
             }
         }
 
@@ -2435,7 +2439,7 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[Peak↔AP] Achievement thrown: " + achievementType);
+                _log.LogInfo("[PeakPelago] Achievement thrown: " + achievementType);
 
                 // Get the badge to location mapping
                 var badgeMapping = GetBadgeToLocationMapping();
@@ -2443,17 +2447,17 @@ namespace Peak.AP
                 // Check if this achievement corresponds to an Archipelago location
                 if (badgeMapping.TryGetValue(achievementType, out string locationName))
                 {
-                    _log.LogInfo("[Peak↔AP] Reporting badge check for: " + locationName);
+                    _log.LogInfo("[PeakPelago] Reporting badge check for: " + locationName);
                     ReportCheckByName(locationName);
                 }
                 else
                 {
-                    _log.LogDebug("[Peak↔AP] Achievement " + achievementType + " is not tracked by Archipelago");
+                    _log.LogDebug("[PeakPelago] Achievement " + achievementType + " is not tracked by Archipelago");
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error handling achievement event: " + ex.Message);
+                _log.LogError("[PeakPelago] Error handling achievement event: " + ex.Message);
             }
         }
 
@@ -2467,13 +2471,13 @@ namespace Peak.AP
                 // Only track acquisitions by the local character
                 if (character != null && character.IsLocal && item != null)
                 {
-                    _log.LogInfo("[Peak↔AP] Item requested by local player: " + item.UIData.itemName);
+                    _log.LogInfo("[PeakPelago] Item requested by local player: " + item.UIData.itemName);
                     TrackItemAcquisition(item.UIData.itemName, item.itemID);
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError("[Peak↔AP] Error handling item request event: " + ex.Message);
+                _log.LogError("[PeakPelago] Error handling item request event: " + ex.Message);
             }
         }
     }

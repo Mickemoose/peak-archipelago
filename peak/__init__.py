@@ -71,31 +71,42 @@ class PeakWorld(World):
 
     def create_items(self):
         """Create the initial item pool based on the location table."""
-
+        
         total_locations = len(self.location_name_to_id)
         item_pool = []
-
+        
         # Add progression items (Ascent unlocks)
         for i in range(1, 8):  # Ascent 1-7 unlocks
             item_pool.append(self.create_item(f"Ascent {i} Unlock", classification=ItemClassification.progression))
-
+        
         # Add useful items
         useful_items = [name for name, (code, classification) in ITEMS.items() if classification == ItemClassification.useful]
         for item_name in useful_items:
             item_pool.append(self.create_item(item_name, classification=ItemClassification.useful))
-
+        
+        # Calculate how many slots are left for traps and fillers
+        remaining_slots = total_locations - len(item_pool)
+        
+        # Calculate number of trap items based on TrapPercentage
+        trap_count = int(remaining_slots * (self.options.trap_percentage.value / 100))
+        
         # Add trap items
-        trap_items = [name for name, (code, classification) in ITEMS.items() if classification == ItemClassification.trap]
-        for item_name in trap_items:
-            item_pool.append(self.create_item(item_name, classification=ItemClassification.trap))
-
+        if trap_count > 0:
+            trap_items = [name for name, (code, classification) in ITEMS.items() if classification == ItemClassification.trap]
+            trap_index = 0
+            for _ in range(trap_count):
+                trap_name = trap_items[trap_index % len(trap_items)]
+                item_pool.append(self.create_item(trap_name, classification=ItemClassification.trap))
+                trap_index += 1
+        
         # Fill remaining slots with filler items
         while len(item_pool) < total_locations:
             filler_name = self.get_filler_item_name()
             item_pool.append(self.create_item(filler_name))
-
+        
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total item pool count: {len(item_pool)}")
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total locations: {total_locations}")
+        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Trap items added: {trap_count}")
         self.multiworld.itempool.extend(item_pool)
 
     def set_rules(self):
