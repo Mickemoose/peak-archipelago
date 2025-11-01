@@ -40,6 +40,8 @@ namespace Peak.AP
         private ConfigEntry<int> cfgGoalType;
         private ConfigEntry<int> cfgRequiredBadges;
         private ConfigEntry<int> cfgRequiredAscent;
+        private ConfigEntry<bool> cfgProgressiveStamina;
+        private ConfigEntry<bool> cfgAdditionalStaminaBars;
 
         // ===== Session =====
         private ArchipelagoSession _session;
@@ -70,9 +72,10 @@ namespace Peak.AP
         private int _luggageOpenedCount = 0;
         private int _luggageOpenedThisRun = 0;
 
-        // ===== State persistence for luggage counts =====
+        // ===== State persistence =====
         private int _totalLuggageOpened = 0;
         private bool _hasOpenedLuggageThisSession = false; // Track if we've actually opened luggage this session
+        private ProgressiveStaminaManager _staminaManager;
 
         // ===== Badge Management =====
         private HashSet<ACHIEVEMENTTYPE> _originalUnlockedBadges = new HashSet<ACHIEVEMENTTYPE>();
@@ -117,6 +120,15 @@ namespace Peak.AP
                 cfgGoalType = Config.Bind("Goal", "Type", 0, "Goal type: 0=Reach Peak, 1=All Badges, 2=24 Karat Badge");
                 cfgRequiredBadges = Config.Bind("Goal", "BadgeCount", 20, "Number of badges required for Complete All Badges goal");
                 cfgRequiredAscent = Config.Bind("Goal", "RequiredAscent", 4, "Ascent level required for Reach Peak goal (0-7)");
+                cfgProgressiveStamina = Config.Bind("Stamina", "ProgressiveStamina", false, "Enable progressive stamina bars");
+                cfgAdditionalStaminaBars = Config.Bind("Stamina", "AdditionalStaminaBars", false, "Enable additional stamina bars (requires Progressive Stamina)");
+
+                // Initialize stamina manager
+                _staminaManager = new ProgressiveStaminaManager(_log);
+                CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
+                CharacterClampStaminaPatch.SetStaminaManager(_staminaManager);
+                StaminaBarUpdatePatch.SetStaminaManager(_staminaManager);
+                _log.LogInfo("[PeakPelago] Stamina manager initialized and patches set");
 
                 // Check for port changes and initialize port-specific caching
                 CheckAndHandlePortChange();
@@ -161,6 +173,7 @@ namespace Peak.AP
                 _log.LogInfo("[PeakPelago] Plugin ready.");
                 _log.LogInfo("[PeakPelago] GUI should be visible - press F10 to toggle");
                 Invoke(nameof(CountExistingBadges), 1.5f);
+                
             }
             catch (System.Exception ex)
             {
@@ -1016,6 +1029,7 @@ namespace Peak.AP
                 { "Ascent 5 Unlock", () => UnlockAscent(5) },
                 { "Ascent 6 Unlock", () => UnlockAscent(6) },
                 { "Ascent 7 Unlock", () => UnlockAscent(7) },
+                { "Progressive Stamina Bar", () => ApplyProgressiveStamina() },
 
                 // Trap Items
                 { "Spawn Bee Swarm", () => SpawnBeeSwarm() },
@@ -1037,6 +1051,48 @@ namespace Peak.AP
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
+        }
+
+        private void ApplyProgressiveStamina()
+        {
+            try
+            {
+                _log.LogInfo("[PeakPelago] ========================================");
+                _log.LogInfo("[PeakPelago] ApplyProgressiveStamina() called");
+                
+                if (_staminaManager == null)
+                {
+                    _log.LogError("[PeakPelago] Stamina manager is NULL!");
+                    return;
+                }
+                
+                if (!_staminaManager.IsProgressiveStaminaEnabled())
+                {
+                    _log.LogWarning("[PeakPelago] Progressive stamina is DISABLED");
+                    return;
+                }
+                
+                if (Character.localCharacter == null)
+                {
+                    _log.LogWarning("[PeakPelago] Local character is NULL - will apply on spawn");
+                    _staminaManager.ApplyStaminaUpgrade();
+                    return;
+                }
+                
+                _log.LogInfo($"[PeakPelago] Before upgrade: {_staminaManager.GetBaseMaxStamina():F2}");
+                _log.LogInfo($"[PeakPelago] Current stamina: {Character.localCharacter.data.currentStamina:F2}");
+                
+                _staminaManager.ApplyStaminaUpgrade();
+                
+                _log.LogInfo($"[PeakPelago] After upgrade: {_staminaManager.GetBaseMaxStamina():F2}");
+                _log.LogInfo($"[PeakPelago] New current stamina: {Character.localCharacter.data.currentStamina:F2}");
+                _log.LogInfo("[PeakPelago] ========================================");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error in ApplyProgressiveStamina: " + ex.Message);
+                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
+            }
         }
 
         // Item Effect Implementation Methods
@@ -2141,7 +2197,57 @@ namespace Peak.AP
                         _log.LogWarning("[PeakPelago] Resubmit checks failed: " + ex.Message);
                     }
                 }
-
+                var loginResult = result as LoginSuccessful;
+                if (loginResult != null && loginResult.SlotData != null)
+                {
+                    _log.LogInfo("[PeakPelago] Received slot data with " + loginResult.SlotData.Count + " entries");
+                    
+                    // Log all slot data for debugging
+                    _log.LogInfo("[PeakPelago] ===== ALL SLOT DATA =====");
+                    foreach (var kvp in loginResult.SlotData)
+                    {
+                        _log.LogInfo($"[PeakPelago] Key: '{kvp.Key}' | Value: '{kvp.Value}' | Type: {kvp.Value?.GetType().Name}");
+                    }
+                    _log.LogInfo("[PeakPelago] ===== END SLOT DATA =====");
+                    
+                    // Initialize stamina system based on slot data
+                    bool progressiveEnabled = false;
+                    bool additionalEnabled = false;
+                    
+                    // The keys MUST match your dataclass field names in PeakOptions
+                    // Your fields are: progressive_stamina and additional_stamina_bars
+                    
+                    if (loginResult.SlotData.ContainsKey("progressive_stamina"))
+                    {
+                        // Toggle values are sent as integers (0 or 1)
+                        var value = loginResult.SlotData["progressive_stamina"];
+                        progressiveEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Progressive Stamina from slot data: {progressiveEnabled}");
+                    }
+                    else
+                    {
+                        _log.LogWarning("[PeakPelago] progressive_stamina not found in slot data");
+                    }
+                    
+                    if (loginResult.SlotData.ContainsKey("additional_stamina_bars"))
+                    {
+                        var value = loginResult.SlotData["additional_stamina_bars"];
+                        additionalEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Additional Stamina Bars from slot data: {additionalEnabled}");
+                    }
+                    else
+                    {
+                        _log.LogWarning("[PeakPelago] additional_stamina_bars not found in slot data");
+                    }
+                    
+                    _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
+                    _log.LogInfo($"[PeakPelago] *** Stamina system initialized - Progressive: {progressiveEnabled}, Additional: {additionalEnabled} ***");
+                }
+                else
+                {
+                    _log.LogWarning("[PeakPelago] No slot data available, using default stamina settings");
+                    _staminaManager.Initialize(false, false);
+                }
                 _status = "Connected";
                 _wantReconnect = false;
                 _log.LogInfo("[PeakPelago] Connected.");
@@ -2228,6 +2334,11 @@ namespace Peak.AP
                 _awardedAscentBadges.Clear();
                 _unlockedAscents.Clear();
 
+                if (_staminaManager != null)
+                {
+                    _staminaManager.Initialize(false, false);
+                }
+
                 _log.LogInfo("[PeakPelago] Cleared all cached data for port change");
             }
             catch (System.Exception ex)
@@ -2297,6 +2408,11 @@ namespace Peak.AP
                         }
                     }
                 }
+
+                if (lines.Length >= 5 && !string.IsNullOrEmpty(lines[4]))
+                {
+                    _staminaManager?.LoadState(lines[4]);
+                }
             }
             catch (Exception ex)
             {
@@ -2312,7 +2428,8 @@ namespace Peak.AP
                 string line2 = string.Join(",", _reportedChecks.Select(x => x.ToString()).ToArray());
                 string line3 = _totalLuggageOpened.ToString();
                 string line4 = string.Join(",", _itemAcquisitionCounts.Select(kvp => kvp.Key + ":" + kvp.Value).ToArray());
-                File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4 });
+                string line5 = _staminaManager?.SaveState() ?? "0,1.00";
+                File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4, line5 });
                 _log.LogDebug("[PeakPelago] Saved state to port-specific file: " + _currentPort);
             }
             catch (Exception ex)

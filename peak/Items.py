@@ -61,6 +61,7 @@ ITEMS = {
     "Ascent 5 Unlock": (76023, ItemClassification.progression),
     "Ascent 6 Unlock": (76024, ItemClassification.progression),
     "Ascent 7 Unlock": (76025, ItemClassification.progression),
+    "Progressive Stamina Bar": (77080, ItemClassification.useful),
     #endregion
     
     #region Game Items

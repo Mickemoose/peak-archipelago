@@ -34,7 +34,8 @@ class PeakWorld(World):
         "Peak Badge",
         "Survivalist Badge",
         "Mesa Access",
-        "Alpine Access"
+        "Alpine Access",
+        "24 Karat Badge"
     ]
     for event_loc in event_locations:
         location_name_to_id[event_loc] = None
@@ -79,6 +80,17 @@ class PeakWorld(World):
         for i in range(1, 8):  # Ascent 1-7 unlocks
             item_pool.append(self.create_item(f"Ascent {i} Unlock", classification=ItemClassification.progression))
         
+        # Add progressive stamina items if enabled
+        if self.options.progressive_stamina.value:
+            max_stamina_upgrades = 4
+            if self.options.additional_stamina_bars.value:
+                max_stamina_upgrades = 7
+            
+            for i in range(max_stamina_upgrades):
+                item_pool.append(self.create_item("Progressive Stamina Bar", classification=ItemClassification.progression))
+            
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {max_stamina_upgrades} progressive stamina items")
+
         # Add useful items
         useful_items = [name for name, (code, classification) in ITEMS.items() if classification == ItemClassification.useful]
         for item_name in useful_items:
@@ -157,8 +169,21 @@ class PeakWorld(World):
 
     def fill_slot_data(self):
         """Return slot data for this player."""
-        options_dict = self.options.as_dict()
-        return options_dict
+        slot_data = {
+            "goal": self.options.goal.value,
+            "ascent_count": self.options.ascent_count.value,
+            "badge_count": self.options.badge_count.value,
+            "progressive_stamina": self.options.progressive_stamina.value,
+            "additional_stamina_bars": self.options.additional_stamina_bars.value,
+            "trap_percentage": self.options.trap_percentage.value,
+            "death_link": self.options.death_link.value,
+            "death_link_behavior": self.options.death_link_behavior.value,
+        }
+        
+        # Log what we're sending
+        logging.info(f"[Player {self.multiworld.player_name[self.player]}] Slot data being sent: {slot_data}")
+        
+        return slot_data
 
     def get_filler_item_name(self):
         """Randomly select a filler item from the available candidates."""

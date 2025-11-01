@@ -23,6 +23,16 @@ class BadgeCount(Range):
     range_end = 50
     default = 20
 
+class ProgressiveStamina(Toggle):
+    """Enable progressive stamina bars. Players start with 25% stamina and unlock 25% more with each upgrade till 100%."""
+    display_name = "Progressive Stamina"
+    default = 0
+
+class AdditionalStaminaBars(Toggle):
+    """Enable 4 additional stamina bars (total of 200% stamina). Only works when Progressive Stamina is enabled."""
+    display_name = "Additional Stamina Bars"
+    default = 0
+
 class TrapPercentage(Range):
     """
     Set a percentage of how many filler items are replaced with traps here.
@@ -49,6 +59,8 @@ class PeakOptions(PerGameCommonOptions):
     goal: Goal
     ascent_count: AscentCount
     badge_count: BadgeCount
+    progressive_stamina: ProgressiveStamina
+    additional_stamina_bars: AdditionalStaminaBars
     trap_percentage: TrapPercentage
     death_link: DeathLink
     death_link_behavior: DeathLinkBehavior
