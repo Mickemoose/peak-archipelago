@@ -82,7 +82,7 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Rope Cannon": 76201,
     "Acquire Anti-Rope Spool": 76202,
     "Acquire Anti-Rope Cannon": 76203,
-    "Acquire Chain Cannon": 76204,
+    "Acquire Chain Launcher": 76204,
     "Acquire Piton": 76205,
     "Acquire Magic Bean": 76206,
     "Acquire Parasol": 76207,
@@ -144,6 +144,7 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Yellow Winterberry": 76263,
     "Acquire Medicinal Root": 76264,
     "Acquire Guidebook": 76265,
+    "Acquire Strange Gem": 76266,
     
     # Peak Badge
     "Peak Badge": 76305,

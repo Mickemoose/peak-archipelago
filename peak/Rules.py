@@ -86,7 +86,7 @@ def apply_rules(world: "PeakWorld"):
     # Acquire locations - most are always accessible
     acquire_locations = [
         "Acquire Rope Spool", "Acquire Rope Cannon", "Acquire Anti-Rope Spool", "Acquire Anti-Rope Cannon",
-        "Acquire Chain Cannon", "Acquire Piton", "Acquire Magic Bean", "Acquire Parasol",
+        "Acquire Chain Launcher", "Acquire Piton", "Acquire Magic Bean", "Acquire Parasol",
         "Acquire Balloon", "Acquire Balloon Bunch", "Acquire Scout Cannon", "Acquire Portable Stove",
         "Acquire Campfire", "Acquire Lantern", "Acquire Flare", "Acquire Torch",
         "Acquire Compass", "Acquire Pirate's Compass", "Acquire Binoculars", "Acquire Flying Disc",
@@ -100,7 +100,8 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Cluster Shroom", "Acquire Chubby Shroom", "Acquire Conch", "Acquire Banana Peel",
         "Acquire Dynamite", "Acquire Bing Bong", "Acquire Red Crispberry", "Acquire Green Crispberry",
         "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Brown Berrynana",
-        "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", "Acquire Yellow Winterberry"
+        "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", "Acquire Yellow Winterberry",
+        "Acquire Strange Gem"
     ]
     
     for acquire_name in acquire_locations:

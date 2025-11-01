@@ -49,6 +49,7 @@ ITEMS = {
     "Deadly Poison Trap": (76034, ItemClassification.trap),
     "Tornado Trap": (76035, ItemClassification.trap),
     "Nap Time Trap": (76036, ItemClassification.trap),
+    "Balloon Trap": (76037, ItemClassification.trap),
     #endregion
     
     #region Progression Items
@@ -66,7 +67,6 @@ ITEMS = {
     "Rope Cannon": (77001, ItemClassification.useful),
     "Anti-Rope Spool": (77002, ItemClassification.useful),
     "Anti-Rope Cannon": (77003, ItemClassification.useful),
-    "Chain Cannon": (77004, ItemClassification.useful),
     "Piton": (77005, ItemClassification.useful),
     "Magic Bean": (77006, ItemClassification.useful),
     "Parasol": (77007, ItemClassification.useful),
@@ -128,5 +128,6 @@ ITEMS = {
     "Orange Winterberry": (77063, ItemClassification.useful),
     "Yellow Winterberry": (77064, ItemClassification.filler),
     "Guidebook": (77065, ItemClassification.useful),
+    "Strange Gem": (77066, ItemClassification.filler),
     #endregion
 }

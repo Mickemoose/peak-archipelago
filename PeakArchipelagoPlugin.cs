@@ -728,8 +728,8 @@ namespace Peak.AP
                 { "ROPE CANNON", "Acquire Rope Cannon" },
                 { "ANTI-ROPE SPOOL", "Acquire Anti-Rope Spool" },
                 { "ANTI-ROPE CANNON", "Acquire Anti-Rope Cannon" },
-                { "ChainShooter", "Acquire ChainShooter" },
-                { "ClimbingSpike", "Acquire ClimbingSpike" },
+                { "CHAIN LAUNCHER", "Acquire Chain Launcher" },
+                { "PITON", "Acquire Piton" },
                 
                 // Special items
                 { "MagicBean", "Acquire MagicBean" },
@@ -749,14 +749,14 @@ namespace Peak.AP
                 { "Lantern_Faerie", "Acquire Lantern_Faerie" },
                 
                 // Navigation items
-                { "CactusBall", "Acquire CactusBall" },
+                { "CACTUS BALL", "Acquire CactusBall" },
                 { "COMPASS", "Acquire Compass" },
-                { "Pirate Compass", "Acquire Pirate Compass" },
+                { "PIRATE COMPASS", "Acquire Pirate Compass" },
                 { "BINOCULARS", "Acquire Binoculars" },
                 
                 // Medical items
                 { "BANDAGES", "Acquire Bandages" },
-                { "FirstAidKit", "Acquire FirstAidKit" },
+                { "FIRST AID KIT", "Acquire FirstAidKit" },
                 { "ANTIDOTE", "Acquire Antidote" },
                 { "HEAT PACK", "Acquire Heat Pack" },
                 { "CURE-ALL", "Acquire Cure-All" },
@@ -770,6 +770,7 @@ namespace Peak.AP
                 { "CURSED SKULL", "Acquire Cursed Skull" },
                 { "PANDORA'S LUNCHBOX", "Acquire Pandora's Lunchbox" },
                 { "ANCIENT IDOL", "Acquire Ancient Idol" },
+                { "STRANGE GEM", "Acquire Strange Gem" },
                 
                 // Musical items
                 { "BUGLE OF FRIENDSHIP", "Acquire Bugle of Friendship" },
@@ -825,7 +826,7 @@ namespace Peak.AP
                 { "Rope Cannon", () => SpawnPhysicalItem("RopeShooter") },
                 { "Anti-Rope Spool", () => SpawnPhysicalItem("Anti-Rope Spool") },
                 { "Anti-Rope Cannon", () => SpawnPhysicalItem("RopeShooterAnti") },
-                { "Chain Cannon", () => SpawnPhysicalItem("ChainShooter") },
+                { "Chain Launcher", () => SpawnPhysicalItem("ChainShooter") },
                 { "Piton", () => SpawnPhysicalItem("ClimbingSpike") },
                 { "Magic Bean", () => SpawnPhysicalItem("MagicBean") },
                 { "Parasol", () => SpawnPhysicalItem("Parasol") },
@@ -848,7 +849,7 @@ namespace Peak.AP
                 { "Heat Pack", () => SpawnPhysicalItem("Heat Pack") },
                 { "Cure-All", () => SpawnPhysicalItem("Cure-All") },
                 { "Faerie Lantern", () => SpawnPhysicalItem("Lantern_Faerie") },
-                { "Medicinal Root", () => SpawnPhysicalItem("MedicinalRoot") }, // best guess mapping
+                { "Medicinal Root", () => SpawnPhysicalItem("MedicinalRoot") },
                 { "Guidebook", () => SpawnPhysicalItem("Guidebook") },
                 { "Aloe Vera", () => SpawnPhysicalItem("AloeVera") },
                 { "Sunscreen", () => SpawnPhysicalItem("Sunscreen") },
@@ -856,24 +857,25 @@ namespace Peak.AP
                 { "Cursed Skull", () => SpawnPhysicalItem("Cursed Skull") },
                 { "Pandora's Lunchbox", () => SpawnPhysicalItem("PandorasBox") },
                 { "Ancient Idol", () => SpawnPhysicalItem("AncientIdol") },
-                { "Bugle of Friendship", () => SpawnPhysicalItem("Bugle_Magic") }, // "friendship" -> magic bugle
+                { "Strange Gem", () => SpawnPhysicalItem("Strange Gem") },
+                { "Bugle of Friendship", () => SpawnPhysicalItem("Bugle_Magic") },
                 { "Bugle", () => SpawnPhysicalItem("Bugle") },
-                { "Remedy Fungus", () => SpawnPhysicalItem("HealingPuffShroom") }, // best guess
+                { "Remedy Fungus", () => SpawnPhysicalItem("HealingPuffShroom") },
                 { "Shelf Shroom", () => SpawnPhysicalItem("ShelfShroom") },
                 { "Bounce Shroom", () => SpawnPhysicalItem("BounceShroom") },
                 { "Trail Mix", () => SpawnPhysicalItem("TrailMix") },
                 { "Granola Bar", () => SpawnPhysicalItem("Granola Bar") },
                 { "Scout Cookies", () => SpawnPhysicalItem("ScoutCookies") },
-                { "Airline Food", () => SpawnPhysicalItem("Marshmallow") }, // placeholder, no direct match
+                { "Airline Food", () => SpawnPhysicalItem("Airplane Food") },
                 { "Energy Drink", () => SpawnPhysicalItem("Energy Drink") },
                 { "Sports Drink", () => SpawnPhysicalItem("Sports Drink") },
                 { "Big Lollipop", () => SpawnPhysicalItem("Lollipop") },
                 { "Button Shroom", () => SpawnPhysicalItem("Mushroom Normie") },
-                { "Bugle Shroom", () => SpawnPhysicalItem("Mushroom Lace") }, // guessed
+                { "Bugle Shroom", () => SpawnPhysicalItem("Mushroom Lace") },
                 { "Cluster Shroom", () => SpawnPhysicalItem("Mushroom Cluster") },
                 { "Chubby Shroom", () => SpawnPhysicalItem("Mushroom Chubby") },
                 { "Conch", () => SpawnPhysicalItem("Shell Big") },
-                { "Banana Peel", () => SpawnPhysicalItem("Berrynana Peel Yellow") }, // generic peel
+                { "Banana Peel", () => SpawnPhysicalItem("Berrynana Peel Yellow") },
                 { "Dynamite", () => SpawnPhysicalItem("Dynamite") },
                 { "Bing Bong", () => SpawnPhysicalItem("BingBong") },
                 { "Red Crispberry", () => SpawnPhysicalItem("Apple Berry Red") },
@@ -908,17 +910,12 @@ namespace Peak.AP
                 { "Deadly Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Deadly, _log) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
                 { "Nap Time Trap", () => NapTimeTrapEffect.ApplyNapTrap(_log) },
-
-                // Special Effect Items
+                { "Balloon Trap", () => BalloonTrapEffect.ApplyBalloonTrap(_log) },
                 { "Clear All Effects", () => ClearAllEffects() },
                 { "Speed Upgrade", () => ApplySpeedUpgrade() },
 
-                // Spawn Items
                 { "Spawn Small Luggage", () => SpawnSmallLuggage() },
-
-                // Useful Items (76000-76031) - Only unique items not already covered
                 { "Bounce Fungus", () => SpawnPhysicalItem("BounceShroom") },
-                { "Chain Launcher", () => SpawnPhysicalItem("ChainShooter") }
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
