@@ -19,7 +19,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.yourname.peak.ap", "Peak Archipelago", "0.4.0")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.0")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin
     {
         // ===== BepInEx / logging =====
@@ -155,7 +155,7 @@ namespace Peak.AP
 
                 // Apply Harmony patches
                 _log.LogInfo("[PeakPelago] About to apply Harmony patches...");
-                _harmony = new Harmony("com.yourname.peak.ap");
+                _harmony = new Harmony("com.mickemoose.peak.ap");
                 _harmony.PatchAll();
                 _log.LogInfo("[PeakPelago] Harmony patches applied successfully");
 

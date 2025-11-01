@@ -57,21 +57,13 @@ This mod consists of two main components:
 ### Archipelago World Installation
 
 1. **Locate Archipelago Installation**:
-   - Find your Archipelago installation directory
-   - Navigate to `lib/worlds/` or `worlds/`
-
-2. **Copy World Files**:
-   - Copy the entire `peak/` folder to the Archipelago worlds directory
-
-3. **Verify Installation**:
-   - Run Archipelago's world validator to ensure proper installation
-   - The "PEAK" option should appear when generating games
+   - Double click the peak.apworld file to install the PEAK AP World into your Archipelago installation
 
 ## Configuration
 
 ### Client Configuration
 
-The plugin creates a configuration file at `BepInEx/config/com.yourname.peak.ap.cfg`:
+The plugin creates a configuration file at `BepInEx/config/com.mickemoose.peak.ap.cfg`:
 
 ```ini
 [Connection]
@@ -108,9 +100,12 @@ DeathLinkApplyStatus = true
 
 When generating an Archipelago game, the following PEAK-specific options are available:
 
-- **Goal**: Choose between "Reach Peak" or "Complete All Badges"
+- **Goal**: Choose between "Reach Peak", "Complete All Badges" or "24 Karat Badge"
 - **Required Ascent Count**: Number of ascents needed to complete (0-7, default: 4)
 - **Required Badge Count**: Number of badges needed for badge completion goal (10-50, default: 20)
+- **Progressive Stamina**: Start with 25% Stamina and require finding Progressive Stamina Bars to reach 100%
+- **Additional Stamina**: With Progressive Stamina enabled, find 4 extra Stamina Bars to reach a total of 200% Stamina
+- **Trap Weigh Percent**: Determine the amount of filler items to get replaced with traps.
 - **Death Link**: Enable death synchronization with other players
 - **Death Link Behavior**: Choose between full run reset or checkpoint reset
 
@@ -199,14 +194,14 @@ The Python world code follows Archipelago's world API:
 
 ## Credits
 
-- **Mod Author**: [Your Name]
+- **Mod Contributors**: ArchipelagoBrad, ManNamedGarbo, Mickemoose
 - **Archipelago**: [Archipelago Team](https://archipelago.gg/)
-- **PEAK**: [Original Game Developer]
+- **PEAK**: [Landfall](https://landfall.se/) & [Aggro Crab](https://aggrocrab.com/)
 - **BepInEx**: [BepInEx Team](https://github.com/BepInEx/BepInEx)
 
 ## Version
 
-Current Version: **0.3.0**
+Current Version: **0.4.0**
 
 ## License
 
