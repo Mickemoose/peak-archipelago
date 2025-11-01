@@ -132,6 +132,12 @@ class PeakWorld(World):
                 lambda state: state.has("Peak Badge", self.player)
             )
 
+        elif goal == 2:  # 24 Karat Badge
+            # DUNK THE IDOL IN THE HOT DRINK
+            self.multiworld.completion_condition[self.player] = (
+                lambda state: state.has("24 Karat Badge", self.player)
+            )
+
         else:
             return  # Unsupported goal type, exit early
 

@@ -13,9 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using UnityEngine;
-using Zorro.Core;
 using static MountainProgressHandler;
 using Newtonsoft.Json.Linq;
 
@@ -39,6 +37,9 @@ namespace Peak.AP
         private ConfigEntry<int> cfgDeathLinkBehavior;
         private ConfigEntry<bool> cfgDeathLinkDropItems;
         private ConfigEntry<bool> cfgDeathLinkApplyStatus;
+        private ConfigEntry<int> cfgGoalType;
+        private ConfigEntry<int> cfgRequiredBadges;
+        private ConfigEntry<int> cfgRequiredAscent;
 
         // ===== Session =====
         private ArchipelagoSession _session;
@@ -113,6 +114,9 @@ namespace Peak.AP
                 cfgDeathLinkBehavior = Config.Bind("DeathLink", "Behavior", 0, "Death Link behavior: 0=Reset Run, 1=Reset to Last Checkpoint");
                 cfgDeathLinkDropItems = Config.Bind("DeathLink", "DropItems", true, "Drop items when respawning from death link");
                 cfgDeathLinkApplyStatus = Config.Bind("DeathLink", "ApplyStatus", true, "Apply status effects when respawning from death link");
+                cfgGoalType = Config.Bind("Goal", "Type", 0, "Goal type: 0=Reach Peak, 1=All Badges, 2=24 Karat Badge");
+                cfgRequiredBadges = Config.Bind("Goal", "BadgeCount", 20, "Number of badges required for Complete All Badges goal");
+                cfgRequiredAscent = Config.Bind("Goal", "RequiredAscent", 4, "Ascent level required for Reach Peak goal (0-7)");
 
                 // Check for port changes and initialize port-specific caching
                 CheckAndHandlePortChange();
@@ -156,6 +160,7 @@ namespace Peak.AP
                 _status = "Ready";
                 _log.LogInfo("[PeakPelago] Plugin ready.");
                 _log.LogInfo("[PeakPelago] GUI should be visible - press F10 to toggle");
+                Invoke(nameof(CountExistingBadges), 1.5f);
             }
             catch (System.Exception ex)
             {
@@ -678,6 +683,116 @@ namespace Peak.AP
             }
         }
 
+        /// <summary>
+        /// Check if the "Reach Peak" goal has been met based on current ascent level.
+        /// </summary>
+        /// <param name="currentAscent"></param>
+        private void CheckReachPeakGoal(int currentAscent)
+        {
+            if (_session == null) return;
+
+            int goalType = cfgGoalType.Value;
+
+            // Only check if the goal is "Reach Peak"
+            if (goalType == 0)
+            {
+                int requiredAscent = cfgRequiredAscent.Value;
+
+                _log.LogInfo($"[PeakPelago] Checking Reach Peak goal: Current ascent {currentAscent}, Required {requiredAscent}");
+
+                if (currentAscent >= requiredAscent)
+                {
+                    _log.LogInfo($"[PeakPelago] PEAK reached on Ascent {currentAscent} - goal complete!");
+                    SendGoalComplete();
+
+                    // Also report the specific ascent completion location
+                    string completionLocation = $"Ascent {currentAscent} Completed";
+                    ReportCheckByName(completionLocation);
+                }
+                else
+                {
+                    _log.LogInfo($"[PeakPelago] Peak reached but on Ascent {currentAscent}, need Ascent {requiredAscent} for goal");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Check for goal completion based on the badges.
+        /// </summary>
+        /// <param name="achievementType"></param>
+        private void CheckForGoalCompletion(ACHIEVEMENTTYPE achievementType)
+        {
+            if (_session == null) return;
+
+            int goalType = cfgGoalType.Value;
+
+            switch (goalType)
+            {
+                case 1: // Complete All Badges goal
+                    int requiredBadges = cfgRequiredBadges.Value;
+                    if (_collectedBadges.Count >= requiredBadges)
+                    {
+                        _log.LogInfo($"[PeakPelago] Collected {_collectedBadges.Count}/{requiredBadges} badges - goal complete!");
+                        SendGoalComplete();
+                    }
+                    else
+                    {
+                        _log.LogInfo($"[PeakPelago] Progress: {_collectedBadges.Count}/{requiredBadges} badges collected");
+                    }
+                    break;
+
+                case 2: // 24 Karat Badge goal
+                    if (achievementType == ACHIEVEMENTTYPE.TwentyFourKaratBadge)
+                    {
+                        _log.LogInfo("[PeakPelago] 24 Karat Badge earned - goal complete!");
+                        SendGoalComplete();
+                    }
+                    break;
+
+                case 0: // Reach Peak goal
+                    // This is handled in CheckReachPeakGoal method
+                    break;
+                default:
+                    // This is handled in CheckReachPeakGoal method
+                    break;
+            }
+        }
+        
+        /// <summary>
+        /// Count existing badges.
+        /// </summary>
+        private void CountExistingBadges()
+        {
+            try
+            {
+                var badgeMapping = GetBadgeToLocationMapping();
+                var achievementManager = GetAchievementManager();
+                
+                if (achievementManager != null)
+                {
+                    var isUnlockedMethod = achievementManager.GetType().GetMethod("IsAchievementUnlocked");
+                    if (isUnlockedMethod != null)
+                    {
+                        foreach (var kvp in badgeMapping)
+                        {
+                            bool isUnlocked = (bool)isUnlockedMethod.Invoke(achievementManager, new object[] { kvp.Key });
+                            if (isUnlocked)
+                            {
+                                _collectedBadges.Add(kvp.Key);
+                            }
+                        }
+                    }
+                }
+                
+                _log.LogInfo($"[PeakPelago] Found {_collectedBadges.Count} existing badges");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error counting existing badges: " + ex.Message);
+            }
+        }
+
+
         /// <summary>Mark goal complete (use when the PEAK victory condition is reached).</summary>
         public void SendGoalComplete()
         {
@@ -713,6 +828,8 @@ namespace Peak.AP
 
         // Track which ascent badges have been awarded to avoid duplicates
         private HashSet<string> _awardedAscentBadges = new HashSet<string>();
+        // Track which badges have been collected to avoid duplicates
+        private HashSet<ACHIEVEMENTTYPE> _collectedBadges = new HashSet<ACHIEVEMENTTYPE>();
 
         // Item effect handlers for Archipelago items
         private Dictionary<string, System.Action> _itemEffectHandlers = new Dictionary<string, System.Action>();
@@ -910,6 +1027,7 @@ namespace Peak.AP
                 { "Deadly Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Deadly, _log) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
                 { "Nap Time Trap", () => NapTimeTrapEffect.ApplyNapTrap(_log) },
+                { "Hungry Hungry Camper Trap", () => HungryHungryCamperTrapEffect.ApplyHungerTrap(_log) },
                 { "Balloon Trap", () => BalloonTrapEffect.ApplyBalloonTrap(_log) },
                 { "Clear All Effects", () => ClearAllEffects() },
                 { "Speed Upgrade", () => ApplySpeedUpgrade() },
@@ -1385,12 +1503,12 @@ namespace Peak.AP
                 {
                     string sashLocation = GetScoutSashLocation(currentAscent);
                     _log.LogInfo("[PeakPelago] GetScoutSashLocation returned: " + (sashLocation ?? "null"));
-                    
+
                     if (!string.IsNullOrEmpty(sashLocation))
                     {
                         string sashKey = sashLocation + "_" + currentAscent;
                         _log.LogInfo("[PeakPelago] Generated sash key: " + sashKey);
-                        
+
                         if (!_awardedAscentBadges.Contains(sashKey))
                         {
                             _log.LogInfo("[PeakPelago] Reporting scout sash: " + sashLocation);
@@ -1403,6 +1521,7 @@ namespace Peak.AP
                             _log.LogInfo("[PeakPelago] Sash already awarded for key: " + sashKey);
                         }
                     }
+                    CheckReachPeakGoal(currentAscent);
                 }
                 else
                 {
@@ -2446,11 +2565,18 @@ namespace Peak.AP
                 {
                     _log.LogInfo("[PeakPelago] Reporting badge check for: " + locationName);
                     ReportCheckByName(locationName);
+                    
+                    // Track this badge as collected
+                    _collectedBadges.Add(achievementType);
+                    _log.LogInfo($"[PeakPelago] Total badges collected: {_collectedBadges.Count}");
                 }
                 else
                 {
                     _log.LogDebug("[PeakPelago] Achievement " + achievementType + " is not tracked by Archipelago");
                 }
+
+                // Check for goal completion
+                CheckForGoalCompletion(achievementType);
             }
             catch (Exception ex)
             {

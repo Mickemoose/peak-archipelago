@@ -6,6 +6,7 @@ class Goal(Choice):
     display_name = "Goal"
     option_reach_peak = 0
     option_complete_all_badges = 1
+    option_24_karat_badge = 2
     default = 0
 
 class AscentCount(Range):

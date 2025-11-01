@@ -50,6 +50,7 @@ ITEMS = {
     "Tornado Trap": (76035, ItemClassification.trap),
     "Nap Time Trap": (76036, ItemClassification.trap),
     "Balloon Trap": (76037, ItemClassification.trap),
+    "Hungry Hungry Camper Trap": (76038, ItemClassification.trap),
     #endregion
     
     #region Progression Items
