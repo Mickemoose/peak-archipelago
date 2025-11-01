@@ -76,6 +76,7 @@ namespace Peak.AP
         private int _totalLuggageOpened = 0;
         private bool _hasOpenedLuggageThisSession = false; // Track if we've actually opened luggage this session
         private ProgressiveStaminaManager _staminaManager;
+        private ArchipelagoNotificationManager _notifications;
 
         // ===== Badge Management =====
         private HashSet<ACHIEVEMENTTYPE> _originalUnlockedBadges = new HashSet<ACHIEVEMENTTYPE>();
@@ -171,7 +172,10 @@ namespace Peak.AP
 
                 _status = "Ready";
                 _log.LogInfo("[PeakPelago] Plugin ready.");
-                _log.LogInfo("[PeakPelago] GUI should be visible - press F10 to toggle");
+                _log.LogInfo("[PeakPelago] GUI should be visible - press F9/F10 to toggle");
+
+                _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
+                _log.LogInfo("[PeakPelago] Notification manager initialized");
                 Invoke(nameof(CountExistingBadges), 1.5f);
                 
             }
@@ -298,7 +302,7 @@ namespace Peak.AP
                 }
 
                 _log.LogInfo("[PeakPelago] Respawning local player due to death link from " + source + " (" + cause + ")");
-
+                _notifications.ShowDeathLink(cause, source);
                 // Get the player's last spawn point (campfire/checkpoint)
                 Vector3 respawnPosition = GetLastCheckpointPosition();
 
@@ -996,7 +1000,7 @@ namespace Peak.AP
                 { "Trail Mix", () => SpawnPhysicalItem("TrailMix") },
                 { "Granola Bar", () => SpawnPhysicalItem("Granola Bar") },
                 { "Scout Cookies", () => SpawnPhysicalItem("ScoutCookies") },
-                { "Airline Food", () => SpawnPhysicalItem("Airplane Food") },
+                { "Airline Food", () => SpawnPhysicalItem("Airline Food") },
                 { "Energy Drink", () => SpawnPhysicalItem("Energy Drink") },
                 { "Sports Drink", () => SpawnPhysicalItem("Sports Drink") },
                 { "Big Lollipop", () => SpawnPhysicalItem("Lollipop") },
@@ -2074,32 +2078,6 @@ namespace Peak.AP
         }
 
         // ===== Connection =====
-        private static string TryGetSenderName(object info)
-        {
-            if (info == null) return "Unknown";
-            try
-            {
-                var t = info.GetType();
-                var senderObj = t.GetProperty("Sender")?.GetValue(info);
-                if (senderObj == null) return "Unknown";
-
-                var st = senderObj.GetType();
-                var alias = st.GetProperty("Alias")?.GetValue(senderObj) as string;
-                if (!string.IsNullOrWhiteSpace(alias)) return alias;
-
-                var name = st.GetProperty("Name")?.GetValue(senderObj) as string;
-                if (!string.IsNullOrWhiteSpace(name)) return name;
-
-                var slot = st.GetProperty("Slot")?.GetValue(senderObj);
-                if (slot != null) return "Slot " + slot;
-
-                return "Unknown";
-            }
-            catch
-            {
-                return "Unknown";
-            }
-        }
 
         private void Connect()
         {
@@ -2107,7 +2085,7 @@ namespace Peak.AP
 
             _isConnecting = true;
             _status = "Connecting...";
-
+           
             try
             {
                 // Check for port changes before connecting
@@ -2158,23 +2136,22 @@ namespace Peak.AP
                 // Ask for datapackage for our game so helper name<->id lookups work
                 _session.Socket.SendPacket(new GetDataPackagePacket { Games = new[] { cfgGameId.Value } });
 
-                // Handle incoming items (helper gives a queue of ItemInfo)
                 _session.Items.ItemReceived += helper =>
                 {
                     try
                     {
-                        // Dequeue exactly one per callback; the helper will be invoked again while there are items
-                        var info = helper.DequeueItem(); // ItemInfo
-
+                        var info = helper.DequeueItem();
                         string itemName = helper.GetItemName(info.ItemId, info.ItemGame) ?? ("Item " + info.ItemId);
-                        string fromName = TryGetSenderName(info); // safely resolves "Unknown" if not present
-
+                        string fromName = _session.Players.GetPlayerName(info.Player) ?? ("Player " + info.Player);
+                        string toName = cfgSlot.Value;
                         _lastProcessedItemIndex = Mathf.Max(_lastProcessedItemIndex, helper.Index);
                         SaveState();
+                        _log.LogInfo($"[PeakPelago] Received: {itemName} from {fromName} to {toName}");
+                        ItemFlags classification = info.Flags;
+                        _notifications.ShowItemNotification(fromName, toName, itemName, classification);
 
-                        _log.LogInfo("[PeakPelago] Received: " + itemName + " from " + fromName);
-
-                        // Apply item effects using the comprehensive item effect system
+                        // Apply effects (items received here are always for us)
+                        _log.LogInfo($"[PeakPelago] Applying effect for item from {fromName}");
                         _instance.ApplyItemEffect(itemName);
                     }
                     catch (Exception ex)
@@ -2250,6 +2227,7 @@ namespace Peak.AP
                 }
                 _status = "Connected";
                 _wantReconnect = false;
+                _notifications.ShowConnected();
                 _log.LogInfo("[PeakPelago] Connected.");
             }
             catch (Exception ex)
@@ -2287,6 +2265,7 @@ namespace Peak.AP
             {
                 // Print the simplified text of server messages
                 _log.LogInfo("[AP] " + msg.ToString());
+                _notifications.ShowSimpleMessage(msg.ToString(), true);
             }
             catch { /* ignore formatting errors */ }
         }
@@ -2441,11 +2420,9 @@ namespace Peak.AP
         // ===== Minimal IMGUI to test quickly in-game ======
         private void Update()
         {
-            // Toggle UI
-            if (Input.GetKeyDown(KeyCode.F10))
+            if (Input.GetKeyDown(KeyCode.F9) || Input.GetKeyDown(KeyCode.F10))
             {
                 _showUI = !_showUI;
-                _log.LogInfo("[PeakPelago] F10 pressed - GUI toggled to: " + _showUI);
             }
 
             // Auto-reconnect tick
@@ -2456,7 +2433,6 @@ namespace Peak.AP
             }
         }
 
-        // Add this field to your class:
         private Rect _win = new Rect(20, 20, 420, 240);
 
         private void EnsureWindowOnScreen()
@@ -2470,21 +2446,14 @@ namespace Peak.AP
         }
         private void OnGUI()
         {
-            // Always draw a test rectangle to verify OnGUI is working
-            GUI.Box(new Rect(10, 10, 200, 30), "Peak AP Test - F10 to toggle");
+            GUI.Box(new Rect(10, 10, 200, 30), "Peak AP - F9/F10 to toggle");
 
             if (!_showUI) return;
-
-            // Debug log to confirm OnGUI is being called
-            if (Time.frameCount % 300 == 0) // Log every 5 seconds at 60fps
-            {
-                _log.LogDebug("[PeakPelago] OnGUI is being called, _showUI = " + _showUI);
-            }
 
             EnsureWindowOnScreen();
             _win = GUILayout.Window(972531, _win, id =>
             {
-                GUILayout.Label("Peak ↔ Archipelago");
+                GUILayout.Label("Peak Archipelago");
                 GUILayout.Space(6);
 
                 GUILayout.Label("Server:");
@@ -2536,56 +2505,12 @@ namespace Peak.AP
                 GUILayout.Label("Total Luggage Opened: " + _totalLuggageOpened);
                 GUILayout.Label("Luggage This Run: " + _luggageOpenedThisRun);
 
-                // Add badge status
-                GUILayout.Space(6);
-                GUILayout.Label("Badges Hidden: " + (_badgesHidden ? "Yes" : "No"));
-                GUILayout.Label("Original Badges: " + _originalUnlockedBadges.Count);
-
                 // Add ascent status
                 GUILayout.Space(6);
                 GUILayout.Label("Cache Port: " + (_currentPort ?? "None"));
-                GUILayout.Label("Original Max Ascent: " + _originalMaxAscent);
                 GUILayout.Label("AP Unlocked Ascents: " + (_unlockedAscents.Count > 0 ? string.Join(", ", _unlockedAscents) : "None"));
                 GUILayout.Label("Current Max Ascent: " + (_unlockedAscents.Count > 0 ? _unlockedAscents.Max().ToString() : "0"));
                 GUILayout.Label("Awarded Ascent Badges: " + _awardedAscentBadges.Count);
-
-                // Add Archipelago item receiving debug
-                GUILayout.Space(6);
-                GUILayout.Label("=== Archipelago Item Receiving Debug ===");
-                GUILayout.Label("Items Received from AP: " + _itemsReceivedFromAP);
-                GUILayout.Label("Last Received Item: " + _lastReceivedItemName);
-                if (_lastReceivedItemTime != DateTime.MinValue)
-                {
-                    GUILayout.Label("Last Received Time: " + _lastReceivedItemTime.ToString("HH:mm:ss"));
-                }
-
-                GUILayout.Space(6);
-
-                // Add last acquired item display
-                GUILayout.Space(6);
-                GUILayout.Label("Last Acquired Item:");
-                if (_lastAcquiredItemName != "None")
-                {
-                    float timeSinceAcquisition = Time.time - _lastAcquiredItemTime;
-                    GUILayout.Label("  Name: " + _lastAcquiredItemName);
-                    GUILayout.Label("  ID: " + _lastAcquiredItemId);
-                    GUILayout.Label("  Time: " + timeSinceAcquisition.ToString("F1") + "s ago");
-
-                    // Show if this item has an Archipelago location
-                    if (_itemToLocationMapping.ContainsKey(_lastAcquiredItemName.ToUpper()))
-                    {
-                        GUILayout.Label("  AP Location: " + _itemToLocationMapping[_lastAcquiredItemName.ToUpper()]);
-                    }
-                    else
-                    {
-                        GUILayout.Label("  AP Location: None");
-                    }
-                }
-                else
-                {
-                    GUILayout.Label("  No items acquired yet");
-                }
-
 
                 // Add reset buttons
                 GUILayout.Space(6);
@@ -2604,10 +2529,10 @@ namespace Peak.AP
                 GUILayout.EndHorizontal();
 
                 GUILayout.Space(6);
-                if (GUILayout.Button("Hide (F10)")) _showUI = false;
+                if (GUILayout.Button("Hide (F9/F10)")) _showUI = false;
 
                 GUI.DragWindow();
-            }, "Peak ↔ Archipelago");
+            }, "Peak Archipelago");
         }
 
 

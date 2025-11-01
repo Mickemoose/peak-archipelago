@@ -34,12 +34,6 @@ namespace Peak.AP
 
                 // Get the base max stamina from our manager
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
-                
-                // Only adjust if base max exceeds 1.0 (i.e., we have additional bars)
-                if (baseMaxStamina <= 1.0f)
-                {
-                    return;
-                }
 
                 // Recalculate the outline size to accommodate larger stamina
                 float statusSum = Character.observedCharacter.refs.afflictions.statusSum;
@@ -49,14 +43,14 @@ namespace Peak.AP
                 
                 // Adjust the stamina bar outline to fit the new max
                 __instance.staminaBarOutline.sizeDelta = new Vector2(
-                    14f + displayMax * __instance.fullBar.sizeDelta.x, 
+                    14f + (baseMaxStamina + statusSum) * __instance.fullBar.sizeDelta.x, 
                     __instance.staminaBarOutline.sizeDelta.y
                 );
 
                 __instance.maxStaminaBar.sizeDelta = new Vector2(
                     Mathf.Lerp(
                         __instance.maxStaminaBar.sizeDelta.x,
-                        Mathf.Max(0f, Character.observedCharacter.GetMaxStamina() * __instance.fullBar.sizeDelta.x + __instance.staminaBarOffset),
+                        Mathf.Max(0f, baseMaxStamina * __instance.fullBar.sizeDelta.x + __instance.staminaBarOffset),
                         Time.deltaTime * 10f
                     ),
                     __instance.maxStaminaBar.sizeDelta.y

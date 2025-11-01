@@ -23,7 +23,7 @@ ITEMS = {
     "Piton": (76014, ItemClassification.useful),
     "Remedy Fungus": (76016, ItemClassification.useful),
     "Sports Drink": (76017, ItemClassification.useful),
-    "Clear All Effects": (76028, ItemClassification.useful),
+    #"Clear All Effects": (76028, ItemClassification.useful),
     "Speed Upgrade": (76031, ItemClassification.useful),
     #endregion
     
@@ -34,7 +34,7 @@ ITEMS = {
     "Lantern": (76012, ItemClassification.filler),
     "Red Crispberry": (76015, ItemClassification.filler),
     "Yellow Crispberry": (76018, ItemClassification.filler),
-    "Spawn Small Luggage": (76026, ItemClassification.filler),
+    #"Spawn Small Luggage": (76026, ItemClassification.filler),
     #endregion
     
     #region Trap Items
@@ -43,7 +43,7 @@ ITEMS = {
     "Dynamite": (76009, ItemClassification.trap),
     "Spawn Bee Swarm": (76027, ItemClassification.trap),
     "Destroy Held Item": (76029, ItemClassification.trap),
-    "Spawn Lightning": (76030, ItemClassification.trap),
+    #"Spawn Lightning": (76030, ItemClassification.trap),
     "Minor Poison Trap": (76032, ItemClassification.trap),
     "Poison Trap": (76033, ItemClassification.trap),
     "Deadly Poison Trap": (76034, ItemClassification.trap),
