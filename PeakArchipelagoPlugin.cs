@@ -19,7 +19,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.yourname.peak.ap", "Peak Archipelago", "0.3.1")]
+    [BepInPlugin("com.yourname.peak.ap", "Peak Archipelago", "0.4.0")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin
     {
         // ===== BepInEx / logging =====
