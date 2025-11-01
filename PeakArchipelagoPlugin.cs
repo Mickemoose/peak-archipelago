@@ -732,10 +732,10 @@ namespace Peak.AP
                 { "PITON", "Acquire Piton" },
                 
                 // Special items
-                { "MAGIC BEAN", "Acquire MagicBean" },
+                { "MAGIC BEAN", "Acquire Magic Bean" },
                 { "PARASOL", "Acquire Parasol" },
                 { "BALLOON", "Acquire Balloon" },
-                { "BalloonBunch", "Acquire BalloonBunch" },
+                { "BALLOON BUNCH", "Acquire Balloon Bunch" },
                 { "SCOUT CANNON", "Acquire Scout Cannon" },
                 { "FLYING DISC", "Acquire Flying Disc" },
                 { "GUIDEBOOK", "Acquire Guidebook" },
