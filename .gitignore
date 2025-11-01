@@ -4,7 +4,5 @@
 peak-archipelago.sln
 archipelago.zip
 PeakArchipelagoPlugin.csproj
-PeakArchipelagoPluginDLL/Archipelago.MultiClient.Net.dll
-PeakArchipelagoPluginDLL/Newtonsoft.Json.dll
 /bin/Debug/net472
 /bin
