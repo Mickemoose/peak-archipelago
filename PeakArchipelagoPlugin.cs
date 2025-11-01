@@ -724,10 +724,10 @@ namespace Peak.AP
             _itemToLocationMapping = new Dictionary<string, string>
             {
                 // Rope items
-                { "RopeSpool", "Acquire RopeSpool" },
-                { "RopeShooter", "Acquire RopeShooter" },
-                { "ANTI-RopeSpool", "Acquire Anti-RopeSpool" },
-                { "ANTI-RopeShooter", "Acquire Anti-RopeShooter" },
+                { "ROPE SPOOL", "Acquire Rope Spool" },
+                { "ROPE CANNON", "Acquire Rope Cannon" },
+                { "ANTI-ROPE SPOOL", "Acquire Anti-Rope Spool" },
+                { "ANTI-ROPE CANNON", "Acquire Anti-Rope Cannon" },
                 { "ChainShooter", "Acquire ChainShooter" },
                 { "ClimbingSpike", "Acquire ClimbingSpike" },
                 

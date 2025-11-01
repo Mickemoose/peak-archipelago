@@ -28,17 +28,17 @@ namespace Peak.AP
                 switch (trapType)
                 {
                     case PoisonTrapType.Minor:
-                        poisonAmount = 0.1f;
+                        poisonAmount = 0.025f;
                         severity = "Minor";
                         break;
                     
                     case PoisonTrapType.Normal:
-                        poisonAmount = 0.25f;
+                        poisonAmount = 0.05f;
                         severity = "Normal";
                         break;
                     
                     case PoisonTrapType.Deadly:
-                        poisonAmount = 0.5f;
+                        poisonAmount = 0.75f;
                         severity = "Deadly";
                         break;
                     

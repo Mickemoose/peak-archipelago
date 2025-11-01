@@ -16,7 +16,7 @@ namespace Peak.AP
                     return;
                 }
 
-                float drowsyAmount = 0.25f;
+                float drowsyAmount = 0.05f;
 
 
                 Character.localCharacter.refs.afflictions.AddStatus(
