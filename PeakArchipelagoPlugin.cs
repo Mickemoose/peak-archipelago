@@ -732,7 +732,7 @@ namespace Peak.AP
                 { "PITON", "Acquire Piton" },
                 
                 // Special items
-                { "MagicBean", "Acquire MagicBean" },
+                { "MAGIC BEAN", "Acquire MagicBean" },
                 { "PARASOL", "Acquire Parasol" },
                 { "BALLOON", "Acquire Balloon" },
                 { "BalloonBunch", "Acquire BalloonBunch" },
@@ -741,12 +741,12 @@ namespace Peak.AP
                 { "GUIDEBOOK", "Acquire Guidebook" },
                 
                 // Fire/light items
-                { "PortableStovetopItem", "Acquire PortableStovetopItem" },
-                { "FireWood", "Acquire FireWood" },
+                { "PORTABLE STOVE", "Acquire PortableStovetopItem" },
+                { "FIREWOOD", "Acquire FireWood" },
                 { "LANTERN", "Acquire Lantern" },
                 { "FLARE", "Acquire Flare" },
                 { "TORCH", "Acquire Torch" },
-                { "Lantern_Faerie", "Acquire Lantern_Faerie" },
+                { "FAERIE LANTERN", "Acquire Lantern_Faerie" },
                 
                 // Navigation items
                 { "CACTUS BALL", "Acquire CactusBall" },
@@ -785,7 +785,7 @@ namespace Peak.AP
                 { "CHUBBY SHROOM", "Acquire Chubby Shroom" },
                 
                 // Food items
-                { "TrailMix", "Acquire TrailMix" },
+                { "TRAIL MIX", "Acquire TrailMix" },
                 { "GRANOLA BAR", "Acquire Granola Bar" },
                 { "SCOUT COOKIES", "Acquire Scout Cookies" },
                 { "AIRLINE FOOD", "Acquire Airline Food" },
