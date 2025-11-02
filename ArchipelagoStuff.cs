@@ -181,6 +181,25 @@ namespace Peak.AP
             }
         }
 
+        public void ShowHeroTitle(string message)
+        {
+            try
+            {
+                if (GUIManager.instance != null)
+                {
+                    GUIManager.instance.SetHeroTitle(message, null);
+                }
+                else
+                {
+                    _log.LogWarning("[PeakPelago] Cannot show hero title - GUIManager not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error showing hero title: {ex.Message}");
+            }
+        }
+
         // some quick helper functions
         public void ShowGoalComplete()
         {
@@ -212,7 +231,7 @@ namespace Peak.AP
                     string deathTag = GetColorTag(new Color(1f, 0.2f, 0.2f));
                     string sourceTag = GetColorTag(_connectionLog.userColor);
                     
-                    string message = $"{deathTag}☠ Death Link:</color> {cause} {sourceTag}({source})</color>";
+                    string message = $"{deathTag} Death Link:</color> {source} {sourceTag} {cause}</color>";
                     
                     addMessageMethod.Invoke(_connectionLog, new object[] { message });
 

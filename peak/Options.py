@@ -48,9 +48,9 @@ class DeathLink(Toggle):
     default = 0
 
 class DeathLinkBehavior(Choice):
-    """Choose what happens when DeathLink triggers."""
+    """Choose what happens when DeathLink triggers.\nkill_random_player: Random player in the lobby will be killed.\nreset_to_last_checkpoint: All players will reset to the last checkpoint/campfire."""
     display_name = "Death Link Behavior"
-    option_reset_run = 0
+    option_kill_random_player = 0
     option_reset_to_last_checkpoint = 1
     default = 0
 

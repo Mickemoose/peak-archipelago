@@ -131,5 +131,7 @@ ITEMS = {
     "Yellow Winterberry": (77064, ItemClassification.filler),
     "Guidebook": (77065, ItemClassification.useful),
     "Strange Gem": (77066, ItemClassification.filler),
+    "Egg": (77067, ItemClassification.useful),
+    "Turkey": (77068, ItemClassification.useful),
     #endregion
 }

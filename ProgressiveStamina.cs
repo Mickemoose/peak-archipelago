@@ -52,7 +52,6 @@ namespace Peak.AP
         {
             if (!_progressiveStaminaEnabled)
             {
-                _log.LogWarning("[PeakPelago] Received stamina upgrade but progressive stamina is disabled");
                 return;
             }
 
@@ -61,15 +60,10 @@ namespace Peak.AP
 
             if (_staminaUpgradesReceived > maxUpgrades)
             {
-                _log.LogWarning($"[PeakPelago] Received more stamina upgrades than maximum ({maxUpgrades})");
                 _staminaUpgradesReceived = maxUpgrades;
             }
 
             _baseMaxStamina = 0.25f + (_staminaUpgradesReceived * 0.25f);
-            _log.LogInfo($"[PeakPelago] *** STAMINA UPGRADE APPLIED ***");
-            _log.LogInfo($"[PeakPelago] Upgrades: {_staminaUpgradesReceived}/{maxUpgrades}");
-            _log.LogInfo($"[PeakPelago] Base Max Stamina: {_baseMaxStamina:F2}");
-
             UpdateCharacterStamina();
         }
 
@@ -91,12 +85,6 @@ namespace Peak.AP
                 {
                     GUIManager.instance.bar.ChangeBar();
                 }
-
-                _log.LogInfo($"[PeakPelago] Character stamina updated to {effectiveMax:F2}");
-            }
-            else
-            {
-                _log.LogDebug("[PeakPelago] Character not spawned yet, stamina will be set on spawn");
             }
         }
 
@@ -179,20 +167,20 @@ namespace Peak.AP
     }
     
     /// <summary>
-    /// Harmony patch to adjust affliction bar sizing AFTER the game calculates it
+    /// Harmony patch to reposition afflictions at the end of the actual max stamina bar
     /// </summary>
-    [HarmonyPatch(typeof(BarAffliction), "ChangeAffliction")]
-    public static class BarAfflictionChangeAfflictionPatch
+    [HarmonyPatch(typeof(BarAffliction), "UpdateAffliction")]
+    public static class BarAfflictionUpdateAfflictionPatch
     {
         private static ProgressiveStaminaManager _staminaManager;
 
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
             _staminaManager = manager;
-            Debug.Log("[PeakPelago] Stamina manager set for BarAffliction patch");
+            Debug.Log("[PeakPelago] Stamina manager set for BarAffliction UpdateAffliction patch");
         }
 
-        static void Postfix(BarAffliction __instance)
+        static void Postfix(BarAffliction __instance, StaminaBar bar)
         {
             try
             {
@@ -201,24 +189,40 @@ namespace Peak.AP
                     return;
                 }
 
-                // Only adjust if the game actually set a size
-                if (__instance.size > 0)
+                if (Character.observedCharacter == null)
                 {
-                    // The game calculated size based on full bar (1.0 = 100%)
-                    // We need to scale it down to match our actual max stamina
-                    float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
-                    
-                    // Scale the affliction size proportionally
-                    // If max stamina is 0.5, afflictions should only be half as wide
-                    __instance.size *= baseMaxStamina;
+                    return;
                 }
+
+                // Calculate where this affliction should be positioned
+                float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
+                
+                // Position the affliction at the end of the max stamina bar
+                float xPosition = baseMaxStamina * bar.fullBar.sizeDelta.x;
+                
+                // Get all afflictions and find our index to stack them properly
+                float offsetX = 0f;
+                for (int i = 0; i < bar.afflictions.Length; i++)
+                {
+                    if (bar.afflictions[i] == __instance)
+                    {
+                        break;
+                    }
+                    if (bar.afflictions[i].gameObject.activeSelf)
+                    {
+                        offsetX += bar.afflictions[i].width;
+                    }
+                }
+                
+                __instance.rtf.anchoredPosition = new Vector2(xPosition + offsetX, __instance.rtf.anchoredPosition.y);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[PeakPelago] BarAffliction patch error: {ex.Message}");
+                Debug.LogError($"[PeakPelago] BarAffliction UpdateAffliction patch error: {ex.Message}");
             }
         }
     }
+
     /// <summary>
     /// Harmony patch to override Character.GetMaxStamina() when progressive stamina is enabled
     /// </summary>

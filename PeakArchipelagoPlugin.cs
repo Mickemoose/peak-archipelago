@@ -16,10 +16,11 @@ using System.Linq;
 using UnityEngine;
 using static MountainProgressHandler;
 using Newtonsoft.Json.Linq;
+using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.0")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.2")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin
     {
         // ===== BepInEx / logging =====
@@ -33,10 +34,6 @@ namespace Peak.AP
         private ConfigEntry<string> cfgPassword;
         private ConfigEntry<string> cfgGameId;
         private ConfigEntry<bool> cfgAutoReconnect;
-        private ConfigEntry<bool> cfgDeathLink;
-        private ConfigEntry<int> cfgDeathLinkBehavior;
-        private ConfigEntry<bool> cfgDeathLinkDropItems;
-        private ConfigEntry<bool> cfgDeathLinkApplyStatus;
         private ConfigEntry<int> cfgGoalType;
         private ConfigEntry<int> cfgRequiredBadges;
         private ConfigEntry<int> cfgRequiredAscent;
@@ -88,7 +85,8 @@ namespace Peak.AP
         private HashSet<int> _unlockedAscents = new HashSet<int>(); // Track which ascents are unlocked via AP items
 
         // ===== Death Link Management =====
-        private bool _deathLinkEnabled = false;
+        private DeathLinkService _deathLinkService;
+        private int _deathLinkBehavior = 0;
         private bool _deathLinkReceivedThisSession = false;
         private DateTime _lastDeathLinkSent = DateTime.MinValue;
         private DateTime _lastDeathLinkReceived = DateTime.MinValue;
@@ -114,22 +112,16 @@ namespace Peak.AP
                 cfgPassword = Config.Bind("Connection", "Password", "", "Room password (optional)");
                 cfgGameId = Config.Bind("Connection", "GameId", "PEAK", "Game ID (must match the room)");
                 cfgAutoReconnect = Config.Bind("Connection", "AutoReconnect", true, "Try to reconnect when socket closes");
-                cfgDeathLink = Config.Bind("DeathLink", "Enabled", false, "Enable Death Link (affects all linked players)");
-                cfgDeathLinkBehavior = Config.Bind("DeathLink", "Behavior", 0, "Death Link behavior: 0=Reset Run, 1=Reset to Last Checkpoint");
-                cfgDeathLinkDropItems = Config.Bind("DeathLink", "DropItems", true, "Drop items when respawning from death link");
-                cfgDeathLinkApplyStatus = Config.Bind("DeathLink", "ApplyStatus", true, "Apply status effects when respawning from death link");
                 cfgGoalType = Config.Bind("Goal", "Type", 0, "Goal type: 0=Reach Peak, 1=All Badges, 2=24 Karat Badge");
                 cfgRequiredBadges = Config.Bind("Goal", "BadgeCount", 20, "Number of badges required for Complete All Badges goal");
                 cfgRequiredAscent = Config.Bind("Goal", "RequiredAscent", 4, "Ascent level required for Reach Peak goal (0-7)");
-                cfgProgressiveStamina = Config.Bind("Stamina", "ProgressiveStamina", false, "Enable progressive stamina bars");
-                cfgAdditionalStaminaBars = Config.Bind("Stamina", "AdditionalStaminaBars", false, "Enable additional stamina bars (requires Progressive Stamina)");
 
                 // Initialize stamina manager
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
                 CharacterClampStaminaPatch.SetStaminaManager(_staminaManager);
                 StaminaBarUpdatePatch.SetStaminaManager(_staminaManager);
-                _log.LogInfo("[PeakPelago] Stamina manager initialized and patches set");
+                BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
 
                 // Check for port changes and initialize port-specific caching
                 CheckAndHandlePortChange();
@@ -140,19 +132,11 @@ namespace Peak.AP
                 InitializeItemMapping();
 
                 // Initialize item effect handlers
-                _log.LogInfo("[PeakPelago] About to initialize item effect handlers...");
                 InitializeItemEffectHandlers();
-                _log.LogInfo("[PeakPelago] Item effect handlers initialized successfully");
 
                 // Subscribe to achievement events for badge checking
-                _log.LogInfo("[PeakPelago] Subscribing to achievement events...");
                 GlobalEvents.OnAchievementThrown += OnAchievementThrown;
-                _log.LogInfo("[PeakPelago] Achievement events subscribed successfully");
-
-                // Subscribe to item acquisition events
-                _log.LogInfo("[PeakPelago] Subscribing to item acquisition events...");
                 GlobalEvents.OnItemRequested += OnItemRequested;
-                _log.LogInfo("[PeakPelago] Item acquisition events subscribed successfully");
 
                 // Apply Harmony patches
                 _log.LogInfo("[PeakPelago] About to apply Harmony patches...");
@@ -161,21 +145,15 @@ namespace Peak.AP
                 _log.LogInfo("[PeakPelago] Harmony patches applied successfully");
 
                 // Hide existing badges after a short delay to let the game initialize
-                _log.LogInfo("[PeakPelago] About to schedule badge hiding...");
                 Invoke(nameof(HideExistingBadges), 1f);
-                _log.LogInfo("[PeakPelago] Badge hiding scheduled");
 
                 // Store original ascent level
-                _log.LogInfo("[PeakPelago] About to schedule ascent storage...");
                 Invoke(nameof(StoreOriginalAscent), 1f);
-                _log.LogInfo("[PeakPelago] Ascent storage scheduled");
 
                 _status = "Ready";
                 _log.LogInfo("[PeakPelago] Plugin ready.");
-                _log.LogInfo("[PeakPelago] GUI should be visible - press F9/F10 to toggle");
 
                 _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
-                _log.LogInfo("[PeakPelago] Notification manager initialized");
                 Invoke(nameof(CountExistingBadges), 1.5f);
                 
             }
@@ -206,7 +184,7 @@ namespace Peak.AP
         /// <summary>Send a death link packet to Archipelago when local player dies</summary>
         public void SendDeathLink(string cause = "Unknown")
         {
-            if (_session == null || !cfgDeathLink.Value)
+            if (_deathLinkService == null)
             {
                 _log.LogDebug("[PeakPelago] Cannot send death link - not connected or disabled");
                 return;
@@ -221,34 +199,22 @@ namespace Peak.AP
                     return;
                 }
 
-                var deathLinkData = new Dictionary<string, JToken>
-                {
-                    ["time"] = DateTimeOffset.Now.ToUnixTimeSeconds(),
-                    ["cause"] = cause,
-                    ["source"] = cfgSlot.Value
-                };
-
-                var bouncePacket = new BouncePacket
-                {
-                    Tags = new List<string> { "DeathLink" },
-                    Data = deathLinkData
-                };
-
-                _session.Socket.SendPacket(bouncePacket);
+                var deathLink = new DeathLink(cfgSlot.Value, cause);
+                _deathLinkService.SendDeathLink(deathLink);
                 _lastDeathLinkSent = DateTime.Now;
 
-                _log.LogInfo("[PeakPelago] *** DEATH LINK SENT ***: " + cause + " from " + cfgSlot.Value);
+                _log.LogInfo($"[PeakPelago] *** DEATH LINK SENT ***: {cause} from {cfgSlot.Value}");
             }
             catch (Exception ex)
             {
-                _log.LogError("[PeakPelago] Failed to send death link: " + ex.Message);
+                _log.LogError($"[PeakPelago] Failed to send death link: {ex.Message}");
             }
         }
 
         /// <summary>Handle incoming death link from Archipelago</summary>
-        public void HandleDeathLink(Dictionary<string, JToken> deathLinkData)
+        private void HandleDeathLinkReceived(string cause, string source)
         {
-            if (!cfgDeathLink.Value)
+            if (_deathLinkService == null)
             {
                 _log.LogDebug("[PeakPelago] Death link received but disabled");
                 return;
@@ -256,17 +222,6 @@ namespace Peak.AP
 
             try
             {
-                string source = deathLinkData.TryGetValue("source", out JToken sourceObj) ? sourceObj.ToString() : "Unknown";
-                string cause = deathLinkData.TryGetValue("cause", out JToken causeObj) ? causeObj.ToString() : "Death Link";
-                long timestamp = deathLinkData.TryGetValue("time", out JToken timeObj) && long.TryParse(timeObj.ToString(), out long time) ? time : 0;
-
-                // Don't process our own death links
-                if (source == cfgSlot.Value)
-                {
-                    _log.LogDebug("[PeakPelago] Ignoring own death link");
-                    return;
-                }
-
                 // Prevent spam - only process one death link per 5 seconds
                 if (DateTime.Now - _lastDeathLinkReceived < TimeSpan.FromSeconds(5))
                 {
@@ -279,45 +234,131 @@ namespace Peak.AP
                 _lastDeathLinkCause = cause;
                 _deathLinkReceivedThisSession = true;
 
-                _log.LogInfo("[PeakPelago] *** DEATH LINK RECEIVED ***: " + cause + " from " + source);
+                _log.LogInfo($"[PeakPelago] *** DEATH LINK RECEIVED ***: {cause} from {source}");
 
-                // Kill the local player
+                // Kill a random player
                 KillLocalPlayerFromDeathLink(cause, source);
             }
             catch (Exception ex)
             {
-                _log.LogError("[PeakPelago] Failed to handle death link: " + ex.Message);
+                _log.LogError($"[PeakPelago] Failed to handle death link: {ex.Message}");
             }
         }
 
-        /// <summary>Respawn the local player at the last campfire/checkpoint when receiving a death link</summary>
+        /// <summary>Kill a random player (or local player) from death link</summary>
         private void KillLocalPlayerFromDeathLink(string cause, string source)
         {
             try
             {
-                if (Character.localCharacter == null)
+                Character targetCharacter;
+
+                // Get all valid characters
+                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
                 {
-                    _log.LogDebug("[PeakPelago] Cannot respawn player - no local character");
+                    _log.LogWarning("[PeakPelago] Cannot apply death link - no characters found");
                     return;
                 }
 
-                _log.LogInfo("[PeakPelago] Respawning local player due to death link from " + source + " (" + cause + ")");
+                // Filter to only active, alive characters
+                var validCharacters = Character.AllCharacters.Where(c => 
+                    c != null && 
+                    c.gameObject.activeInHierarchy && 
+                    !c.data.dead &&
+                    !c.data.fullyPassedOut
+                ).ToList();
+
+                if (validCharacters.Count == 0)
+                {
+                    _log.LogWarning("[PeakPelago] Cannot apply death link - no valid characters found");
+                    return;
+                }
+
+                var random = new System.Random();
+                targetCharacter = validCharacters[random.Next(validCharacters.Count)];
+
+                if (targetCharacter == null)
+                {
+                    _log.LogWarning("[PeakPelago] Cannot apply death link - target character not found");
+                    return;
+                }
+
+                string characterName;
+                if (targetCharacter == Character.localCharacter)
+                {
+                    characterName = cfgSlot.Value;
+                }
+                else
+                {
+                    characterName = targetCharacter.characterName ?? "Player";
+                }
+
+                _log.LogInfo($"[PeakPelago] Applying death link to {characterName} due to death from {source} ({cause})");
+
                 _notifications.ShowDeathLink(cause, source);
-                // Get the player's last spawn point (campfire/checkpoint)
-                Vector3 respawnPosition = GetLastCheckpointPosition();
+                _notifications.ShowHeroTitle("RIP " + characterName.ToUpper());
 
-                // Use the RPCA_ReviveAtPosition method to respawn at the checkpoint
-                // This will revive the player if they're dead, or just teleport them if they're alive
-                Character.localCharacter.photonView.RPC("RPCA_ReviveAtPosition", RpcTarget.All, respawnPosition, true);
+                if (_deathLinkBehavior == 1)
+                {
+                    _log.LogInfo($"[PeakPelago] Death link behavior: Reset to checkpoint");
+                    
+                    // Get checkpoint position
+                    Vector3 checkpointPos = GetLastCheckpointPosition();
+                    
+                    // Move all players to checkpoint
+                    foreach (var character in validCharacters)
+                    {
+                        character.transform.position = checkpointPos;
+                        _log.LogInfo($"[PeakPelago] Moved {character.characterName ?? "player"} to last checkpoint due to death link");
+                    }
+                }
+                else
+                {
+                    
+                    StartCoroutine(KillCharacterCoroutine(targetCharacter, characterName));
+                }
 
-                _log.LogInfo("[PeakPelago] Player respawned at checkpoint: " + respawnPosition);
+                _log.LogInfo($"[PeakPelago] Death link applied to {characterName}");
             }
             catch (Exception ex)
             {
-                _log.LogError("[PeakPelago] Failed to respawn player from death link: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to apply death link: " + ex.Message);
+                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
             }
         }
 
+        private System.Collections.IEnumerator KillCharacterCoroutine(Character targetCharacter, string characterName)
+        {
+            // Wait a frame to ensure we're on the main thread
+            yield return null;
+
+            try
+            {
+                _log.LogInfo($"[PeakPelago] Executing death for {characterName}");
+                
+                // Use reflection to call DieInstantly
+                var dieInstantlyMethod = targetCharacter.GetType().GetMethod("DieInstantly", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (dieInstantlyMethod != null)
+                {
+                    dieInstantlyMethod.Invoke(targetCharacter, null);
+                    _log.LogInfo($"[PeakPelago] DieInstantly succeeded for {characterName}");
+                }
+                else
+                {
+                    _log.LogError("[PeakPelago] Could not find DieInstantly method");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Coroutine death failed: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    _log.LogError($"[PeakPelago] Inner: {ex.InnerException.Message}");
+                    _log.LogError($"[PeakPelago] Inner stack: {ex.InnerException.StackTrace}");
+                }
+            }
+        }
         /// <summary>Get the position of the last checkpoint/campfire the player visited</summary>
         private Vector3 GetLastCheckpointPosition()
         {
@@ -491,10 +532,8 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[PeakPelago] HideExistingBadges called");
                 if (_hasHiddenBadges)
                 {
-                    _log.LogInfo("[PeakPelago] Badges already hidden, skipping");
                     return;
                 }
 
@@ -522,8 +561,6 @@ namespace Peak.AP
 
                 _badgesHidden = true;
                 _hasHiddenBadges = true;
-                _log.LogInfo("[PeakPelago] Hidden " + _originalUnlockedBadges.Count + " existing badges");
-                _log.LogInfo("[PeakPelago] Badge hiding completed - _badgesHidden = " + _badgesHidden);
             }
             catch (Exception ex)
             {
@@ -571,7 +608,6 @@ namespace Peak.AP
                     if (getMaxAscentMethod != null)
                     {
                         _originalMaxAscent = (int)getMaxAscentMethod.Invoke(achievementManager, null);
-                        _log.LogInfo("[PeakPelago] Stored original max ascent: " + _originalMaxAscent);
                     }
                 }
             }
@@ -654,7 +690,6 @@ namespace Peak.AP
         {
             if (currentCount >= requiredCount)
             {
-                _log.LogInfo("[PeakPelago] Reporting achievement: " + achievementName + " (count: " + currentCount + ")");
                 ReportCheckByName(achievementName);
             }
         }
@@ -678,7 +713,6 @@ namespace Peak.AP
                 // Some versions return -1 when the name isn't found
                 if (id <= 0)
                 {
-                    _log.LogWarning("[PeakPelago] Unknown AP location: " + locationName);
                     return;
                 }
 
@@ -686,12 +720,7 @@ namespace Peak.AP
                 {
                     // Use the long[] overload (works across client versions)
                     _session.Locations.CompleteLocationChecks(new long[] { id });
-                    _log.LogInfo("[PeakPelago] Reported check: " + locationName + " (ID " + id + ")");
                     SaveState();
-                }
-                else
-                {
-                    _log.LogDebug("[PeakPelago] Check already reported: " + locationName);
                 }
             }
             catch (Exception ex)
@@ -715,7 +744,6 @@ namespace Peak.AP
             {
                 int requiredAscent = cfgRequiredAscent.Value;
 
-                _log.LogInfo($"[PeakPelago] Checking Reach Peak goal: Current ascent {currentAscent}, Required {requiredAscent}");
 
                 if (currentAscent >= requiredAscent)
                 {
@@ -801,7 +829,6 @@ namespace Peak.AP
                     }
                 }
                 
-                _log.LogInfo($"[PeakPelago] Found {_collectedBadges.Count} existing badges");
             }
             catch (Exception ex)
             {
@@ -926,6 +953,8 @@ namespace Peak.AP
                 { "ENERGY DRINK", "Acquire Energy Drink" },
                 { "SPORTS DRINK", "Acquire Sports Drink" },
                 { "BIG LOLLIPOP", "Acquire Big Lollipop" },
+                { "EGG", "Acquire Egg" },
+                { "TURKEY", "Acquire Turkey" },
                 
                 // Miscellaneous items
                 { "CONCH", "Acquire Conch" },
@@ -952,7 +981,6 @@ namespace Peak.AP
 
         private void InitializeItemEffectHandlers()
         {
-            _log.LogInfo("[PeakPelago] Starting item effect handlers initialization...");
             _itemEffectHandlers = new Dictionary<string, System.Action>
             {
                 // Physical Game Items (77000-77064) - Spawn directly
@@ -992,6 +1020,8 @@ namespace Peak.AP
                 { "Pandora's Lunchbox", () => SpawnPhysicalItem("PandorasBox") },
                 { "Ancient Idol", () => SpawnPhysicalItem("AncientIdol") },
                 { "Strange Gem", () => SpawnPhysicalItem("Strange Gem") },
+                { "Egg", () => SpawnPhysicalItem("Egg") },
+                { "Turkey", () => SpawnPhysicalItem("EggTurkey") },
                 { "Bugle of Friendship", () => SpawnPhysicalItem("Bugle_Magic") },
                 { "Bugle", () => SpawnPhysicalItem("Bugle") },
                 { "Remedy Fungus", () => SpawnPhysicalItem("HealingPuffShroom") },
@@ -1061,9 +1091,6 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[PeakPelago] ========================================");
-                _log.LogInfo("[PeakPelago] ApplyProgressiveStamina() called");
-                
                 if (_staminaManager == null)
                 {
                     _log.LogError("[PeakPelago] Stamina manager is NULL!");
@@ -1078,19 +1105,10 @@ namespace Peak.AP
                 
                 if (Character.localCharacter == null)
                 {
-                    _log.LogWarning("[PeakPelago] Local character is NULL - will apply on spawn");
                     _staminaManager.ApplyStaminaUpgrade();
                     return;
-                }
-                
-                _log.LogInfo($"[PeakPelago] Before upgrade: {_staminaManager.GetBaseMaxStamina():F2}");
-                _log.LogInfo($"[PeakPelago] Current stamina: {Character.localCharacter.data.currentStamina:F2}");
-                
+                }          
                 _staminaManager.ApplyStaminaUpgrade();
-                
-                _log.LogInfo($"[PeakPelago] After upgrade: {_staminaManager.GetBaseMaxStamina():F2}");
-                _log.LogInfo($"[PeakPelago] New current stamina: {Character.localCharacter.data.currentStamina:F2}");
-                _log.LogInfo("[PeakPelago] ========================================");
             }
             catch (Exception ex)
             {
@@ -1106,7 +1124,6 @@ namespace Peak.AP
             {
                 if (Character.localCharacter == null)
                 {
-                    _log.LogWarning("[PeakPelago] Cannot spawn item - no local character");
                     return;
                 }
 
@@ -1114,15 +1131,15 @@ namespace Peak.AP
                 Item itemToSpawn = null;
 
                 // DEBUG: Log all available items in the database
-                //_log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
-                //for (ushort itemID = 1; itemID < 300; itemID++) // Limit to first 200 for now
-                //{
-                //    if (ItemDatabase.TryGetItem(itemID, out Item item))
-                //    {
-                //        _log.LogInfo("[PeakPelago] Item ID " + itemID + ": " + item.name);
-                //    }
-                //}
-                //_log.LogInfo("[PeakPelago] === END OF AVAILABLE ITEMS ===");
+                _log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
+                for (ushort itemID = 1; itemID < 300; itemID++) // Limit to first 200 for now
+                {
+                    if (ItemDatabase.TryGetItem(itemID, out Item item))
+                    {
+                        _log.LogInfo("[PeakPelago] Item ID " + itemID + ": " + item.name);
+                    }
+                }
+                _log.LogInfo("[PeakPelago] === END OF AVAILABLE ITEMS ===");
 
                 for (ushort itemID = 1; itemID < 1000; itemID++)
                 {
@@ -1148,7 +1165,6 @@ namespace Peak.AP
 
                 // Spawn the item prefab directly without calling RequestPickup
                 GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
-                _log.LogInfo("[PeakPelago] Spawned item: " + itemName + " at position " + spawnPosition);
             }
             catch (System.Exception ex)
             {
@@ -1160,7 +1176,6 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[PeakPelago] Unlocking Ascent " + ascentLevel);
 
                 // Track the unlocked ascent
                 _unlockedAscents.Add(ascentLevel);
@@ -1173,11 +1188,9 @@ namespace Peak.AP
                     if (unlockMethod != null)
                     {
                         unlockMethod.Invoke(null, new object[] { ascentLevel });
-                        _log.LogInfo("[PeakPelago] Successfully unlocked Ascent " + ascentLevel);
 
                         // Log all currently unlocked ascents
                         var sortedAscents = _unlockedAscents.OrderBy(x => x).ToList();
-                        _log.LogInfo("[PeakPelago] All unlocked ascents: " + string.Join(", ", sortedAscents));
                     }
                     else
                     {
@@ -1319,8 +1332,6 @@ namespace Peak.AP
                 // Increase speed by 50% for 30 seconds
                 movement.movementModifier += 0.5f;
 
-                _log.LogInfo("[PeakPelago] Applied speed upgrade (50% boost)");
-
                 // Start coroutine to restore original speed after 30 seconds
                 StartCoroutine(RestoreSpeedAfterDelay(character, originalModifier, 30f));
             }
@@ -1336,7 +1347,6 @@ namespace Peak.AP
             if (character != null && character.refs.movement != null)
             {
                 character.refs.movement.movementModifier = originalModifier;
-                _log.LogInfo("[PeakPelago] Restored original speed");
             }
         }
 
@@ -1356,10 +1366,6 @@ namespace Peak.AP
 
                 // Try to spawn luggage using the existing system
                 var luggage = PhotonNetwork.Instantiate("SmallLuggage", spawnPosition, Quaternion.identity, 0);
-                if (luggage != null)
-                {
-                    _log.LogInfo("[PeakPelago] Spawned small luggage at position " + spawnPosition);
-                }
             }
             catch (System.Exception ex)
             {
@@ -1371,19 +1377,16 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[PeakPelago] Applying effect for item: " + itemName);
 
                 // Track the received item for debug purposes
                 _itemsReceivedFromAP++;
                 _lastReceivedItemName = itemName;
                 _lastReceivedItemTime = DateTime.Now;
-                _log.LogInfo("[PeakPelago] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
 
                 // Check if we have a handler for this item
                 if (_itemEffectHandlers.ContainsKey(itemName))
                 {
                     _itemEffectHandlers[itemName].Invoke();
-                    _log.LogInfo("[PeakPelago] Successfully applied effect for: " + itemName);
                 }
                 else
                 {
@@ -1405,7 +1408,7 @@ namespace Peak.AP
                 _lastReceivedItemName = itemName;
                 _lastReceivedItemTime = DateTime.Now;
 
-                _log.LogInfo("[PeakPelago] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
+                //_log.LogInfo("[PeakPelago] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
 
                 // Apply the item effect
                 ApplyItemEffect(itemName);
@@ -1455,7 +1458,6 @@ namespace Peak.AP
         {
             if (currentCount >= requiredCount)
             {
-                _log.LogInfo("[PeakPelago] Reporting item achievement: " + achievementName + " (count: " + currentCount + ")");
                 ReportCheckByName(achievementName);
             }
         }
@@ -1479,12 +1481,9 @@ namespace Peak.AP
                 _itemAcquisitionCountsThisRun[itemName] = 0;
             _itemAcquisitionCountsThisRun[itemName]++;
 
-            _log.LogInfo("[PeakPelago] Item acquired: " + itemName + " (ID: " + itemId + ", Total: " + _itemAcquisitionCounts[itemName] + ", This run: " + _itemAcquisitionCountsThisRun[itemName] + ")");
-
             // Check if this item has an Archipelago location to report
             if (_itemToLocationMapping.TryGetValue(itemName.ToUpper(), out string locationName))
             {
-                _log.LogInfo("[PeakPelago] Reporting Archipelago check: " + locationName);
                 ReportCheckByName(locationName);
             }
             else
@@ -1520,8 +1519,6 @@ namespace Peak.AP
             {
                 // Get current ascent level using reflection
                 int currentAscent = GetCurrentAscentLevel();
-                _log.LogInfo("[PeakPelago] HandleAscentPeakReached: Peak=" + peakName + ", CurrentAscent=" + currentAscent);
-                _log.LogInfo("[PeakPelago] DEBUG: currentAscent=" + currentAscent + " corresponds to Ascent " + currentAscent);
                 
                 if (currentAscent < 1) 
                 {
@@ -1529,24 +1526,17 @@ namespace Peak.AP
                     return; // Only award for ascents 1+ (currentAscent is 1-indexed)
                 }
 
-                _log.LogInfo("[PeakPelago] Player reached " + peakName + " on Ascent " + currentAscent);
 
                 // Award ascent-specific badges based on peak and ascent level
                 string badgeLocation = GetAscentBadgeLocation(peakName, currentAscent);
-                _log.LogInfo("[PeakPelago] GetAscentBadgeLocation returned: " + (badgeLocation ?? "null"));
-                _log.LogInfo("[PeakPelago] DEBUG: For currentAscent=" + currentAscent + ", Roman numeral=" + GetRomanNumeral(currentAscent + 1) + ", Ascent number=" + currentAscent);
-                
                 if (!string.IsNullOrEmpty(badgeLocation))
                 {
                     string badgeKey = badgeLocation + "_" + currentAscent;
-                    _log.LogInfo("[PeakPelago] Generated badge key: " + badgeKey);
                     
                     if (!_awardedAscentBadges.Contains(badgeKey))
                     {
-                        _log.LogInfo("[PeakPelago] Reporting ascent badge: " + badgeLocation);
                         ReportCheckByName(badgeLocation);
                         _awardedAscentBadges.Add(badgeKey);
-                        _log.LogInfo("[PeakPelago] Added badge key to awarded set. Total awarded: " + _awardedAscentBadges.Count);
                     }
                     else
                     {
@@ -1562,19 +1552,15 @@ namespace Peak.AP
                 if (peakName.ToUpper() == "PEAK")
                 {
                     string sashLocation = GetScoutSashLocation(currentAscent);
-                    _log.LogInfo("[PeakPelago] GetScoutSashLocation returned: " + (sashLocation ?? "null"));
 
                     if (!string.IsNullOrEmpty(sashLocation))
                     {
                         string sashKey = sashLocation + "_" + currentAscent;
-                        _log.LogInfo("[PeakPelago] Generated sash key: " + sashKey);
 
                         if (!_awardedAscentBadges.Contains(sashKey))
                         {
-                            _log.LogInfo("[PeakPelago] Reporting scout sash: " + sashLocation);
                             ReportCheckByName(sashLocation);
                             _awardedAscentBadges.Add(sashKey);
-                            _log.LogInfo("[PeakPelago] Added sash key to awarded set. Total awarded: " + _awardedAscentBadges.Count);
                         }
                         else
                         {
@@ -1741,7 +1727,6 @@ namespace Peak.AP
                             }
                         }
 
-                        _instance._log.LogInfo("[PeakPelago] Local player opened luggage: " + luggageName);
 
                         // Mark that we've opened luggage this session
                         _instance._hasOpenedLuggageThisSession = true;
@@ -1979,7 +1964,6 @@ namespace Peak.AP
                             }
                             else
                             {
-                                _instance._log.LogDebug("[PeakPelago] GetName() method not found, trying UIData");
                                 // Fallback to UIData.itemName
                                 var uidDataField = item.GetType().GetField("UIData");
                                 if (uidDataField != null)
@@ -1991,7 +1975,6 @@ namespace Peak.AP
                                         if (itemNameField != null)
                                         {
                                             itemName = (string)itemNameField.GetValue(uidData) ?? "Unknown";
-                                            _instance._log.LogDebug("[PeakPelago] Got item name via UIData: " + itemName);
                                         }
                                         else
                                         {
@@ -2117,8 +2100,8 @@ namespace Peak.AP
                     cfgGameId.Value,
                     cfgSlot.Value,
                     ItemsHandlingFlags.AllItems,
-                    null,                        // version
-                    null,                        // tags
+                    null,
+                    null,
                     null,                        // uuid
                     string.IsNullOrEmpty(cfgPassword.Value) ? null : cfgPassword.Value,
                     true                         // requestSlotData
@@ -2135,6 +2118,29 @@ namespace Peak.AP
 
                 // Ask for datapackage for our game so helper name<->id lookups work
                 _session.Socket.SendPacket(new GetDataPackagePacket { Games = new[] { cfgGameId.Value } });
+                _deathLinkService = _session.CreateDeathLinkService();
+                _log.LogInfo("[PeakPelago] Death Link service created");
+                _deathLinkService.OnDeathLinkReceived += (deathLink) =>
+                {
+                    try
+                    {
+                        _log.LogInfo($"[PeakPelago] Death Link received from {deathLink.Source}: {deathLink.Cause}");
+
+                        if (deathLink.Source == cfgSlot.Value)
+                        {
+                            _log.LogDebug("[PeakPelago] Ignoring own death link");
+                            return;
+                        }
+
+                        HandleDeathLinkReceived(deathLink.Cause ?? "Death Link", deathLink.Source);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError($"[PeakPelago] Error handling death link: {ex.Message}");
+                    }
+                };
+
+
 
                 _session.Items.ItemReceived += helper =>
                 {
@@ -2146,12 +2152,8 @@ namespace Peak.AP
                         string toName = cfgSlot.Value;
                         _lastProcessedItemIndex = Mathf.Max(_lastProcessedItemIndex, helper.Index);
                         SaveState();
-                        _log.LogInfo($"[PeakPelago] Received: {itemName} from {fromName} to {toName}");
                         ItemFlags classification = info.Flags;
                         _notifications.ShowItemNotification(fromName, toName, itemName, classification);
-
-                        // Apply effects (items received here are always for us)
-                        _log.LogInfo($"[PeakPelago] Applying effect for item from {fromName}");
                         _instance.ApplyItemEffect(itemName);
                     }
                     catch (Exception ex)
@@ -2178,53 +2180,76 @@ namespace Peak.AP
                 if (loginResult != null && loginResult.SlotData != null)
                 {
                     _log.LogInfo("[PeakPelago] Received slot data with " + loginResult.SlotData.Count + " entries");
-                    
-                    // Log all slot data for debugging
+
                     _log.LogInfo("[PeakPelago] ===== ALL SLOT DATA =====");
                     foreach (var kvp in loginResult.SlotData)
                     {
                         _log.LogInfo($"[PeakPelago] Key: '{kvp.Key}' | Value: '{kvp.Value}' | Type: {kvp.Value?.GetType().Name}");
                     }
                     _log.LogInfo("[PeakPelago] ===== END SLOT DATA =====");
-                    
-                    // Initialize stamina system based on slot data
+
                     bool progressiveEnabled = false;
                     bool additionalEnabled = false;
+                    bool deathLinkEnabled = false;
+
+                    if (loginResult.SlotData.ContainsKey("death_link"))
+                    {
+                        var value = loginResult.SlotData["death_link"];
+                        deathLinkEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Death Link from slot data: {deathLinkEnabled}");
+                    }
+                    if (deathLinkEnabled)
+                    {
+                        _deathLinkService.EnableDeathLink();
+
+                        var updatePacket = new ConnectUpdatePacket
+                        {
+                            Tags = new[] { "DeathLink" }
+                        };
+
+                        _session.Socket.SendPacket(updatePacket);
+                    }
                     
-                    // The keys MUST match your dataclass field names in PeakOptions
-                    // Your fields are: progressive_stamina and additional_stamina_bars
-                    
+                    if (loginResult.SlotData.ContainsKey("death_link_behavior"))
+                    {
+                        var value = loginResult.SlotData["death_link_behavior"];
+                        _deathLinkBehavior = Convert.ToInt32(value);
+                        _log.LogInfo($"[PeakPelago] Death Link Behavior from slot data: {_deathLinkBehavior}");
+                    }
+                    else
+                    {
+                        _log.LogWarning("[PeakPelago] death_link_behavior not found in slot data");
+                    }
+
+
                     if (loginResult.SlotData.ContainsKey("progressive_stamina"))
                     {
-                        // Toggle values are sent as integers (0 or 1)
                         var value = loginResult.SlotData["progressive_stamina"];
                         progressiveEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Progressive Stamina from slot data: {progressiveEnabled}");
                     }
                     else
                     {
                         _log.LogWarning("[PeakPelago] progressive_stamina not found in slot data");
                     }
-                    
+
                     if (loginResult.SlotData.ContainsKey("additional_stamina_bars"))
                     {
                         var value = loginResult.SlotData["additional_stamina_bars"];
                         additionalEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Additional Stamina Bars from slot data: {additionalEnabled}");
                     }
                     else
                     {
                         _log.LogWarning("[PeakPelago] additional_stamina_bars not found in slot data");
                     }
-                    
+
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
-                    _log.LogInfo($"[PeakPelago] *** Stamina system initialized - Progressive: {progressiveEnabled}, Additional: {additionalEnabled} ***");
                 }
                 else
                 {
                     _log.LogWarning("[PeakPelago] No slot data available, using default stamina settings");
                     _staminaManager.Initialize(false, false);
                 }
+
                 _status = "Connected";
                 _wantReconnect = false;
                 _notifications.ShowConnected();
@@ -2288,7 +2313,6 @@ namespace Peak.AP
                         ClearCacheForPortChange();
                     }
                     _currentPort = currentPort;
-                    _log.LogInfo("[PeakPelago] Now using port-specific cache for: " + _currentPort);
                 }
             }
             catch (System.Exception ex)
@@ -2338,7 +2362,6 @@ namespace Peak.AP
                     _log.LogInfo("[PeakPelago] No state file found for port " + _currentPort + " - starting fresh");
                     return;
                 }
-                _log.LogInfo("[PeakPelago] Loading state from port-specific file: " + _currentPort);
                 string[] lines = File.ReadAllLines(StateFilePath);
 
                 // Load item index
@@ -2519,7 +2542,6 @@ namespace Peak.AP
                 {
                     _luggageOpenedThisRun = 0;
                     _itemAcquisitionCountsThisRun.Clear();
-                    _log.LogInfo("[PeakPelago] Manually reset run counters");
                 }
 
                 if (GUILayout.Button("Reset All Data"))
@@ -2582,7 +2604,6 @@ namespace Peak.AP
                 // Clear current port to force re-initialization
                 _currentPort = "";
 
-                _log.LogInfo("[PeakPelago] All cached data has been reset");
             }
             catch (Exception ex)
             {
@@ -2597,7 +2618,6 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[PeakPelago] Achievement thrown: " + achievementType);
 
                 // Get the badge to location mapping
                 var badgeMapping = GetBadgeToLocationMapping();
@@ -2605,12 +2625,10 @@ namespace Peak.AP
                 // Check if this achievement corresponds to an Archipelago location
                 if (badgeMapping.TryGetValue(achievementType, out string locationName))
                 {
-                    _log.LogInfo("[PeakPelago] Reporting badge check for: " + locationName);
                     ReportCheckByName(locationName);
                     
                     // Track this badge as collected
                     _collectedBadges.Add(achievementType);
-                    _log.LogInfo($"[PeakPelago] Total badges collected: {_collectedBadges.Count}");
                 }
                 else
                 {
@@ -2636,7 +2654,6 @@ namespace Peak.AP
                 // Only track acquisitions by the local character
                 if (character != null && character.IsLocal && item != null)
                 {
-                    _log.LogInfo("[PeakPelago] Item requested by local player: " + item.UIData.itemName);
                     TrackItemAcquisition(item.UIData.itemName, item.itemID);
                 }
             }

@@ -81,19 +81,6 @@ Password =
 
 # Auto-reconnect on disconnect
 AutoReconnect = true
-
-[DeathLink]
-# Enable DeathLink mode
-DeathLink = false
-
-# Death behavior: 0 = Reset Run, 1 = Reset to Checkpoint
-DeathLinkBehavior = 0
-
-# Drop items on DeathLink death
-DeathLinkDropItems = true
-
-# Apply status effects on DeathLink death
-DeathLinkApplyStatus = true
 ```
 
 ### World Options
@@ -201,7 +188,7 @@ The Python world code follows Archipelago's world API:
 
 ## Version
 
-Current Version: **0.4.0**
+Current Version: **0.4.2**
 
 ## License
 
