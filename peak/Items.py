@@ -38,7 +38,7 @@ ITEMS = {
     #endregion
     
     #region Trap Items
-    "Blue Berrynana Peel": (76005, ItemClassification.trap),
+    "Banana Peel Trap": (76005, ItemClassification.trap),
     "Coconut": (76006, ItemClassification.trap),
     "Dynamite": (76009, ItemClassification.trap),
     "Spawn Bee Swarm": (76027, ItemClassification.trap),

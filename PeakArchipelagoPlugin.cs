@@ -1520,15 +1520,7 @@ namespace Peak.AP
         
         private bool IsTrapItem(string itemName)
         {
-            // Check if this is a trap item
-            var trapItems = new HashSet<string>
-            {
-                "Spawn Bee Swarm", "Destroy Held Item", "Minor Poison Trap", "Dynamite",
-                "Poison Trap", "Deadly Poison Trap", "Tornado Trap", "Freeze Trap",
-                "Nap Time Trap", "Balloon Trap", "Hungry Hungry Camper Trap", "Swap Trap",
-                "Blue Berrynana Peel", "Yeet Trap", "Cactus Ball Trap", "Slip Trap"
-            };
-            return trapItems.Contains(itemName);
+            return TrapTypeExtensions.IsTrapName(itemName);
         }
 
         // Method to track when items are received from Archipelago
@@ -2343,21 +2335,7 @@ namespace Peak.AP
 
                     if (trapLinkEnabled)
                     {
-                        var enabledTraps = new HashSet<string>
-                        {
-                            "Spawn Bee Swarm",
-                            "Destroy Held Item",
-                            "Minor Poison Trap",
-                            "Poison Trap",
-                            "Deadly Poison Trap",
-                            "Tornado Trap",
-                            "Nap Time Trap",
-                            "Balloon Trap",
-                            "Dynamite",
-                            "Hungry Hungry Camper Trap",
-                            "Blue Berrynana Peel",
-                            "Yeet Item Trap"
-                        };
+                        var enabledTraps = TrapTypeExtensions.GetAllTrapNames();
                         _trapLinkService.Initialize(
                             _session,
                             trapLinkEnabled,
