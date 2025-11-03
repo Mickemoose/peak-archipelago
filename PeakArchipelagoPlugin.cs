@@ -85,6 +85,7 @@ namespace Peak.AP
         private string _lastDeathLinkCause = "None";
         private static PeakArchipelagoPlugin _instance;
         public string Status => _status;
+        private ArchipelagoUI _ui;
         private void Awake()
         {
             try
@@ -115,6 +116,8 @@ namespace Peak.AP
                 CheckAndHandlePortChange();
 
                 LoadState();
+                _ui = gameObject.AddComponent<ArchipelagoUI>();
+                _ui.Initialize(this);
 
                 // Initialize item to location mapping
                 InitializeItemMapping();

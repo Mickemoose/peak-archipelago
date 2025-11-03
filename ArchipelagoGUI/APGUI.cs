@@ -38,11 +38,9 @@ namespace Peak.AP
 
             if (_plugin == null || _plugin.Status != "Connected")
             {
-                // Calculate total height needed
-                int totalHeight = 12 + rowHeight * 6; // Font size + Server + Port + Slot + Password + Connect button
+                int totalHeight = 12 + rowHeight * 6;
                 _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
 
-                // Font size controls
                 GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "PeakPelago font size: ", labelStyle);
                 if (GUI.Button(new Rect(xPos + labelWidth, yPos, _fontSize * 2, rowHeight), "-", buttonStyle))
                 {
@@ -60,33 +58,27 @@ namespace Peak.AP
                 int fieldWidth = rectWidth - labelWidth;
                 bool enterPressed = Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return;
 
-                // Server URL
                 GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Server: ", labelStyle);
                 _serverUrl = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _serverUrl, textFieldStyle);
                 yPos += rowHeight;
 
-                // Port
                 GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Port: ", labelStyle);
                 _port = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _port, textFieldStyle);
                 yPos += rowHeight;
 
-                // Slot Name
                 GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Slot Name: ", labelStyle);
                 _slotName = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _slotName, textFieldStyle);
                 yPos += rowHeight;
 
-                // Password
                 GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Password: ", labelStyle);
                 _password = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _password, textFieldStyle);
                 yPos += rowHeight;
 
-                // Consume the enter key event
                 if (enterPressed && Event.current.type == EventType.KeyDown)
                 {
                     enterPressed = false;
                 }
 
-                // Connect button
                 if ((GUI.Button(new Rect(xPos, yPos, 76 + _fontSize * 2, rowHeight), "Connect", buttonStyle) || enterPressed) 
                     && !string.IsNullOrEmpty(_serverUrl) 
                     && !string.IsNullOrEmpty(_slotName))
@@ -101,8 +93,6 @@ namespace Peak.AP
                 _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
                 GUI.Label(new Rect(xPos, yPos, 900f, rowHeight), "Archipelago configured.", labelStyle);
                 
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
             }
         }
 
