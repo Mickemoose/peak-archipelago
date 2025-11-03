@@ -54,6 +54,16 @@ class DeathLinkBehavior(Choice):
     option_reset_to_last_checkpoint = 1
     default = 0
 
+class DeathLinkSendBehavior(Choice):
+    """Choose when to send Death Links to other players.
+    any_player_dies: Send Death Link whenever any player in your game dies.
+    all_players_dead: Send Death Link only when all players are dead (game over)."""
+    display_name = "Death Link Send Behavior"
+    option_any_player_dies = 0
+    option_all_players_dead = 1
+    default = 0
+
+
 @dataclass
 class PeakOptions(PerGameCommonOptions):
     goal: Goal
@@ -64,3 +74,4 @@ class PeakOptions(PerGameCommonOptions):
     trap_percentage: TrapPercentage
     death_link: DeathLink
     death_link_behavior: DeathLinkBehavior
+    death_link_send_behavior: DeathLinkSendBehavior

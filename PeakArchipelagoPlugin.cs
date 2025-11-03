@@ -17,10 +17,11 @@ using UnityEngine;
 using static MountainProgressHandler;
 using Newtonsoft.Json.Linq;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
+using PeakArchipelago;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.2")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.3")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin
     {
         // ===== BepInEx / logging =====
@@ -37,21 +38,12 @@ namespace Peak.AP
         private ConfigEntry<int> cfgGoalType;
         private ConfigEntry<int> cfgRequiredBadges;
         private ConfigEntry<int> cfgRequiredAscent;
-        private ConfigEntry<bool> cfgProgressiveStamina;
-        private ConfigEntry<bool> cfgAdditionalStaminaBars;
 
         // ===== Session =====
         private ArchipelagoSession _session;
         private string _status = "Disconnected";
         private bool _isConnecting;
         private bool _wantReconnect;
-
-        // ===== State (simple persistence, no JsonUtility) =====
-        // file format:
-        // line 1: last processed item index (int)
-        // line 2: comma-separated checked location IDs (long)
-        // line 3: total luggage opened count (int)
-        // line 4: item acquisition counts (itemName:count,itemName:count,...)
         private string _currentPort = "";
         private string StateFilePath { get { return Path.Combine(Paths.ConfigPath, "Peak.AP.state." + _currentPort.Replace(":", "_") + ".txt"); } }
         private int _lastProcessedItemIndex = 0;
@@ -74,6 +66,8 @@ namespace Peak.AP
         private bool _hasOpenedLuggageThisSession = false; // Track if we've actually opened luggage this session
         private ProgressiveStaminaManager _staminaManager;
         private ArchipelagoNotificationManager _notifications;
+        private PhotonView _photonView;
+        private const string CHECK_RPC_NAME = "ReceiveCheckFromClient";
 
         // ===== Badge Management =====
         private HashSet<ACHIEVEMENTTYPE> _originalUnlockedBadges = new HashSet<ACHIEVEMENTTYPE>();
@@ -88,12 +82,11 @@ namespace Peak.AP
         private DeathLinkService _deathLinkService;
         private int _deathLinkBehavior = 0;
         private bool _deathLinkReceivedThisSession = false;
+        private int _deathLinkSendBehavior = 0;
         private DateTime _lastDeathLinkSent = DateTime.MinValue;
         private DateTime _lastDeathLinkReceived = DateTime.MinValue;
         private string _lastDeathLinkSource = "None";
         private string _lastDeathLinkCause = "None";
-
-        // ===== Static reference for Harmony patches =====
         private static PeakArchipelagoPlugin _instance;
 
         private void Awake()
@@ -115,7 +108,6 @@ namespace Peak.AP
                 cfgGoalType = Config.Bind("Goal", "Type", 0, "Goal type: 0=Reach Peak, 1=All Badges, 2=24 Karat Badge");
                 cfgRequiredBadges = Config.Bind("Goal", "BadgeCount", 20, "Number of badges required for Complete All Badges goal");
                 cfgRequiredAscent = Config.Bind("Goal", "RequiredAscent", 4, "Ascent level required for Reach Peak goal (0-7)");
-
                 // Initialize stamina manager
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
@@ -143,6 +135,9 @@ namespace Peak.AP
                 _harmony = new Harmony("com.mickemoose.peak.ap");
                 _harmony.PatchAll();
                 _log.LogInfo("[PeakPelago] Harmony patches applied successfully");
+
+
+                SetupPhotonView();
 
                 // Hide existing badges after a short delay to let the game initialize
                 Invoke(nameof(HideExistingBadges), 1f);
@@ -177,6 +172,50 @@ namespace Peak.AP
 
             TryCloseSession();
             SaveState();
+        }
+        private void SetupPhotonView()
+        {
+            try
+            {
+                _photonView = GetComponent<PhotonView>();
+                if (_photonView == null)
+                {
+                    _photonView = gameObject.AddComponent<PhotonView>();
+                }
+                if (_photonView.ViewID == 0)
+                {
+                    _photonView.ViewID = 999001;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Failed to setup PhotonView: " + ex.Message);
+                _log.LogWarning("[PeakPelago] Network synchronization may not work properly");
+            }
+        }
+
+        [PunRPC]
+        private void ReceiveCheckFromClient(string locationName, int senderId)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] Received check '{locationName}' from player {senderId}");
+                
+                // Only the host processes and reports to Archipelago
+                if (PhotonNetwork.IsMasterClient)
+                {
+                    ReportCheckByName(locationName);
+                }
+                else
+                {
+                    _log.LogWarning("[PeakPelago] Non-host received RPC - this shouldn't happen");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in ReceiveCheckFromClient RPC: {ex.Message}");
+            }
         }
 
         // ===== Death Link Implementation =====
@@ -699,33 +738,94 @@ namespace Peak.AP
         /// <summary>Report a check by its AP location name (defined in the apworld).</summary>
         public void ReportCheckByName(string locationName)
         {
-            if (_session == null)
-            {
-                _log.LogWarning("[PeakPelago] Not connected; cannot report checks.");
-                return;
-            }
-
             try
             {
-                // FIX: must pass game id, then location name
-                long id = _session.Locations.GetLocationIdFromName(cfgGameId.Value, locationName);
-
-                // Some versions return -1 when the name isn't found
-                if (id <= 0)
+                // If we're not the host, send the check to the host via RPC
+                if (!PhotonNetwork.IsMasterClient)
                 {
+                    if (_photonView != null && PhotonNetwork.IsConnected)
+                    {
+                        _log.LogInfo($"[PeakPelago] Sending check '{locationName}' to host");
+                        _photonView.RPC(CHECK_RPC_NAME, RpcTarget.MasterClient, locationName, PhotonNetwork.LocalPlayer.ActorNumber);
+                    }
+                    else
+                    {
+                        _log.LogWarning($"[PeakPelago] Cannot send check '{locationName}' - not connected to Photon");
+                    }
                     return;
                 }
 
-                if (_reportedChecks.Add(id))
+                // Host processing: Report to Archipelago
+                if (_session == null)
                 {
-                    // Use the long[] overload (works across client versions)
-                    _session.Locations.CompleteLocationChecks(new long[] { id });
-                    SaveState();
+                    _log.LogWarning("[PeakPelago] Not connected to AP; cannot report checks.");
+                    return;
+                }
+
+                try
+                {
+                    long id = _session.Locations.GetLocationIdFromName(cfgGameId.Value, locationName);
+
+                    if (id <= 0)
+                    {
+                        _log.LogDebug($"[PeakPelago] Location '{locationName}' not found in AP");
+                        return;
+                    }
+
+                    if (_reportedChecks.Add(id))
+                    {
+                        _session.Locations.CompleteLocationChecks(new long[] { id });
+                        _log.LogInfo($"[PeakPelago] ✓ Reported NEW check: {locationName} (ID: {id})");
+                        SaveState();
+
+                        // Broadcast to all clients that this check was completed
+                        BroadcastCheckCompleted(locationName, id);
+                    }
+                    else
+                    {
+                        _log.LogDebug($"[PeakPelago] ✗ Check already reported: {locationName} (ID: {id})");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError("[PeakPelago] ReportCheckByName failed: " + ex.Message);
                 }
             }
             catch (Exception ex)
             {
-                _log.LogError("[PeakPelago] ReportCheckByName failed: " + ex.Message);
+                _log.LogError($"[PeakPelago] Error in ReportCheckByName wrapper: {ex.Message}");
+            }
+        }
+        /// <summary>Broadcast to all clients that a check was completed</summary>
+        private void BroadcastCheckCompleted(string locationName, long locationId)
+        {
+            try
+            {
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("OnCheckCompletedRPC", RpcTarget.All, locationName, locationId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Failed to broadcast check completion: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        private void OnCheckCompletedRPC(string locationName, long locationId)
+        {
+            try
+            {
+                // All clients add this to their reported checks to avoid duplicate reports
+                _reportedChecks.Add(locationId);
+                _log.LogInfo($"[PeakPelago] Check completed notification: {locationName}");
+                
+                // Update local state
+                SaveState();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in OnCheckCompletedRPC: {ex.Message}");
             }
         }
 
@@ -1638,6 +1738,7 @@ namespace Peak.AP
                 case "TROPICS":
                     return "Trailblazer " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "MESA":
+                    return "Nomad " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "ALPINE":
                     return "Desolate " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "CALDERA":
@@ -1685,6 +1786,54 @@ namespace Peak.AP
 
         // ===== Harmony Patches =====
 
+        [HarmonyPatch(typeof(Character), "RPCA_Die")]
+        public static class CharacterRPCADiePatch
+        {
+            static void Postfix(Character __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    if (_instance._deathLinkService == null) return;
+                    
+                    _instance._log.LogInfo($"[PeakPelago] Character died: {__instance.characterName}");
+                    
+                    // Send when any player dies
+                    if (_instance._deathLinkSendBehavior == 0)
+                    {
+                        _instance._log.LogInfo("[PeakPelago] Sending Death Link (any player dies mode)");
+                        _instance.SendDeathLink($"{_instance.cfgSlot.Value} died");
+                    }
+                    // Check if all players are dead
+                    else if (_instance._deathLinkSendBehavior == 1)
+                    {
+                        bool allDead = true;
+                        foreach (var character in Character.AllCharacters)
+                        {
+                            if (!character.data.dead)
+                            {
+                                allDead = false;
+                                break;
+                            }
+                        }
+                        
+                        if (allDead)
+                        {
+                            _instance._log.LogInfo("[PeakPelago] Sending Death Link (all players dead mode)");
+                            _instance.SendDeathLink("Everyone died");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError("[PeakPelago] RPCA_Die patch error: " + ex.Message);
+                    }
+                }
+            }
+        }
+
         [HarmonyPatch(typeof(Luggage), "Interact_CastFinished")]
         public static class LuggageInteractCastFinishedPatch
         {
@@ -1693,57 +1842,37 @@ namespace Peak.AP
                 try
                 {
                     if (_instance == null) return;
+                    if (interactor == null) return;
 
-                    // Use reflection to check if this is the local player
-                    bool isLocalPlayer = false;
-                    if (interactor != null)
+
+                    // Get luggage name for logging using reflection
+                    string luggageName = "Unknown";
+                    if (__instance != null)
                     {
-                        var characterType = interactor.GetType();
-                        var photonViewProperty = characterType.GetProperty("photonView");
-                        if (photonViewProperty != null)
+                        var getNameMethod = __instance.GetType().GetMethod("GetName");
+                        if (getNameMethod != null)
                         {
-                            var photonView = photonViewProperty.GetValue(interactor);
-                            if (photonView != null)
-                            {
-                                var isMineProperty = photonView.GetType().GetProperty("IsMine");
-                                if (isMineProperty != null)
-                                {
-                                    isLocalPlayer = (bool)isMineProperty.GetValue(photonView);
-                                }
-                            }
+                            luggageName = (string)getNameMethod.Invoke(__instance, null) ?? "Unknown";
                         }
                     }
 
-                    if (isLocalPlayer)
-                    {
-                        // Get luggage name for logging using reflection
-                        string luggageName = "Unknown";
-                        if (__instance != null)
-                        {
-                            var getNameMethod = __instance.GetType().GetMethod("GetName");
-                            if (getNameMethod != null)
-                            {
-                                luggageName = (string)getNameMethod.Invoke(__instance, null) ?? "Unknown";
-                            }
-                        }
+                    _instance._log.LogInfo("[PeakPelago] Luggage opened: " + luggageName);
 
+                    // Mark that we've opened luggage this session
+                    _instance._hasOpenedLuggageThisSession = true;
 
-                        // Mark that we've opened luggage this session
-                        _instance._hasOpenedLuggageThisSession = true;
+                    // Increment counters
+                    _instance._luggageOpenedCount++;
+                    _instance._luggageOpenedThisRun++;
+                    _instance._totalLuggageOpened++;
 
-                        // Increment counters
-                        _instance._luggageOpenedCount++;
-                        _instance._luggageOpenedThisRun++;
-                        _instance._totalLuggageOpened++;
+                    _instance._log.LogInfo("[PeakPelago] Luggage opened - Total: " + _instance._totalLuggageOpened + ", This run: " + _instance._luggageOpenedThisRun);
 
-                        _instance._log.LogInfo("[PeakPelago] Luggage opened - Total: " + _instance._totalLuggageOpened + ", This run: " + _instance._luggageOpenedThisRun);
+                    // Check and report all luggage-related achievements
+                    _instance.CheckLuggageAchievements();
 
-                        // Check and report all luggage-related achievements
-                        _instance.CheckLuggageAchievements();
-
-                        // Save state
-                        _instance.SaveState();
-                    }
+                    // Save state
+                    _instance.SaveState();
                 }
                 catch (Exception ex)
                 {
@@ -1917,34 +2046,13 @@ namespace Peak.AP
             {
                 try
                 {
-                    if (_instance == null)
-                    {
-                        UnityEngine.Debug.Log("[PeakPelago] TestRequestedItemPatch: _instance is null");
-                        return;
-                    }
+                    if (_instance == null) return;
 
-                    UnityEngine.Debug.Log("[PeakPelago] TestRequestedItemPatch: Patch is working! Item: " + (item?.name ?? "null"));
+                    _instance._log.LogDebug("[PeakPelago] TestRequestedItemPatch: Item requested");
 
-                    // Check if this is the local player
-                    bool isLocalPlayer = false;
-                    if (character != null)
-                    {
-                        var photonViewProperty = character.GetType().GetProperty("photonView");
-                        if (photonViewProperty != null)
-                        {
-                            var photonView = photonViewProperty.GetValue(character);
-                            if (photonView != null)
-                            {
-                                var isMineProperty = photonView.GetType().GetProperty("IsMine");
-                                if (isMineProperty != null)
-                                {
-                                    isLocalPlayer = (bool)isMineProperty.GetValue(photonView);
-                                }
-                            }
-                        }
-                    }
+                    // Remove the isLocalPlayer check - allow any player to trigger
 
-                    if (isLocalPlayer && item != null)
+                    if (item != null)
                     {
                         // Get the item name using reflection
                         string itemName = "Unknown";
@@ -1952,9 +2060,6 @@ namespace Peak.AP
 
                         try
                         {
-                            // Debug: Log the item type
-                            _instance._log.LogDebug("[PeakPelago] Item type: " + item.GetType().Name);
-
                             // Try to get the item name using the GetName() method first
                             var getNameMethod = item.GetType().GetMethod("GetName");
                             if (getNameMethod != null)
@@ -1976,32 +2081,16 @@ namespace Peak.AP
                                         {
                                             itemName = (string)itemNameField.GetValue(uidData) ?? "Unknown";
                                         }
-                                        else
-                                        {
-                                            _instance._log.LogDebug("[PeakPelago] itemName field not found in UIData");
-                                        }
                                     }
-                                    else
-                                    {
-                                        _instance._log.LogDebug("[PeakPelago] UIData is null");
-                                    }
-                                }
-                                else
-                                {
-                                    _instance._log.LogDebug("[PeakPelago] UIData field not found");
                                 }
                             }
 
-                            // Get the item ID using reflection (it's a field, not a property)
+                            // Get the item ID using reflection
                             var itemIdField = item.GetType().GetField("itemID");
                             if (itemIdField != null)
                             {
                                 itemId = (ushort)itemIdField.GetValue(item);
                                 _instance._log.LogDebug("[PeakPelago] Got item ID: " + itemId);
-                            }
-                            else
-                            {
-                                _instance._log.LogDebug("[PeakPelago] itemID field not found");
                             }
                         }
                         catch (Exception ex)
@@ -2009,7 +2098,7 @@ namespace Peak.AP
                             _instance._log.LogError("[PeakPelago] Error getting item info: " + ex.Message);
                         }
 
-                        _instance._log.LogInfo("[PeakPelago] Local player requested item: " + itemName + " (ID: " + itemId + ")");
+                        _instance._log.LogInfo("[PeakPelago] Player requested item: " + itemName + " (ID: " + itemId + ")");
                         _instance.TrackItemAcquisition(itemName, itemId);
                     }
                 }
@@ -2032,23 +2121,19 @@ namespace Peak.AP
                 {
                     if (_instance == null) return;
 
-                    // Check if this is the local player reaching a peak
-                    if (Character.localCharacter != null && !Character.localCharacter.data.dead)
+                    // Get the peak name from the progress point
+                    string peakName = "Unknown";
+                    if (pointReached != null)
                     {
-                        // Get the peak name from the progress point
-                        string peakName = "Unknown";
-                        if (pointReached != null)
+                        var titleField = pointReached.GetType().GetField("title");
+                        if (titleField != null)
                         {
-                            var titleField = pointReached.GetType().GetField("title");
-                            if (titleField != null)
-                            {
-                                peakName = (string)titleField.GetValue(pointReached) ?? "Unknown";
-                            }
+                            peakName = (string)titleField.GetValue(pointReached) ?? "Unknown";
                         }
-
-                        _instance._log.LogInfo("[PeakPelago] Local player reached peak: " + peakName);
-                        _instance.HandleAscentPeakReached(peakName);
                     }
+
+                    _instance._log.LogInfo("[PeakPelago] Player reached peak: " + peakName);
+                    _instance.HandleAscentPeakReached(peakName);
                 }
                 catch (Exception ex)
                 {
@@ -2209,7 +2294,7 @@ namespace Peak.AP
 
                         _session.Socket.SendPacket(updatePacket);
                     }
-                    
+
                     if (loginResult.SlotData.ContainsKey("death_link_behavior"))
                     {
                         var value = loginResult.SlotData["death_link_behavior"];
@@ -2220,7 +2305,16 @@ namespace Peak.AP
                     {
                         _log.LogWarning("[PeakPelago] death_link_behavior not found in slot data");
                     }
-
+                    if (loginResult.SlotData.ContainsKey("death_link_send_behavior"))
+                    {
+                        var value = loginResult.SlotData["death_link_send_behavior"];
+                        _deathLinkSendBehavior = Convert.ToInt32(value);
+                        _log.LogInfo($"[PeakPelago] Death Link Send Behavior: {_deathLinkSendBehavior}");
+                    }
+                    else
+                    {
+                        _log.LogWarning("[PeakPelago] death_link_send_behavior not found in slot data");
+                    }
 
                     if (loginResult.SlotData.ContainsKey("progressive_stamina"))
                     {
@@ -2249,7 +2343,7 @@ namespace Peak.AP
                     _log.LogWarning("[PeakPelago] No slot data available, using default stamina settings");
                     _staminaManager.Initialize(false, false);
                 }
-
+                SaveState();
                 _status = "Connected";
                 _wantReconnect = false;
                 _notifications.ShowConnected();
@@ -2273,14 +2367,36 @@ namespace Peak.AP
             {
                 if (_session != null)
                 {
-                    _session.MessageLog.OnMessageReceived -= OnApMessage;
-                    _session.Socket?.Disconnect();
+                    try
+                    {
+                        _session.MessageLog.OnMessageReceived -= OnApMessage;
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogDebug("[PeakPelago] Error unsubscribing from messages: " + ex.Message);
+                    }
+                    
+                    try
+                    {
+                        if (_session.Socket != null && _session.Socket.Connected)
+                        {
+                            _session.Socket.Disconnect();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogDebug("[PeakPelago] Error disconnecting socket: " + ex.Message);
+                    }
                 }
             }
-            catch { /* ignore */ }
+            catch (Exception ex)
+            {
+                _log.LogWarning("[PeakPelago] Error in TryCloseSession: " + ex.Message);
+            }
             finally
             {
                 _session = null;
+                _status = "Disconnected";
             }
         }
 
@@ -2431,7 +2547,7 @@ namespace Peak.AP
                 string line3 = _totalLuggageOpened.ToString();
                 string line4 = string.Join(",", _itemAcquisitionCounts.Select(kvp => kvp.Key + ":" + kvp.Value).ToArray());
                 string line5 = _staminaManager?.SaveState() ?? "0,1.00";
-                File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4, line5 });
+                File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4, line5});
                 _log.LogDebug("[PeakPelago] Saved state to port-specific file: " + _currentPort);
             }
             catch (Exception ex)
