@@ -17,7 +17,6 @@ using UnityEngine;
 using static MountainProgressHandler;
 using Newtonsoft.Json.Linq;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
-using PeakArchipelago;
 
 namespace Peak.AP
 {
@@ -54,9 +53,6 @@ namespace Peak.AP
         private string _lastReceivedItemName = "None";
         private DateTime _lastReceivedItemTime = DateTime.MinValue;
 
-        // ===== Simple IMGUI toggle =====
-        private bool _showUI = true;
-
         // ===== Debug counter for luggage opens =====
         private int _luggageOpenedCount = 0;
         private int _luggageOpenedThisRun = 0;
@@ -88,7 +84,7 @@ namespace Peak.AP
         private string _lastDeathLinkSource = "None";
         private string _lastDeathLinkCause = "None";
         private static PeakArchipelagoPlugin _instance;
-
+        public string Status => _status;
         private void Awake()
         {
             try
@@ -2145,9 +2141,21 @@ namespace Peak.AP
             }
         }
 
+        public void SetConnectionDetails(string server, string port, string slot, string password)
+        {
+            cfgServer.Value = server;
+            if (int.TryParse(port, out int portNum))
+            {
+                cfgPort.Value = portNum;
+            }
+            cfgSlot.Value = slot;
+            cfgPassword.Value = password;
+        }
+
+
         // ===== Connection =====
 
-        private void Connect()
+        public void Connect()
         {
             if (_isConnecting) return;
 

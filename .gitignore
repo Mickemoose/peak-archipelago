@@ -1,8 +1,6 @@
 /.vs
 /archipelago_package
 /obj
-peak-archipelago.sln
 archipelago.zip
-PeakArchipelagoPlugin.csproj
 /bin/Debug/net472
 /bin

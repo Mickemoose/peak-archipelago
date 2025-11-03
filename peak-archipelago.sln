@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PeakArchipelagoPlugin", "PeakArchipelagoPlugin.csproj", "{29F9CEB0-DB8C-E48B-81DC-133926F872F3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Debug|x64.Build.0 = Debug|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Debug|x86.Build.0 = Debug|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Release|x64.ActiveCfg = Release|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Release|x64.Build.0 = Release|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Release|x86.ActiveCfg = Release|Any CPU
+		{29F9CEB0-DB8C-E48B-81DC-133926F872F3}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8E4A4139-FE2F-460D-B498-BF4457EB60CD}
+	EndGlobalSection
+EndGlobal
