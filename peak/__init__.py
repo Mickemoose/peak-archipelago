@@ -176,8 +176,11 @@ class PeakWorld(World):
             "progressive_stamina": self.options.progressive_stamina.value,
             "additional_stamina_bars": self.options.additional_stamina_bars.value,
             "trap_percentage": self.options.trap_percentage.value,
+            "ring_link": self.options.ring_link.value,
+            "trap_link": self.options.trap_link.value,
             "death_link": self.options.death_link.value,
             "death_link_behavior": self.options.death_link_behavior.value,
+            "death_link_send_behavior": self.options.death_link_send_behavior.value,
         }
         
         # Log what we're sending

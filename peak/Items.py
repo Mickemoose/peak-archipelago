@@ -43,7 +43,7 @@ ITEMS = {
     "Dynamite": (76009, ItemClassification.trap),
     "Spawn Bee Swarm": (76027, ItemClassification.trap),
     "Destroy Held Item": (76029, ItemClassification.trap),
-    #"Spawn Lightning": (76030, ItemClassification.trap),
+    "Swap Trap": (76030, ItemClassification.trap),
     "Minor Poison Trap": (76032, ItemClassification.trap),
     "Poison Trap": (76033, ItemClassification.trap),
     "Deadly Poison Trap": (76034, ItemClassification.trap),
@@ -51,6 +51,10 @@ ITEMS = {
     "Nap Time Trap": (76036, ItemClassification.trap),
     "Balloon Trap": (76037, ItemClassification.trap),
     "Hungry Hungry Camper Trap": (76038, ItemClassification.trap),
+    "Cactus Ball Trap": (76039, ItemClassification.trap),
+    "Freeze Trap": (76040, ItemClassification.trap),
+    "Slip Trap": (76041, ItemClassification.trap),
+    "Yeet Trap": (76042, ItemClassification.trap),
     #endregion
     
     #region Progression Items
@@ -133,5 +137,7 @@ ITEMS = {
     "Strange Gem": (77066, ItemClassification.filler),
     "Egg": (77067, ItemClassification.useful),
     "Turkey": (77068, ItemClassification.useful),
+    "Honeycomb": (77069, ItemClassification.useful),
+    "Beehive": (77070, ItemClassification.useful),
     #endregion
 }

@@ -35,12 +35,22 @@ class AdditionalStaminaBars(Toggle):
 
 class TrapPercentage(Range):
     """
-    Set a percentage of how many filler items are replaced with traps here.
+    Replace a percentage of junk items in the item pool with random traps.
     """
     display_name = "Trap Percentage"
     range_start = 0
     range_end = 100
     default = 10
+
+class RingLink(Toggle):
+    """Enable Ring Link, affecting all linked players."""
+    display_name = "Ring Link"
+    default = 0
+
+class TrapLink(Toggle):
+    """Enable Trap Link, affecting all linked players."""
+    display_name = "Trap Link"
+    default = 0
 
 class DeathLink(Toggle):
     """Enable death link mode, affecting all linked players."""
@@ -72,6 +82,8 @@ class PeakOptions(PerGameCommonOptions):
     progressive_stamina: ProgressiveStamina
     additional_stamina_bars: AdditionalStaminaBars
     trap_percentage: TrapPercentage
+    ring_link: RingLink
+    trap_link: TrapLink
     death_link: DeathLink
     death_link_behavior: DeathLinkBehavior
     death_link_send_behavior: DeathLinkSendBehavior

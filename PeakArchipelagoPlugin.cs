@@ -74,7 +74,9 @@ namespace Peak.AP
         private int _originalMaxAscent = 0;
         private HashSet<int> _unlockedAscents = new HashSet<int>(); // Track which ascents are unlocked via AP items
 
-        // ===== Death Link Management =====
+        // ===== AP Link Management =====
+        private RingLinkService _ringLinkService;
+        private TrapLinkService _trapLinkService;
         private DeathLinkService _deathLinkService;
         private int _deathLinkBehavior = 0;
         private bool _deathLinkReceivedThisSession = false;
@@ -111,7 +113,8 @@ namespace Peak.AP
                 CharacterClampStaminaPatch.SetStaminaManager(_staminaManager);
                 StaminaBarUpdatePatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
-
+                _ringLinkService = new RingLinkService(_log);
+                _trapLinkService = new TrapLinkService(_log);
                 // Check for port changes and initialize port-specific caching
                 CheckAndHandlePortChange();
 
@@ -165,7 +168,8 @@ namespace Peak.AP
 
             // Unsubscribe from item acquisition events
             GlobalEvents.OnItemRequested -= OnItemRequested;
-
+            _ringLinkService?.Cleanup();
+            _trapLinkService?.Cleanup();
             // Remove Harmony patches
             _harmony?.UnpatchSelf();
 
@@ -1054,6 +1058,8 @@ namespace Peak.AP
                 { "BIG LOLLIPOP", "Acquire Big Lollipop" },
                 { "EGG", "Acquire Egg" },
                 { "TURKEY", "Acquire Turkey" },
+                { "HONEYCOMB", "Acquire Honeycomb" },
+                { "BEEHIVE", "Acquire Beehive" },
                 
                 // Miscellaneous items
                 { "CONCH", "Acquire Conch" },
@@ -1119,6 +1125,8 @@ namespace Peak.AP
                 { "Pandora's Lunchbox", () => SpawnPhysicalItem("PandorasBox") },
                 { "Ancient Idol", () => SpawnPhysicalItem("AncientIdol") },
                 { "Strange Gem", () => SpawnPhysicalItem("Strange Gem") },
+                { "Beehive", () => SpawnPhysicalItem("Beehive") },
+                { "Honeycomb", () => SpawnPhysicalItem("Item_Honeycomb") },
                 { "Egg", () => SpawnPhysicalItem("Egg") },
                 { "Turkey", () => SpawnPhysicalItem("EggTurkey") },
                 { "Bugle of Friendship", () => SpawnPhysicalItem("Bugle_Magic") },
@@ -1166,21 +1174,28 @@ namespace Peak.AP
 
                 // Trap Items
                 { "Spawn Bee Swarm", () => SpawnBeeSwarm() },
-                { "Spawn Lightning", () => SpawnLightning() },
                 { "Destroy Held Item", () => DestroyHeldItem() },
                 { "Blue Berrynana Peel", () => SpawnPhysicalItem("Berrynana Peel Blue Variant") },
+                { "Banana Peel Trap", () => SpawnPhysicalItem("Berrynana Peel Yellow") },
                 { "Minor Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Minor, _log) },
                 { "Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Normal, _log) },
                 { "Deadly Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Deadly, _log) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
+                { "Swap Trap", () => SwapTrapEffect.ApplyPositionSwapTrap(_log) },
                 { "Nap Time Trap", () => NapTimeTrapEffect.ApplyNapTrap(_log) },
                 { "Hungry Hungry Camper Trap", () => HungryHungryCamperTrapEffect.ApplyHungerTrap(_log) },
                 { "Balloon Trap", () => BalloonTrapEffect.ApplyBalloonTrap(_log) },
+                { "Slip Trap", () => SlipTrapEffect.ApplySlipTrap(_log) },
                 { "Clear All Effects", () => ClearAllEffects() },
                 { "Speed Upgrade", () => ApplySpeedUpgrade() },
-
-                { "Spawn Small Luggage", () => SpawnSmallLuggage() },
+                { "Cactus Ball Trap", () => SpawnPhysicalItem("CactusBall") },
+                { "Freeze Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Cold) },
+                { "Cold Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Cold) },
+                { "Hot Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Hot) },
+                { "Injury Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Injury) },
                 { "Bounce Fungus", () => SpawnPhysicalItem("BounceShroom") },
+                { "Instant Death Trap", () => InstantDeathTrapEffect.ApplyInstantDeathTrap(_log) },
+                { "Yeet Trap", () => YeetItemTrapEffect.ApplyYeetTrap(_log)},
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
@@ -1472,11 +1487,10 @@ namespace Peak.AP
             }
         }
 
-        public void ApplyItemEffect(string itemName)
+        public void ApplyItemEffect(string itemName, bool fromTrapLink = false)
         {
             try
             {
-
                 // Track the received item for debug purposes
                 _itemsReceivedFromAP++;
                 _lastReceivedItemName = itemName;
@@ -1486,6 +1500,12 @@ namespace Peak.AP
                 if (_itemEffectHandlers.ContainsKey(itemName))
                 {
                     _itemEffectHandlers[itemName].Invoke();
+
+                    // Send trap link if this is a trap item and not already from trap link
+                    if (!fromTrapLink && _trapLinkService != null && IsTrapItem(itemName))
+                    {
+                        _trapLinkService.SendTrapLink(itemName);
+                    }
                 }
                 else
                 {
@@ -1496,6 +1516,19 @@ namespace Peak.AP
             {
                 _log.LogError("[PeakPelago] Error applying item effect for " + itemName + ": " + ex.Message);
             }
+        }
+        
+        private bool IsTrapItem(string itemName)
+        {
+            // Check if this is a trap item
+            var trapItems = new HashSet<string>
+            {
+                "Spawn Bee Swarm", "Destroy Held Item", "Minor Poison Trap", "Dynamite",
+                "Poison Trap", "Deadly Poison Trap", "Tornado Trap", "Freeze Trap",
+                "Nap Time Trap", "Balloon Trap", "Hungry Hungry Camper Trap", "Swap Trap",
+                "Blue Berrynana Peel", "Yeet Trap", "Cactus Ball Trap", "Slip Trap"
+            };
+            return trapItems.Contains(itemName);
         }
 
         // Method to track when items are received from Archipelago
@@ -2250,6 +2283,10 @@ namespace Peak.AP
                         SaveState();
                         ItemFlags classification = info.Flags;
                         _notifications.ShowItemNotification(fromName, toName, itemName, classification);
+                        if (IsTrapItem(itemName))
+                        {
+                            _trapLinkService?.QueueTrap(itemName);
+                        }
                         _instance.ApplyItemEffect(itemName);
                     }
                     catch (Exception ex)
@@ -2287,6 +2324,48 @@ namespace Peak.AP
                     bool progressiveEnabled = false;
                     bool additionalEnabled = false;
                     bool deathLinkEnabled = false;
+                    bool trapLinkEnabled = false;
+
+                    if (loginResult.SlotData.ContainsKey("ring_link"))
+                    {
+                        var value = loginResult.SlotData["ring_link"];
+                        bool ringLinkEnabled = Convert.ToInt32(value) != 0;
+                        _ringLinkService.Initialize(_session, ringLinkEnabled);
+                        _log.LogInfo($"[PeakPelago] Ring Link from slot data: {ringLinkEnabled}");
+                    }
+
+                    if (loginResult.SlotData.ContainsKey("trap_link"))
+                    {
+                        var value = loginResult.SlotData["trap_link"];
+                        trapLinkEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Trap Link from slot data: {trapLinkEnabled}");
+                    }
+
+                    if (trapLinkEnabled)
+                    {
+                        var enabledTraps = new HashSet<string>
+                        {
+                            "Spawn Bee Swarm",
+                            "Destroy Held Item",
+                            "Minor Poison Trap",
+                            "Poison Trap",
+                            "Deadly Poison Trap",
+                            "Tornado Trap",
+                            "Nap Time Trap",
+                            "Balloon Trap",
+                            "Dynamite",
+                            "Hungry Hungry Camper Trap",
+                            "Blue Berrynana Peel",
+                            "Yeet Item Trap"
+                        };
+                        _trapLinkService.Initialize(
+                            _session,
+                            trapLinkEnabled,
+                            cfgSlot.Value,
+                            enabledTraps,
+                            ApplyItemEffect
+                        );
+                    }
 
                     if (loginResult.SlotData.ContainsKey("death_link"))
                     {

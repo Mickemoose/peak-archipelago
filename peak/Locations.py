@@ -147,6 +147,8 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Strange Gem": 76266,
     "Acquire Egg": 76267,
     "Acquire Turkey": 76268,
+    "Acquire Honeycomb": 76269,
+    "Acquire Beehive": 76270,
     
     # Peak Badge
     "Peak Badge": 76305,
