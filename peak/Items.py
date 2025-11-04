@@ -136,11 +136,13 @@ ITEMS = {
     "Yellow Winterberry": (77064, ItemClassification.filler),
     "Guidebook": (77065, ItemClassification.useful),
     "Strange Gem": (77066, ItemClassification.filler),
-    "Egg": (77067, ItemClassification.useful),
-    "Turkey": (77068, ItemClassification.useful),
+    "Egg": (77067, ItemClassification.filler),
+    "Cooked Bird": (77068, ItemClassification.filler),
     "Honeycomb": (77069, ItemClassification.useful),
-    "Beehive": (77070, ItemClassification.useful),
+    "Beehive": (77070, ItemClassification.filler),
     "Red Prickleberry": (77071, ItemClassification.filler),
     "Gold Prickleberry": (77072, ItemClassification.filler),
+    "Big Egg": (77073, ItemClassification.filler),
+    "Scorpion": (77074, ItemClassification.trap),
     #endregion
 }

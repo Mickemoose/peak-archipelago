@@ -101,7 +101,7 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Dynamite", "Acquire Bing Bong", "Acquire Red Crispberry", "Acquire Green Crispberry",
         "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Brown Berrynana",
         "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", "Acquire Yellow Winterberry",
-        "Acquire Strange Gem", "Acquire Egg", "Acquire Turkey", "Acquire Honeycomb", "Acquire Beehive"
+        "Acquire Strange Gem", "Acquire Egg", "Acquire Cooked Bird", "Acquire Honeycomb", "Acquire Beehive", "Acquire Big Egg"
     ]
     
     for acquire_name in acquire_locations:
@@ -118,7 +118,7 @@ def apply_rules(world: "PeakWorld"):
     
     # Mesa-locked items require Mesa Access
     mesa_locked_items = [
-        "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol", "Acquire Red Prickleberry", "Acquire Gold Prickleberry"
+        "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol", "Acquire Red Prickleberry", "Acquire Gold Prickleberry", "Acquire Scorpion"
     ]
     
     for mesa_item in mesa_locked_items:

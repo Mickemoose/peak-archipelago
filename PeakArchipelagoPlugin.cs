@@ -89,6 +89,9 @@ namespace Peak.AP
         private static PeakArchipelagoPlugin _instance;
         public string Status => _status;
         private ArchipelagoUI _ui;
+        private LinkedList<(string itemName, bool isTrap)> _itemQueue = new LinkedList<(string, bool)>();
+        private float _lastItemProcessed = 0f;
+        private const float ITEM_PROCESSING_COOLDOWN = 0.5f;
         private void Awake()
         {
             try
@@ -1059,10 +1062,12 @@ namespace Peak.AP
                 { "ENERGY DRINK", "Acquire Energy Drink" },
                 { "SPORTS DRINK", "Acquire Sports Drink" },
                 { "BIG LOLLIPOP", "Acquire Big Lollipop" },
+                { "BIG EGG", "Acquire Big Egg" },
                 { "EGG", "Acquire Egg" },
-                { "TURKEY", "Acquire Turkey" },
+                { "COOKED BIRD", "Acquire Cooked Bird" },
                 { "HONEYCOMB", "Acquire Honeycomb" },
                 { "BEEHIVE", "Acquire Beehive" },
+                { "SCORPION", "Acquire Scorpion" },
                 
                 // Miscellaneous items
                 { "CONCH", "Acquire Conch" },
@@ -1093,7 +1098,6 @@ namespace Peak.AP
         {
             _itemEffectHandlers = new Dictionary<string, System.Action>
             {
-                // Physical Game Items (77000-77064) - Spawn directly
                 { "Rope Spool", () => SpawnPhysicalItem("RopeSpool") },
                 { "Rope Cannon", () => SpawnPhysicalItem("RopeShooter") },
                 { "Anti-Rope Spool", () => SpawnPhysicalItem("Anti-Rope Spool") },
@@ -1130,10 +1134,12 @@ namespace Peak.AP
                 { "Pandora's Lunchbox", () => SpawnPhysicalItem("PandorasBox") },
                 { "Ancient Idol", () => SpawnPhysicalItem("AncientIdol") },
                 { "Strange Gem", () => SpawnPhysicalItem("Strange Gem") },
+                { "Scorpion", () => SpawnPhysicalItem("Scorpion") },
                 { "Beehive", () => SpawnPhysicalItem("Beehive") },
                 { "Honeycomb", () => SpawnPhysicalItem("Item_Honeycomb") },
-                { "Egg", () => SpawnPhysicalItem("NestEgg") },
-                { "Turkey", () => SpawnPhysicalItem("EggTurkey") },
+                { "Big Egg", () => SpawnPhysicalItem("NestEgg") },
+                { "Egg", () => SpawnPhysicalItem("Egg") },
+                { "Cooked Bird", () => SpawnPhysicalItem("EggTurkey") },
                 { "Bugle of Friendship", () => SpawnPhysicalItem("Bugle_Magic") },
                 { "Bugle", () => SpawnPhysicalItem("Bugle") },
                 { "Remedy Fungus", () => SpawnPhysicalItem("HealingPuffShroom") },
@@ -1180,7 +1186,7 @@ namespace Peak.AP
                 { "Progressive Stamina Bar", () => ApplyProgressiveStamina() },
 
                 // Trap Items
-                { "Spawn Bee Swarm", () => SpawnBeeSwarm() },
+                { "Spawn Bee Swarm", () => BeeSwarmTrapEffect.ApplyBeeSwarmTrap(_log) },
                 { "Destroy Held Item", () => DestroyHeldItem() },
                 { "Blue Berrynana Peel", () => SpawnPhysicalItem("Berrynana Peel Blue Variant") },
                 { "Banana Peel Trap", () => SpawnPhysicalItem("Berrynana Peel Yellow") },
@@ -1268,7 +1274,7 @@ namespace Peak.AP
                 {
                     if (ItemDatabase.TryGetItem(itemID, out Item item))
                     {
-                        if (item.name.Equals(itemName, System.StringComparison.OrdinalIgnoreCase))
+                        if (item.name.Equals(itemName, StringComparison.OrdinalIgnoreCase))
                         {
                             itemToSpawn = item;
                             break;
@@ -1289,7 +1295,7 @@ namespace Peak.AP
                 // Spawn the item prefab directly without calling RequestPickup
                 GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error spawning physical item " + itemName + ": " + ex.Message);
             }
@@ -1325,66 +1331,11 @@ namespace Peak.AP
                     _log.LogWarning("[PeakPelago] Could not find Ascents class");
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error unlocking ascent " + ascentLevel + ": " + ex.Message);
             }
         }
-
-        private void SpawnBeeSwarm()
-        {
-            try
-            {
-                if (Character.localCharacter == null)
-                {
-                    _log.LogWarning("[PeakPelago] Cannot spawn bee swarm - no local character");
-                    return;
-                }
-
-                // Spawn a bee swarm near the player
-                Vector3 spawnPosition = Character.localCharacter.Center + Character.localCharacter.transform.forward * 3f;
-                spawnPosition += Vector3.up * 1f;
-
-                // Try to spawn a bee swarm using the existing system
-                var beeSwarm = PhotonNetwork.Instantiate("BeeSwarm", spawnPosition, Quaternion.identity, 0);
-                if (beeSwarm != null)
-                {
-                    _log.LogInfo("[PeakPelago] Spawned bee swarm at position " + spawnPosition);
-                }
-            }
-            catch (System.Exception ex)
-            {
-                _log.LogError("[PeakPelago] Error spawning bee swarm: " + ex.Message);
-            }
-        }
-
-        private void SpawnLightning()
-        {
-            try
-            {
-                if (Character.localCharacter == null)
-                {
-                    _log.LogWarning("[PeakPelago] Cannot spawn lightning - no local character");
-                    return;
-                }
-
-                // Spawn lightning near the player
-                Vector3 spawnPosition = Character.localCharacter.Center + Character.localCharacter.transform.forward * 5f;
-                spawnPosition += Vector3.up * 10f; // High above
-
-                // Try to spawn lightning using the existing system
-                var lightning = PhotonNetwork.Instantiate("Lightning", spawnPosition, Quaternion.identity, 0);
-                if (lightning != null)
-                {
-                    _log.LogInfo("[PeakPelago] Spawned lightning at position " + spawnPosition);
-                }
-            }
-            catch (System.Exception ex)
-            {
-                _log.LogError("[PeakPelago] Error spawning lightning: " + ex.Message);
-            }
-        }
-
         private void DestroyHeldItem()
         {
             try
@@ -1399,12 +1350,11 @@ namespace Peak.AP
                 Character.localCharacter.refs.items.photonView.RPC("DestroyHeldItemRpc", RpcTarget.All);
                 _log.LogInfo("[PeakPelago] Destroyed held item");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error destroying held item: " + ex.Message);
             }
         }
-
         private void ClearAllEffects()
         {
             try
@@ -1472,30 +1422,6 @@ namespace Peak.AP
                 character.refs.movement.movementModifier = originalModifier;
             }
         }
-
-        private void SpawnSmallLuggage()
-        {
-            try
-            {
-                if (Character.localCharacter == null)
-                {
-                    _log.LogWarning("[PeakPelago] Cannot spawn luggage - no local character");
-                    return;
-                }
-
-                // Spawn a small luggage near the player
-                Vector3 spawnPosition = Character.localCharacter.Center + Character.localCharacter.transform.forward * 2f;
-                spawnPosition += Vector3.up * 0.1f;
-
-                // Try to spawn luggage using the existing system
-                var luggage = PhotonNetwork.Instantiate("SmallLuggage", spawnPosition, Quaternion.identity, 0);
-            }
-            catch (System.Exception ex)
-            {
-                _log.LogError("[PeakPelago] Error spawning small luggage: " + ex.Message);
-            }
-        }
-
         public void ApplyItemEffect(string itemName, bool fromTrapLink = false)
         {
             try
@@ -1540,10 +1466,6 @@ namespace Peak.AP
                 _itemsReceivedFromAP++;
                 _lastReceivedItemName = itemName;
                 _lastReceivedItemTime = DateTime.Now;
-
-                //_log.LogInfo("[PeakPelago] *** ITEM RECEIVED FROM ARCHIPELAGO ***: " + itemName + " (Total: " + _itemsReceivedFromAP + ")");
-
-                // Apply the item effect
                 ApplyItemEffect(itemName);
             }
             catch (System.Exception ex)
@@ -1551,7 +1473,6 @@ namespace Peak.AP
                 _log.LogError("[PeakPelago] Error tracking received item: " + ex.Message);
             }
         }
-
         private void CheckItemAcquisitionAchievements()
         {
             if (_session == null) return;
@@ -2090,8 +2011,6 @@ namespace Peak.AP
 
                     _instance._log.LogDebug("[PeakPelago] TestRequestedItemPatch: Item requested");
 
-                    // Remove the isLocalPlayer check - allow any player to trigger
-
                     if (item != null)
                     {
                         // Get the item name using reflection
@@ -2291,14 +2210,11 @@ namespace Peak.AP
                         SaveState();
                         ItemFlags classification = info.Flags;
                         _notifications.ShowItemNotification(fromName, toName, itemName, classification);
-                        if (IsTrapItem(itemName))
-                        {
-                            _trapLinkService?.QueueTrap(itemName); // Traps are queued to check for TrapLink stuff
-                        }
-                        else
-                        {
-                            _instance.ApplyItemEffect(itemName);  // otherwise just apply the item effect normally
-                        }
+                        
+                        bool isTrap = IsTrapItem(itemName);
+                        _itemQueue.AddLast((itemName, isTrap));
+                        
+                        _log.LogInfo($"[PeakPelago] Queued item: {itemName} (Queue size: {_itemQueue.Count})");
                     }
                     catch (Exception ex)
                     {
@@ -2525,10 +2441,46 @@ namespace Peak.AP
             try
             {
                 _trapLinkService?.Update();
+                ProcessItemQueue();
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in Update: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Process items from the queue gradually to prevent overwhelming the game
+        /// </summary>
+        private void ProcessItemQueue()
+        {
+            if (_itemQueue.Count == 0 || Time.time - _lastItemProcessed < ITEM_PROCESSING_COOLDOWN)
+            {
+                return;
+            }
+            
+            var (itemName, isTrap) = _itemQueue.First.Value;
+            _itemQueue.RemoveFirst();
+            
+            try
+            {
+                _log.LogInfo($"[PeakPelago] Processing queued item: {itemName} (Remaining: {_itemQueue.Count})");
+                
+                if (isTrap)
+                {
+                    _trapLinkService?.QueueTrap(itemName);
+                }
+                else
+                {
+                    ApplyItemEffect(itemName);
+                }
+                
+                _lastItemProcessed = Time.time;
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error processing queued item {itemName}: {ex.Message}");
+                _lastItemProcessed = Time.time;
             }
         }
 
@@ -2552,7 +2504,7 @@ namespace Peak.AP
                     _currentPort = currentPort;
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error checking port change: " + ex.Message);
             }
@@ -2677,61 +2629,6 @@ namespace Peak.AP
             }
         }
 
-        // ===== Data Reset Methods =====
-
-        private void ResetAllCachedData()
-        {
-            try
-            {
-                // Reset all counters
-                _luggageOpenedCount = 0;
-                _luggageOpenedThisRun = 0;
-                _totalLuggageOpened = 0;
-                _hasOpenedLuggageThisSession = false;
-
-                // Reset item acquisition tracking
-                _itemAcquisitionCounts.Clear();
-                _itemAcquisitionCountsThisRun.Clear();
-                _lastAcquiredItemName = "None";
-                _lastAcquiredItemId = 0;
-                _lastAcquiredItemTime = 0f;
-
-                // Reset ascent badge tracking
-                _awardedAscentBadges.Clear();
-
-                // Reset badge management
-                _originalUnlockedBadges.Clear();
-                _badgesHidden = false;
-                _hasHiddenBadges = false;
-
-                // Reset ascent management
-                _originalMaxAscent = 0;
-                _unlockedAscents.Clear();
-
-                // Clear reported checks
-                _reportedChecks.Clear();
-
-                // Reset item index
-                _lastProcessedItemIndex = 0;
-
-                // Delete the state file
-                if (File.Exists(StateFilePath))
-                {
-                    File.Delete(StateFilePath);
-                }
-
-                // Clear current port to force re-initialization
-                _currentPort = "";
-
-            }
-            catch (Exception ex)
-            {
-                _log.LogError("[PeakPelago] Failed to reset cached data: " + ex.Message);
-            }
-        }
-
-        // ===== Achievement Event Handling =====
-
         /// <summary>Handle achievement events to report badge checks to Archipelago</summary>
         private void OnAchievementThrown(ACHIEVEMENTTYPE achievementType)
         {
@@ -2770,8 +2667,7 @@ namespace Peak.AP
         {
             try
             {
-                // Only track acquisitions by the local character
-                if (character != null && character.IsLocal && item != null)
+                if (character != null && item != null)
                 {
                     TrackItemAcquisition(item.UIData.itemName, item.itemID);
                 }
