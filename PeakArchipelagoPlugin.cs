@@ -1081,7 +1081,9 @@ namespace Peak.AP
                 { "PINK BERRYNANA", "Acquire Pink Berrynana" },
                 { "YELLOW BERRYNANA", "Acquire Yellow Berrynana" },
                 { "ORANGE WINTERBERRY", "Acquire Orange Winterberry" },
-                { "YELLOW WINTERBERRY", "Acquire Yellow Winterberry" }
+                { "YELLOW WINTERBERRY", "Acquire Yellow Winterberry" },
+                { "RED PRICKLEBERRY", "Acquire Red Prickleberry" },
+                { "GOLD PRICKLEBERRY", "Acquire Gold Prickleberry" },
             };
 
             _log.LogInfo("[PeakPelago] Initialized item mapping with " + _itemToLocationMapping.Count + " items");
@@ -1130,7 +1132,7 @@ namespace Peak.AP
                 { "Strange Gem", () => SpawnPhysicalItem("Strange Gem") },
                 { "Beehive", () => SpawnPhysicalItem("Beehive") },
                 { "Honeycomb", () => SpawnPhysicalItem("Item_Honeycomb") },
-                { "Egg", () => SpawnPhysicalItem("Egg") },
+                { "Egg", () => SpawnPhysicalItem("NestEgg") },
                 { "Turkey", () => SpawnPhysicalItem("EggTurkey") },
                 { "Bugle of Friendship", () => SpawnPhysicalItem("Bugle_Magic") },
                 { "Bugle", () => SpawnPhysicalItem("Bugle") },
@@ -1163,6 +1165,8 @@ namespace Peak.AP
                 { "Yellow Berrynana", () => SpawnPhysicalItem("Berrynana Yellow") },
                 { "Orange Winterberry", () => SpawnPhysicalItem("Winterberry Orange") },
                 { "Yellow Winterberry", () => SpawnPhysicalItem("Winterberry Yellow") },
+                { "Red Prickleberry", () => SpawnPhysicalItem("Prickleberry_Red") },
+                { "Gold Prickleberry", () => SpawnPhysicalItem("Prickleberry_Gold") },
 
 
                 // Progression Items (76019-76025) - Unlock ascents

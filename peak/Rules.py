@@ -118,7 +118,7 @@ def apply_rules(world: "PeakWorld"):
     
     # Mesa-locked items require Mesa Access
     mesa_locked_items = [
-        "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol"
+        "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol", "Acquire Red Prickleberry", "Acquire Gold Prickleberry"
     ]
     
     for mesa_item in mesa_locked_items:

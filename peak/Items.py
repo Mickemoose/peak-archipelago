@@ -140,5 +140,7 @@ ITEMS = {
     "Turkey": (77068, ItemClassification.useful),
     "Honeycomb": (77069, ItemClassification.useful),
     "Beehive": (77070, ItemClassification.useful),
+    "Red Prickleberry": (77071, ItemClassification.filler),
+    "Gold Prickleberry": (77072, ItemClassification.filler),
     #endregion
 }
