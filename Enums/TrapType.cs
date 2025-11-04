@@ -23,7 +23,8 @@ namespace Peak.AP
         CactusBallTrap,
         FreezeTrap,
         SlipTrap,
-        YeetTrap
+        YeetTrap,
+        TumbleweedTrapEffect,
     }
 
     public static class TrapTypeExtensions
@@ -46,7 +47,8 @@ namespace Peak.AP
             { TrapType.CactusBallTrap, "Cactus Ball Trap" },
             { TrapType.FreezeTrap, "Freeze Trap" },
             { TrapType.SlipTrap, "Slip Trap" },
-            { TrapType.YeetTrap, "Yeet Trap" }
+            { TrapType.YeetTrap, "Yeet Trap" },
+            { TrapType.TumbleweedTrapEffect, "Tumbleweed Trap" }
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

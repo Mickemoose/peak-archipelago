@@ -48,11 +48,11 @@ This mod consists of two main components:
 2. **Install the Plugin**:
    - Download the `PeakArchipelagoPluginDLL` folder from the releases
    - Drag the entire `PeakArchipelagoPluginDLL` folder into your `BepInEx/plugins/` directory
-   - The folder contains all necessary DLLs including the plugin and Archipelago.MultiClient.Net
+   - The folder contains all necessary DLLs including the plugin
 
 3. **Launch the Game**:
    - Start PEAK - the plugin will create a configuration file on first run
-   - Configure your connection settings (see Configuration section)
+   - Connect using the in game UI
 
 ### Archipelago World Installation
 
@@ -60,28 +60,6 @@ This mod consists of two main components:
    - Double click the peak.apworld file to install the PEAK AP World into your Archipelago installation
 
 ## Configuration
-
-### Client Configuration
-
-The plugin creates a configuration file at `BepInEx/config/com.mickemoose.peak.ap.cfg`:
-
-```ini
-[Connection]
-# Archipelago server address
-Server = archipelago.gg
-
-# Server port
-Port = 38281
-
-# Your slot/player name
-Slot = Player1
-
-# Room password (if required)
-Password = 
-
-# Auto-reconnect on disconnect
-AutoReconnect = true
-```
 
 ### World Options
 
@@ -93,8 +71,13 @@ When generating an Archipelago game, the following PEAK-specific options are ava
 - **Progressive Stamina**: Start with 25% Stamina and require finding Progressive Stamina Bars to reach 100%
 - **Additional Stamina**: With Progressive Stamina enabled, find 4 extra Stamina Bars to reach a total of 200% Stamina
 - **Trap Weigh Percent**: Determine the amount of filler items to get replaced with traps.
+- **Ring Link**: Enable RingLink with other linked players.
+- **Trap Link**: Enable TrapLink with other linked players.
 - **Death Link**: Enable death synchronization with other players
 - **Death Link Behavior**: Choose between full run reset or checkpoint reset
+- **Death Link Send Behavior**: Choose between sending on any players death or on failed run
+
+**HardRingLink and EnergyLink options will appear but are non functioning at this current time**
 
 ## How to Play
 
@@ -108,28 +91,14 @@ When generating an Archipelago game, the following PEAK-specific options are ava
    - The in-game UI will show connection status
 
 3. **Connect to Archipelago**:
-   - Use the in-game menu (press the UI toggle key)
-   - Connection will happen automatically based on your config
-   - Verify connection status in the UI overlay
+   - Use the in-game menu in the top left
+   - Fill in the connection details and click Connect or hit Enter
 
 4. **Play the Game**:
    - Ascents are initially locked - unlock them by receiving items
    - Collecting items and completing objectives sends checks to other players
    - Receive items from other players as they complete their objectives
    - Work together (or compete) to complete your goals!
-
-## In-Game UI
-
-The mod includes an on-screen overlay showing:
-- Connection status
-- Current server/slot information
-- Items received counter
-- Last received item and timestamp
-- Luggage opened count
-- DeathLink status and history
-- Unlocked ascents
-
-Toggle the UI visibility using the configured hotkey.
 
 ## Development
 
@@ -188,7 +157,7 @@ The Python world code follows Archipelago's world API:
 
 ## Version
 
-Current Version: **0.4.2**
+Current Version: **0.4.5**
 
 ## License
 

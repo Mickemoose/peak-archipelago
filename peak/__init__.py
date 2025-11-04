@@ -177,6 +177,8 @@ class PeakWorld(World):
             "additional_stamina_bars": self.options.additional_stamina_bars.value,
             "trap_percentage": self.options.trap_percentage.value,
             "ring_link": self.options.ring_link.value,
+            "hard_ring_link": self.options.hard_ring_link.value,
+            "energy_link": self.options.energy_link.value,
             "trap_link": self.options.trap_link.value,
             "death_link": self.options.death_link.value,
             "death_link_behavior": self.options.death_link_behavior.value,

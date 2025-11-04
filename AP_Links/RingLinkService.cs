@@ -17,11 +17,13 @@ namespace Peak.AP
         private bool _isEnabled;
         private int _connectionId;
         private Harmony _harmony;
+        private ArchipelagoNotificationManager _notifications;
 
-        public RingLinkService(ManualLogSource log)
+        public RingLinkService(ManualLogSource log, ArchipelagoNotificationManager notifications)
         {
             _log = log;
             _connectionId = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
+            _notifications = notifications;
         }
 
         /// <summary>
@@ -35,12 +37,8 @@ namespace Peak.AP
             if (_session != null && _isEnabled)
             {
                 _session.Socket.PacketReceived += OnPacketReceived;
-                
-                // Apply Harmony patches for item consumption tracking
                 _harmony = new Harmony("com.mickemoose.peak.ap.ringlink");
                 _harmony.PatchAll(typeof(RingLinkPatches));
-                
-                // Set static instance for patches
                 RingLinkPatches.SetInstance(this);
                 
                 _log.LogInfo($"[PeakPelago] Ring Link service initialized (Connection ID: {_connectionId})");
@@ -57,11 +55,11 @@ namespace Peak.AP
         }
 
         /// <summary>
-        /// Send a Ring Link packet when rings change
+        /// Send a Ring Link packet when rings change (supports negative amounts)
         /// </summary>
         public void SendRingLink(int amount)
         {
-            if (_session == null || !_isEnabled || amount == 0)
+            if (_session == null || !_isEnabled)
             {
                 return;
             }
@@ -82,7 +80,17 @@ namespace Peak.AP
                 };
 
                 _session.Socket.SendPacket(bouncePacket);
-                _log.LogInfo($"[PeakPelago] Sent Ring Link: {amount} rings");
+                
+                string ringType = amount > 0 ? "positive" : "negative";
+                _log.LogInfo($"[PeakPelago] Sent Ring Link: {amount} rings ({ringType})");
+                if (ringType == "positive")
+                {
+                    _notifications.ShowRingLinkNotification($"RingLink: Sent +{amount} ring(s)");
+                }
+                else
+                {
+                    _notifications.ShowRingLinkNotification($"RingLink: Sent -{amount} ring(s)");
+                }
             }
             catch (Exception ex)
             {
@@ -132,11 +140,17 @@ namespace Peak.AP
                 if (data.ContainsKey("amount"))
                 {
                     int amount = data["amount"].ToObject<int>();
-                    
-                    _log.LogInfo($"[PeakPelago] Ring Link received: {amount} rings");
-                    
-                    // Apply the healing directly
-                    ApplyRingLinkHealing(amount);
+                    string ringType = amount > 0 ? "positive" : "negative";
+                    _log.LogInfo($"[PeakPelago] Ring Link received: {amount} rings ({ringType})");
+                    if (ringType == "positive")
+                    {
+                        _notifications.ShowRingLinkNotification($"RingLink: +{amount} ring(s)!");
+                    }
+                    else
+                    {
+                        _notifications.ShowRingLinkNotification($"RingLink: -{amount} ring(s)!");
+                    }
+                    ApplyRingLinkEffect(amount);
                 }
             }
             catch (Exception ex)
@@ -146,47 +160,63 @@ namespace Peak.AP
         }
 
         /// <summary>
-        /// Apply Ring Link healing to the local character
+        /// Apply Ring Link effect to all characters in the lobby
         /// </summary>
-        private void ApplyRingLinkHealing(int amount)
+        private void ApplyRingLinkEffect(int amount)
         {
             try
             {
-                if (Character.localCharacter == null)
+                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
                 {
-                    _log.LogWarning("[PeakPelago] Cannot apply Ring Link - no local character");
+                    _log.LogWarning("[PeakPelago] Cannot apply Ring Link - no characters found");
                     return;
                 }
 
-                // Convert rings back to healing value (100 rings = 1.0f healing)
-                float healingValue = amount / 100f;
+                // Convert rings to stamina value (100 rings = 1.0f stamina)
+                float staminaValue = amount / 100f;
 
-                if (healingValue > 0)
+                // Apply to all valid characters
+                var validCharacters = Character.AllCharacters.Where(c => 
+                    c != null && 
+                    c.gameObject.activeInHierarchy && 
+                    !c.data.dead
+                ).ToList();
+
+                foreach (var character in validCharacters)
                 {
-                    var afflictions = Character.localCharacter.refs.afflictions;
-                    if (afflictions != null)
+                    if (staminaValue > 0)
                     {
-                        Character.localCharacter.data.staminaDelta = Mathf.Min(
-                            Character.localCharacter.data.staminaDelta + healingValue,
-                            Character.localCharacter.GetMaxStamina()
-                        );
-
-                        var hungerField = afflictions.GetType().GetField("hunger", 
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        if (hungerField != null)
-                        {
-                            float currentHunger = (float)hungerField.GetValue(afflictions);
-                            float newHunger = Mathf.Max(0f, currentHunger - healingValue);
-                            hungerField.SetValue(afflictions, newHunger);
-                        }
-
-                        _log.LogInfo($"[PeakPelago] Applied Ring Link healing: {healingValue} (from {amount} rings)");
+                        // Positive: Add to extra stamina
+                        character.data.extraStamina += staminaValue;
                     }
+                    else if (staminaValue < 0)
+                    {
+                        float remainingPenalty = Mathf.Abs(staminaValue);
+                        
+                        // Negative: Deduct from extra stamina first
+                        if (character.data.extraStamina > 0)
+                        {
+                            float deduction = Mathf.Min(character.data.extraStamina, remainingPenalty);
+                            character.data.extraStamina -= deduction;
+                            remainingPenalty -= deduction;
+                        }
+                        
+                        // If there's still penalty left, deduct from regular stamina
+                        if (remainingPenalty > 0)
+                        {
+                            character.data.staminaDelta = Mathf.Max(0f, character.data.staminaDelta - remainingPenalty);
+                        }
+                    }
+                    
+                    string action = amount > 0 ? "added" : "deducted";
+                    _log.LogInfo($"[PeakPelago] Ring Link {action}: {Mathf.Abs(staminaValue)} stamina (from {amount} rings)");
                 }
+
+                _log.LogInfo($"[PeakPelago] Ring Link applied to {validCharacters.Count} character(s)");
             }
             catch (Exception ex)
             {
-                _log.LogError($"[PeakPelago] Failed to apply Ring Link healing: {ex.Message}");
+                _log.LogError($"[PeakPelago] Failed to apply Ring Link: {ex.Message}");
             }
         }
 
@@ -223,87 +253,270 @@ namespace Peak.AP
                 _instance = instance;
             }
 
-            // Patch for when items are consumed
-            [HarmonyPatch(typeof(Item), "OnConsume")]
-            public static class ItemOnConsumePatch
+            [HarmonyPatch(typeof(Item), "Awake")]
+            public static class ItemAwakePatch
             {
-                static void Prefix(Item __instance)
+                static void Postfix(Item __instance)
                 {
                     try
                     {
                         if (_instance == null || !_instance._isEnabled) return;
 
-                        // Only track local character's consumption
-                        if (Character.localCharacter == null) return;
-                        if (__instance.holderCharacter != Character.localCharacter) return;
+                        // Add a handler to OnConsumed event
+                        __instance.OnConsumed = (System.Action)System.Delegate.Combine(
+                            __instance.OnConsumed,
+                            (System.Action)delegate
+                            {
+                                if (_instance == null || !_instance._isEnabled) return;
 
-                        // Calculate total healing value
-                        float totalHealingValue = 0f;
+                                if (__instance.holderCharacter == null) return;
 
-                        // Get stamina healing value
-                        var staminaHealField = __instance.GetType().GetField("staminaHeal", 
-                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        if (staminaHealField != null)
-                        {
-                            float staminaHeal = (float)staminaHealField.GetValue(__instance);
-                            totalHealingValue += staminaHeal;
-                        }
-
-                        // Get hunger healing value (if it exists)
-                        var hungerHealField = __instance.GetType().GetField("hungerHeal", 
-                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        if (hungerHealField != null)
-                        {
-                            float hungerHeal = (float)hungerHealField.GetValue(__instance);
-                            totalHealingValue += hungerHeal;
-                        }
-
-                        // Convert to rings (1.0f = 100 rings)
-                        int ringValue = Mathf.RoundToInt(totalHealingValue * 100f);
-
-                        if (ringValue > 0)
-                        {
-                            _instance._log.LogInfo($"[PeakPelago] Item consumed: {__instance.name}, healing value: {totalHealingValue}, rings: {ringValue}");
-                            _instance.SendRingLink(ringValue);
-                        }
+                                // Calculate ring value based on item (or poison)
+                                int ringValue = CalculateRingValue(__instance);
+                                
+                                if (ringValue != 0)
+                                {
+                                    string ringType = ringValue > 0 ? "positive" : "negative";
+                                    _instance._log.LogInfo($"[PeakPelago] Item consumed: {__instance.name}, sending {ringValue} rings ({ringType})");
+                                    _instance.SendRingLink(ringValue);
+                                }
+                            }
+                        );
                     }
                     catch (Exception ex)
                     {
                         if (_instance != null)
                         {
-                            _instance._log.LogError("[PeakPelago] ItemOnConsume patch error: " + ex.Message);
+                            _instance._log.LogError("[PeakPelago] ItemAwake patch error: " + ex.Message);
                         }
                     }
                 }
-            }
 
-            [HarmonyPatch(typeof(Character), "ConsumeItem")]
-            public static class CharacterConsumeItemPatch
-            {
-                static void Postfix(Character __instance, Item item, float staminaHealed, float hungerHealed)
+                private static int CalculateRingValue(Item item)
+                {
+                    string name = item.name;
+
+                    // Check if item has poison effects - if so, return negative rings
+                    bool isPoisonous = HasPoisonEffects(item);
+                    
+                    if (isPoisonous)
+                    {
+                        // Calculate poison penalty
+                        float poisonPenalty = CalculatePoisonPenalty(item);
+                        
+                        if (poisonPenalty > 0)
+                        {
+                            _instance._log.LogInfo($"[PeakPelago] Item {name} is poisonous, penalty: {poisonPenalty}");
+                            return -Mathf.RoundToInt(poisonPenalty * 100f);
+                        }
+                    }
+
+                    float totalRings = 0f;
+
+
+                    if (name.Contains("Apple Berry"))
+                    {
+                        totalRings += 0.1f;
+                    }
+                    if (name.Contains("Berrynana"))
+                    {
+                        totalRings += 0.2f;
+                    }
+                    if (name.Contains("Clusterberry"))
+                    {
+                        totalRings += 0.35f;
+                    }
+                    if (name.Contains("Kingberry"))
+                    {
+                        totalRings += 0.15f;
+                    }
+                    if (name.Contains("Marshmallow"))
+                    {
+                        totalRings += 0.50f;
+                    }
+                    if (name.Contains("Mushroom"))
+                    {
+                        totalRings += 0.07f;
+                    }
+                    if (name.Contains("Sports Drink"))
+                    {
+                        totalRings += 0.15f;
+                    }
+                    if (name.Contains("Energy Drink"))
+                    {
+                        totalRings += 0.25f;
+                    }
+                    if (name.Contains("Winterberry"))
+                    {
+                        totalRings += 0.35f;
+                    }
+                    if (name.Contains("Honeycomb"))
+                    {
+                        totalRings += 0.15f;
+                    }
+                    if (name.Contains("Coconut_half"))
+                    {
+                        totalRings += 0.35f;
+                    }
+                    if (name.Contains("AloeVera"))
+                    {
+                        totalRings += 0.35f;
+                    }
+                    if (name.Contains("Turkey"))
+                    {
+                        totalRings += 0.75f;
+                    }
+                    if (name.Contains("Napberry"))
+                    {
+                        totalRings += 1f;
+                    }
+                    if (name.Contains("Prickleberry"))
+                    {
+                        totalRings += 0.15f;
+                    }
+                    if (name.Contains("Cure-All"))
+                    {
+                        totalRings += 0.30f;
+                    }
+                    if (name.Contains("MedicinalRoot"))
+                    {
+                        totalRings += 0.25f;
+                    }
+                    if (name.Contains("Granola Bar"))
+                    {
+                        totalRings += 0.15f;
+                    }
+                    if (name.Contains("Scout Cookies") || name.Contains("ScoutCookies"))
+                    {
+                        totalRings += 0.3f;
+                    }
+                    if (name.Contains("Trail Mix") || name.Contains("TrailMix"))
+                    {
+                        totalRings += 0.25f;
+                    }
+                    if (name.Contains("Airline Food"))
+                    {
+                        totalRings += 0.35f;
+                    }
+                    if (name.Contains("Lollipop"))
+                    {
+                        totalRings += 0.2f;
+                    }
+                    if (name.Contains("Egg") && !name.Contains("Turkey"))
+                    {
+                        totalRings += 0.15f;
+                    }
+
+                    // Convert to rings (1.0f = 100 rings)
+                    return Mathf.RoundToInt(totalRings * 100f);
+                }
+
+                private static bool HasPoisonEffects(Item item)
                 {
                     try
                     {
-                        if (_instance == null || !_instance._isEnabled) return;
-                        if (!__instance.IsLocal) return;
-
-                        // Calculate total healing
-                        float totalHealing = staminaHealed + hungerHealed;
-                        int ringValue = Mathf.RoundToInt(totalHealing * 100f);
-
-                        if (ringValue > 0)
+                        // Check for Action_InflictPoison component
+                        var inflictPoison = item.GetComponent<Action_InflictPoison>();
+                        if (inflictPoison != null)
                         {
-                            _instance._log.LogInfo($"[PeakPelago] Consumed {item?.name ?? "item"}, healing: {totalHealing}, rings: {ringValue}");
-                            _instance.SendRingLink(ringValue);
+                            return true;
+                        }
+
+                        // Check for Action_ModifyStatus with poison
+                        var modifyStatusActions = item.GetComponents<Action_ModifyStatus>();
+                        if (modifyStatusActions != null)
+                        {
+                            foreach (var action in modifyStatusActions)
+                            {
+                                // STATUSTYPE.Poison = 3
+                                if ((int)action.statusType == 3 && action.changeAmount > 0)
+                                {
+                                    return true;
+                                }
+                            }
+                        }
+
+                        // Check for thorns
+                        var thornsAction = item.GetComponent<Action_AddOrRemoveThorns>();
+                        if (thornsAction != null)
+                        {
+                            return true;
                         }
                     }
                     catch (Exception ex)
                     {
                         if (_instance != null)
                         {
-                            _instance._log.LogError("[PeakPelago] ConsumeItem patch error: " + ex.Message);
+                            _instance._log.LogError($"[PeakPelago] Error checking poison effects: {ex.Message}");
                         }
                     }
+
+                    return false;
+                }
+
+                private static float CalculatePoisonPenalty(Item item)
+                {
+                    float penalty = 0f;
+
+                    try
+                    {
+                        // Check Action_InflictPoison
+                        var inflictPoison = item.GetComponent<Action_InflictPoison>();
+                        if (inflictPoison != null)
+                        {
+                            var poisonAmountField = inflictPoison.GetType().GetField("poisonAmount",
+                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                            if (poisonAmountField != null)
+                            {
+                                float poisonAmount = (float)poisonAmountField.GetValue(inflictPoison);
+                                penalty += poisonAmount * 0.05f;
+                            }
+                            else
+                            {
+                                penalty += 0.05f;
+                            }
+
+                            if (penalty < 0.01f)
+                            {
+                                penalty = 0.05f;
+                            }
+                        }
+
+                        // Check Action_ModifyStatus with poison
+                        var modifyStatusActions = item.GetComponents<Action_ModifyStatus>();
+                        if (modifyStatusActions != null)
+                        {
+                            foreach (var action in modifyStatusActions)
+                            {
+                                if ((int)action.statusType == 3 && action.changeAmount > 0)
+                                {
+                                    penalty += action.changeAmount * 0.05f;
+                                }
+                            }
+                        }
+
+                        var thornsAction = item.GetComponent<Action_AddOrRemoveThorns>();
+                        if (thornsAction != null)
+                        {
+                            penalty += 0.05f;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (_instance != null)
+                        {
+                            _instance._log.LogError($"[PeakPelago] Error calculating poison penalty: {ex.Message}");
+                        }
+                        penalty = 0.05f;
+                    }
+                    
+                    if (penalty < 0.01f)
+                    {
+                        penalty = 0.05f;
+                    }
+
+                    return penalty;
                 }
             }
         }

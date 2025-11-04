@@ -47,6 +47,16 @@ class RingLink(Toggle):
     display_name = "Ring Link"
     default = 0
 
+class HardRingLink(Toggle):
+    """Enable Hard Ring Link, affecting all linked players."""
+    display_name = "Hard Ring Link"
+    default = 0
+
+class EnergyLink(Toggle):
+    """Enable Energy Link, allowing you to send & receive energy from the server pool."""
+    display_name = "Energy Link"
+    default = 0
+
 class TrapLink(Toggle):
     """Enable Trap Link, affecting all linked players."""
     display_name = "Trap Link"
@@ -83,6 +93,8 @@ class PeakOptions(PerGameCommonOptions):
     additional_stamina_bars: AdditionalStaminaBars
     trap_percentage: TrapPercentage
     ring_link: RingLink
+    hard_ring_link: HardRingLink
+    energy_link: EnergyLink
     trap_link: TrapLink
     death_link: DeathLink
     death_link_behavior: DeathLinkBehavior

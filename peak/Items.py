@@ -55,6 +55,7 @@ ITEMS = {
     "Freeze Trap": (76040, ItemClassification.trap),
     "Slip Trap": (76041, ItemClassification.trap),
     "Yeet Trap": (76042, ItemClassification.trap),
+    "Tumbleweed Trap": (76043, ItemClassification.trap),
     #endregion
     
     #region Progression Items

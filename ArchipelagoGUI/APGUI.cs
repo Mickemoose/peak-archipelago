@@ -16,9 +16,37 @@ namespace Peak.AP
 
         private PeakArchipelagoPlugin _plugin;
 
+        // PlayerPrefs keys
+        private const string PREFS_SERVER = "PeakPelago_ServerUrl";
+        private const string PREFS_PORT = "PeakPelago_Port";
+        private const string PREFS_SLOT = "PeakPelago_SlotName";
+        private const string PREFS_PASSWORD = "PeakPelago_Password";
+        private const string PREFS_FONTSIZE = "PeakPelago_FontSize";
+
         public void Initialize(PeakArchipelagoPlugin plugin)
         {
             _plugin = plugin;
+            LoadSettings();
+        }
+
+        private void LoadSettings()
+        {
+            // Load saved values or use defaults
+            _serverUrl = PlayerPrefs.GetString(PREFS_SERVER, "archipelago.gg");
+            _port = PlayerPrefs.GetString(PREFS_PORT, "38281");
+            _slotName = PlayerPrefs.GetString(PREFS_SLOT, string.Empty);
+            _password = PlayerPrefs.GetString(PREFS_PASSWORD, string.Empty);
+            _fontSize = PlayerPrefs.GetInt(PREFS_FONTSIZE, 12);
+        }
+
+        private void SaveSettings()
+        {
+            PlayerPrefs.SetString(PREFS_SERVER, _serverUrl);
+            PlayerPrefs.SetString(PREFS_PORT, _port);
+            PlayerPrefs.SetString(PREFS_SLOT, _slotName);
+            PlayerPrefs.SetString(PREFS_PASSWORD, _password);
+            PlayerPrefs.SetInt(PREFS_FONTSIZE, _fontSize);
+            PlayerPrefs.Save();
         }
 
         private void OnGUI()
@@ -45,10 +73,12 @@ namespace Peak.AP
                 if (GUI.Button(new Rect(xPos + labelWidth, yPos, _fontSize * 2, rowHeight), "-", buttonStyle))
                 {
                     _fontSize = Mathf.Max(8, _fontSize - 1);
+                    SaveSettings(); // Save when font size changes
                 }
                 if (GUI.Button(new Rect(xPos + labelWidth + _fontSize * 2 + 8, yPos, _fontSize * 2, rowHeight), "+", buttonStyle))
                 {
                     _fontSize = Mathf.Min(24, _fontSize + 1);
+                    SaveSettings(); // Save when font size changes
                 }
                 yPos += rowHeight;
 
@@ -57,6 +87,12 @@ namespace Peak.AP
 
                 int fieldWidth = rectWidth - labelWidth;
                 bool enterPressed = Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return;
+
+                // Track if any field changed
+                string oldServerUrl = _serverUrl;
+                string oldPort = _port;
+                string oldSlotName = _slotName;
+                string oldPassword = _password;
 
                 GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Server: ", labelStyle);
                 _serverUrl = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _serverUrl, textFieldStyle);
@@ -74,6 +110,12 @@ namespace Peak.AP
                 _password = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _password, textFieldStyle);
                 yPos += rowHeight;
 
+                // Save settings if any field changed
+                if (_serverUrl != oldServerUrl || _port != oldPort || _slotName != oldSlotName || _password != oldPassword)
+                {
+                    SaveSettings();
+                }
+
                 if (enterPressed && Event.current.type == EventType.KeyDown)
                 {
                     enterPressed = false;
@@ -83,6 +125,7 @@ namespace Peak.AP
                     && !string.IsNullOrEmpty(_serverUrl) 
                     && !string.IsNullOrEmpty(_slotName))
                 {
+                    SaveSettings(); // Save before connecting
                     _plugin.SetConnectionDetails(_serverUrl, _port, _slotName, _password);
                     _plugin.Connect();
                 }

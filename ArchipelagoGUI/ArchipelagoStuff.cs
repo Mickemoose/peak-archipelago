@@ -123,7 +123,7 @@ namespace Peak.AP
         /// <summary>
         /// Display a message without player names
         /// </summary>
-        public void ShowSimpleMessage(string message, bool playSound = true)
+        public void ShowSimpleMessage(string message)
         {
             try
             {
@@ -155,7 +155,7 @@ namespace Peak.AP
             }
         }
 
-        public void ShowWarningMessage(string message, bool playSound = false)
+        public void ShowWarningMessage(string message)
         {
             try
             {
@@ -171,13 +171,39 @@ namespace Peak.AP
                     string colorTag = GetColorTag(_connectionLog.leftColor);
                     string formattedMessage = colorTag + message + "</color>";
 
-                    addMessageMethod.Invoke(_connectionLog, new object[] { formattedMessage });
+                    addMessageMethod.Invoke(_connectionLog, [formattedMessage]);
 
                 }
             }
             catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error displaying warning message: " + ex.Message);
+            }
+        }
+
+        public void ShowColoredMessage(string message, Color color)
+        {
+            try
+            {
+                FindConnectionLog();
+
+                if (_connectionLog == null) return;
+
+                var addMessageMethod = _connectionLog.GetType().GetMethod("AddMessage",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (addMessageMethod != null)
+                {
+                    string colorTag = GetColorTag(color);
+                    string formattedMessage = colorTag + message + "</color>";
+
+                    addMessageMethod.Invoke(_connectionLog, [formattedMessage]);
+
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error displaying colored message: " + ex.Message);
             }
         }
 
@@ -203,17 +229,32 @@ namespace Peak.AP
         // some quick helper functions
         public void ShowGoalComplete()
         {
-            ShowSimpleMessage("GOAL COMPLETE!", true);
+            ShowSimpleMessage("GOAL COMPLETE!");
+        }
+
+        public void ShowTrapLinkNotification(string message)
+        {
+            ShowColoredMessage(message, new Color(1f, 0.5f, 0f));
+        }
+
+        public void ShowDeathLinkSent(string message)
+        {
+            ShowColoredMessage(message, new Color(1f, 0.2f, 0.2f));
+        }
+
+        public void ShowRingLinkNotification(string message)
+        {
+            ShowColoredMessage(message, new Color(1f, 0.84f, 0f));
         }
 
         public void ShowConnected()
         {
-            ShowSimpleMessage($"Connected to Archipelago as {_localSlotName}", true);
+            ShowSimpleMessage($"Connected to Archipelago as {_localSlotName}");
         }
 
         public void ShowDisconnected()
         {
-            ShowWarningMessage("Disconnected from Archipelago", false);
+            ShowWarningMessage("Disconnected from Archipelago");
         }
 
         public void ShowDeathLink(string cause, string source)

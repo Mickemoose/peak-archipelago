@@ -20,7 +20,7 @@ using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.3")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.5")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin
     {
         // ===== BepInEx / logging =====
@@ -85,6 +85,7 @@ namespace Peak.AP
         private DateTime _lastDeathLinkReceived = DateTime.MinValue;
         private string _lastDeathLinkSource = "None";
         private string _lastDeathLinkCause = "None";
+        private bool _isDyingFromDeathLink = false;
         private static PeakArchipelagoPlugin _instance;
         public string Status => _status;
         private ArchipelagoUI _ui;
@@ -107,14 +108,14 @@ namespace Peak.AP
                 cfgGoalType = Config.Bind("Goal", "Type", 0, "Goal type: 0=Reach Peak, 1=All Badges, 2=24 Karat Badge");
                 cfgRequiredBadges = Config.Bind("Goal", "BadgeCount", 20, "Number of badges required for Complete All Badges goal");
                 cfgRequiredAscent = Config.Bind("Goal", "RequiredAscent", 4, "Ascent level required for Reach Peak goal (0-7)");
-                // Initialize stamina manager
+                _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
                 CharacterClampStaminaPatch.SetStaminaManager(_staminaManager);
                 StaminaBarUpdatePatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
-                _ringLinkService = new RingLinkService(_log);
-                _trapLinkService = new TrapLinkService(_log);
+                _ringLinkService = new RingLinkService(_log, _notifications);
+                _trapLinkService = new TrapLinkService(_log, _notifications);
                 // Check for port changes and initialize port-specific caching
                 CheckAndHandlePortChange();
 
@@ -150,7 +151,7 @@ namespace Peak.AP
                 _status = "Ready";
                 _log.LogInfo("[PeakPelago] Plugin ready.");
 
-                _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
+                
                 Invoke(nameof(CountExistingBadges), 1.5f);
                 
             }
@@ -244,7 +245,7 @@ namespace Peak.AP
                 var deathLink = new DeathLink(cfgSlot.Value, cause);
                 _deathLinkService.SendDeathLink(deathLink);
                 _lastDeathLinkSent = DateTime.Now;
-
+                _notifications.ShowDeathLinkSent("DeathLink Sent!");
                 _log.LogInfo($"[PeakPelago] *** DEATH LINK SENT ***: {cause} from {cfgSlot.Value}");
             }
             catch (Exception ex)
@@ -355,7 +356,7 @@ namespace Peak.AP
                 }
                 else
                 {
-                    
+                    _isDyingFromDeathLink = true;
                     StartCoroutine(KillCharacterCoroutine(targetCharacter, characterName));
                 }
 
@@ -370,14 +371,12 @@ namespace Peak.AP
 
         private System.Collections.IEnumerator KillCharacterCoroutine(Character targetCharacter, string characterName)
         {
-            // Wait a frame to ensure we're on the main thread
             yield return null;
 
             try
             {
                 _log.LogInfo($"[PeakPelago] Executing death for {characterName}");
                 
-                // Use reflection to call DieInstantly
                 var dieInstantlyMethod = targetCharacter.GetType().GetMethod("DieInstantly", 
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
@@ -400,6 +399,10 @@ namespace Peak.AP
                     _log.LogError($"[PeakPelago] Inner stack: {ex.InnerException.StackTrace}");
                 }
             }
+            
+            // Reset the flag after a short delay to ensure the death event has been processed
+            yield return new WaitForSeconds(1f);
+            _isDyingFromDeathLink = false;
         }
         /// <summary>Get the position of the last checkpoint/campfire the player visited</summary>
         private Vector3 GetLastCheckpointPosition()
@@ -1196,6 +1199,8 @@ namespace Peak.AP
                 { "Bounce Fungus", () => SpawnPhysicalItem("BounceShroom") },
                 { "Instant Death Trap", () => InstantDeathTrapEffect.ApplyInstantDeathTrap(_log) },
                 { "Yeet Trap", () => YeetItemTrapEffect.ApplyYeetTrap(_log)},
+                { "Tumbleweed Trap", () => TumbleweedTrapEffect.ApplyTumbleweedTrap(_log) },
+                { "Items to Bombs", () => ItemToBombTrapEffect.ApplyItemToBombTrap(_log) },
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
@@ -1819,6 +1824,13 @@ namespace Peak.AP
                 {
                     if (_instance == null) return;
                     if (_instance._deathLinkService == null) return;
+
+                    if (_instance._isDyingFromDeathLink)
+                    {
+                        _instance._log.LogInfo("[PeakPelago] Death was caused by DeathLink, not sending another DeathLink");
+                        return;
+                    }
+            
                     
                     _instance._log.LogInfo($"[PeakPelago] Character died: {__instance.characterName}");
                     
@@ -2277,9 +2289,12 @@ namespace Peak.AP
                         _notifications.ShowItemNotification(fromName, toName, itemName, classification);
                         if (IsTrapItem(itemName))
                         {
-                            _trapLinkService?.QueueTrap(itemName);
+                            _trapLinkService?.QueueTrap(itemName); // Traps are queued to check for TrapLink stuff
                         }
-                        _instance.ApplyItemEffect(itemName);
+                        else
+                        {
+                            _instance.ApplyItemEffect(itemName);  // otherwise just apply the item effect normally
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -2317,13 +2332,20 @@ namespace Peak.AP
                     bool additionalEnabled = false;
                     bool deathLinkEnabled = false;
                     bool trapLinkEnabled = false;
+                    bool ringLinkEnabled = false;
+
+                    List<string> tags = new List<string>();
 
                     if (loginResult.SlotData.ContainsKey("ring_link"))
                     {
                         var value = loginResult.SlotData["ring_link"];
-                        bool ringLinkEnabled = Convert.ToInt32(value) != 0;
-                        _ringLinkService.Initialize(_session, ringLinkEnabled);
+                        ringLinkEnabled = Convert.ToInt32(value) != 0;
                         _log.LogInfo($"[PeakPelago] Ring Link from slot data: {ringLinkEnabled}");
+                        
+                        if (ringLinkEnabled)
+                        {
+                            tags.Add("RingLink");
+                        }
                     }
 
                     if (loginResult.SlotData.ContainsKey("trap_link"))
@@ -2331,8 +2353,40 @@ namespace Peak.AP
                         var value = loginResult.SlotData["trap_link"];
                         trapLinkEnabled = Convert.ToInt32(value) != 0;
                         _log.LogInfo($"[PeakPelago] Trap Link from slot data: {trapLinkEnabled}");
+                        
+                        if (trapLinkEnabled)
+                        {
+                            tags.Add("TrapLink");
+                        }
                     }
 
+
+
+                    if (loginResult.SlotData.ContainsKey("death_link"))
+                    {
+                        var value = loginResult.SlotData["death_link"];
+                        deathLinkEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Death Link from slot data: {deathLinkEnabled}");
+
+                        if (deathLinkEnabled)
+                        {
+                            tags.Add("DeathLink");
+                        }
+                    }
+                    
+                    if (tags.Count > 0)
+                    {
+                        var updatePacket = new ConnectUpdatePacket
+                        {
+                            Tags = tags.ToArray()
+                        };
+                        _session.Socket.SendPacket(updatePacket);
+                        _log.LogInfo($"[PeakPelago] Sent tags: {string.Join(", ", tags)}");
+                    }
+                    if (ringLinkEnabled)
+                    {
+                        _ringLinkService.Initialize(_session, ringLinkEnabled);
+                    }
                     if (trapLinkEnabled)
                     {
                         var enabledTraps = TrapTypeExtensions.GetAllTrapNames();
@@ -2343,24 +2397,6 @@ namespace Peak.AP
                             enabledTraps,
                             ApplyItemEffect
                         );
-                    }
-
-                    if (loginResult.SlotData.ContainsKey("death_link"))
-                    {
-                        var value = loginResult.SlotData["death_link"];
-                        deathLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Death Link from slot data: {deathLinkEnabled}");
-                    }
-                    if (deathLinkEnabled)
-                    {
-                        _deathLinkService.EnableDeathLink();
-
-                        var updatePacket = new ConnectUpdatePacket
-                        {
-                            Tags = new[] { "DeathLink" }
-                        };
-
-                        _session.Socket.SendPacket(updatePacket);
                     }
 
                     if (loginResult.SlotData.ContainsKey("death_link_behavior"))
@@ -2472,11 +2508,24 @@ namespace Peak.AP
         {
             try
             {
-                // Print the simplified text of server messages
                 _log.LogInfo("[AP] " + msg.ToString());
-                _notifications.ShowSimpleMessage(msg.ToString(), true);
+                // hide some messages that are spammy or not useful to show
+                if (msg.ToString().Contains("Cheat console:")) return;
+                _notifications.ShowSimpleMessage(msg.ToString());
             }
             catch { /* ignore formatting errors */ }
+        }
+
+        private void Update()
+        {
+            try
+            {
+                _trapLinkService?.Update();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in Update: {ex.Message}");
+            }
         }
 
         // ===== Tiny state persistence (no Unity JsonUtility dependency) ======

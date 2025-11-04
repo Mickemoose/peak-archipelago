@@ -30,13 +30,15 @@ namespace Peak.AP
         
         // Mapping of standardized/external trap names to PEAK trap names (for RECEIVING)
         private Dictionary<string, string> _standardToPeakMapping;
-        
+
         // List of traps that can be sent/received
         private HashSet<string> _enabledTraps;
+        private ArchipelagoNotificationManager _notifications;
 
-        public TrapLinkService(ManualLogSource log)
+        public TrapLinkService(ManualLogSource log, ArchipelagoNotificationManager notifications)
         {
             _log = log;
+            _notifications = notifications;
             InitializeTrapMappings();
         }
 
@@ -50,9 +52,8 @@ namespace Peak.AP
             {
                 // Basic traps
                 { "Spawn Bee Swarm", "Bee Trap" },
-                { "Yeet Trap", "Eject Ability" },
+                { "Dynamite", "Bomb" },
                 { "Banana Peel Trap", "Banana Peel Trap" },
-                { "Banana Peel Trap", "Banana Trap" },
                 { "Minor Poison Trap", "Poison Mushroom" },
                 { "Poison Trap", "Poison Trap" },
                 { "Deadly Poison Trap", "Poison Trap" },
@@ -69,6 +70,7 @@ namespace Peak.AP
                 { "Cactus Ball Trap", "Spike Ball Trap" },
                 { "Instant Death Trap", "Instant Death Trap" },
                 { "Yeet Trap", "Whoops! Trap" },
+                { "Tumbleweed Trap", "Tip Trap"}
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -109,6 +111,8 @@ namespace Peak.AP
                 { "Cursed Ball Trap", "Cactus Ball Trap" },
                 { "Instant Death Trap", "Instant Death Trap" },
                 { "One Hit KO", "Instant Death Trap" },
+                { "Tip Trap", "Tumbleweed Trap"},
+                { "Items to Bombs", "Items to Bombs"},
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
@@ -186,6 +190,7 @@ namespace Peak.AP
 
                 _session.Socket.SendPacket(bouncePacket);
                 _log.LogInfo($"[PeakPelago] Sent Trap Link: '{standardizedTrapName}' (from '{peakTrapName}')");
+                _notifications.ShowTrapLinkNotification($"TrapLink: sent {standardizedTrapName}");
             }
             catch (Exception ex)
             {
@@ -235,8 +240,10 @@ namespace Peak.AP
                 if (data.ContainsKey("trap_name"))
                 {
                     string externalTrapName = data["trap_name"].ToObject<string>();
-                    
+                    string source = data.ContainsKey("source") ? data["source"].ToObject<string>() : "Unknown";
+
                     _log.LogInfo($"[PeakPelago] Trap Link received: '{externalTrapName}'");
+                    
                     
                     // Map TrapLink trap names to my trap names
                     string peakTrapName = MapToPeakTrap(externalTrapName);
@@ -244,6 +251,7 @@ namespace Peak.AP
                     if (peakTrapName != null && _enabledTraps.Contains(peakTrapName))
                     {
                         _priorityTrap = peakTrapName;
+                        _notifications.ShowTrapLinkNotification($"TrapLink: received {externalTrapName} from {source}");
                         _log.LogInfo($"[PeakPelago] Set priority trap: '{peakTrapName}' (from '{externalTrapName}')");
                     }
                     else if (peakTrapName == null)
