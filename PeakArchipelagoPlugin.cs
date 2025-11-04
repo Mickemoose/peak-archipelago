@@ -72,6 +72,9 @@ namespace Peak.AP
 
         // ===== Ascent Management =====
         private int _originalMaxAscent = 0;
+        private int _slotGoalType = 0;
+        private int _slotRequiredAscent = 0;
+        private int _slotRequiredBadges = 20;
         private HashSet<int> _unlockedAscents = new HashSet<int>(); // Track which ascents are unlocked via AP items
 
         // ===== AP Link Management =====
@@ -144,7 +147,7 @@ namespace Peak.AP
 
 
                 SetupPhotonView();
-
+                _notifications.SetPhotonView(_photonView);
                 // Hide existing badges after a short delay to let the game initialize
                 Invoke(nameof(HideExistingBadges), 1f);
 
@@ -200,6 +203,42 @@ namespace Peak.AP
                 _log.LogError("[PeakPelago] Failed to setup PhotonView: " + ex.Message);
                 _log.LogWarning("[PeakPelago] Network synchronization may not work properly");
             }
+        }
+
+        [PunRPC]
+        private void ShowItemNotificationRPC(string fromName, string toName, string itemName, int classificationInt)
+        {
+            _notifications?.ReceiveItemNotificationRPC(fromName, toName, itemName, classificationInt);
+        }
+
+        [PunRPC]
+        private void ShowSimpleMessageRPC(string message)
+        {
+            _notifications?.ReceiveSimpleMessageRPC(message);
+        }
+
+        [PunRPC]
+        private void ShowWarningMessageRPC(string message)
+        {
+            _notifications?.ReceiveWarningMessageRPC(message);
+        }
+
+        [PunRPC]
+        private void ShowColoredMessageRPC(string message, float r, float g, float b)
+        {
+            _notifications?.ReceiveColoredMessageRPC(message, r, g, b);
+        }
+
+        [PunRPC]
+        private void ShowHeroTitleRPC(string message)
+        {
+            _notifications?.ReceiveHeroTitleRPC(message);
+        }
+
+        [PunRPC]
+        private void ShowDeathLinkRPC(string cause, string source)
+        {
+            _notifications?.ReceiveDeathLinkRPC(cause, source);
         }
 
         [PunRPC]
@@ -846,26 +885,19 @@ namespace Peak.AP
         {
             if (_session == null) return;
 
-            int goalType = cfgGoalType.Value;
-
             // Only check if the goal is "Reach Peak"
-            if (goalType == 0)
+            if (_slotGoalType == 0)
             {
-                int requiredAscent = cfgRequiredAscent.Value;
-
-
-                if (currentAscent >= requiredAscent)
+                if (currentAscent >= _slotRequiredAscent)
                 {
                     _log.LogInfo($"[PeakPelago] PEAK reached on Ascent {currentAscent} - goal complete!");
                     SendGoalComplete();
-
-                    // Also report the specific ascent completion location
                     string completionLocation = $"Ascent {currentAscent} Completed";
                     ReportCheckByName(completionLocation);
                 }
                 else
                 {
-                    _log.LogInfo($"[PeakPelago] Peak reached but on Ascent {currentAscent}, need Ascent {requiredAscent} for goal");
+                    _log.LogInfo($"[PeakPelago] Peak reached but on Ascent {currentAscent}, need Ascent {_slotRequiredAscent} for goal");
                 }
             }
         }
@@ -878,20 +910,17 @@ namespace Peak.AP
         {
             if (_session == null) return;
 
-            int goalType = cfgGoalType.Value;
-
-            switch (goalType)
+            switch (_slotGoalType)
             {
                 case 1: // Complete All Badges goal
-                    int requiredBadges = cfgRequiredBadges.Value;
-                    if (_collectedBadges.Count >= requiredBadges)
+                    if (_collectedBadges.Count >= _slotRequiredBadges)
                     {
-                        _log.LogInfo($"[PeakPelago] Collected {_collectedBadges.Count}/{requiredBadges} badges - goal complete!");
+                        _log.LogInfo($"[PeakPelago] Collected {_collectedBadges.Count}/{_slotRequiredBadges} badges - goal complete!");
                         SendGoalComplete();
                     }
                     else
                     {
-                        _log.LogInfo($"[PeakPelago] Progress: {_collectedBadges.Count}/{requiredBadges} badges collected");
+                        _log.LogInfo($"[PeakPelago] Progress: {_collectedBadges.Count}/{_slotRequiredBadges} badges collected");
                     }
                     break;
 
@@ -1190,22 +1219,22 @@ namespace Peak.AP
                 { "Destroy Held Item", () => DestroyHeldItem() },
                 { "Blue Berrynana Peel", () => SpawnPhysicalItem("Berrynana Peel Blue Variant") },
                 { "Banana Peel Trap", () => SpawnPhysicalItem("Berrynana Peel Yellow") },
-                { "Minor Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Minor, _log) },
-                { "Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Normal, _log) },
-                { "Deadly Poison Trap", () => PoisonTrapEffect.ApplyPoisonTrap(PoisonTrapEffect.PoisonTrapType.Deadly, _log) },
+                { "Minor Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.25f, CharacterAfflictions.STATUSTYPE.Poison, _photonView) },
+                { "Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.53f, CharacterAfflictions.STATUSTYPE.Poison, _photonView) },
+                { "Deadly Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.95f, CharacterAfflictions.STATUSTYPE.Poison, _photonView) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
                 { "Swap Trap", () => SwapTrapEffect.ApplyPositionSwapTrap(_log) },
-                { "Nap Time Trap", () => NapTimeTrapEffect.ApplyNapTrap(_log) },
+                { "Nap Time Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Drowsy, _photonView) },
                 { "Hungry Hungry Camper Trap", () => HungryHungryCamperTrapEffect.ApplyHungerTrap(_log) },
                 { "Balloon Trap", () => BalloonTrapEffect.ApplyBalloonTrap(_log) },
                 { "Slip Trap", () => SlipTrapEffect.ApplySlipTrap(_log) },
                 { "Clear All Effects", () => ClearAllEffects() },
                 { "Speed Upgrade", () => ApplySpeedUpgrade() },
                 { "Cactus Ball Trap", () => SpawnPhysicalItem("CactusBall") },
-                { "Freeze Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Cold) },
-                { "Cold Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Cold) },
-                { "Hot Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Hot) },
-                { "Injury Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Injury) },
+                { "Freeze Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Cold, _photonView) },
+                { "Cold Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Cold, _photonView) },
+                { "Hot Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Hot, _photonView) },
+                { "Injury Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Injury, _photonView) },
                 { "Bounce Fungus", () => SpawnPhysicalItem("BounceShroom") },
                 { "Instant Death Trap", () => InstantDeathTrapEffect.ApplyInstantDeathTrap(_log) },
                 { "Yeet Trap", () => YeetItemTrapEffect.ApplyYeetTrap(_log)},
@@ -1214,6 +1243,46 @@ namespace Peak.AP
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
+        }
+
+        [PunRPC]
+        public void ApplyAfflictionToPlayer(int targetActorNumber, int statusType, float amount)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] RPC received: ApplyAfflictionToPlayer for actor {targetActorNumber}, type {statusType}, amount {amount}");
+
+                // Find the character belonging to this actor
+                var targetCharacter = Character.AllCharacters.FirstOrDefault(c => 
+                    c != null && 
+                    c.photonView != null && 
+                    c.photonView.Owner != null &&
+                    c.photonView.Owner.ActorNumber == targetActorNumber
+                );
+
+                if (targetCharacter == null)
+                {
+                    _log.LogWarning($"[PeakPelago] Could not find character for actor {targetActorNumber}");
+                    return;
+                }
+
+                // Only apply if this is OUR character (we own it)
+                if (targetCharacter.IsLocal)
+                {
+                    _log.LogInfo($"[PeakPelago] Applying {(CharacterAfflictions.STATUSTYPE)statusType} ({amount}) to local character");
+                    targetCharacter.refs.afflictions.AddStatus((CharacterAfflictions.STATUSTYPE)statusType, amount);
+                    _log.LogInfo($"[PeakPelago] Affliction applied successfully!");
+                }
+                else
+                {
+                    _log.LogDebug($"[PeakPelago] Ignoring RPC for non-local character");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in ApplyAfflictionToPlayer RPC: {ex.Message}");
+                _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
+            }
         }
 
         private void ApplyProgressiveStamina()
@@ -1573,13 +1642,6 @@ namespace Peak.AP
             {
                 // Get current ascent level using reflection
                 int currentAscent = GetCurrentAscentLevel();
-                
-                if (currentAscent < 1) 
-                {
-                    _log.LogInfo("[PeakPelago] HandleAscentPeakReached: Current ascent < 1, skipping badge award");
-                    return; // Only award for ascents 1+ (currentAscent is 1-indexed)
-                }
-
 
                 // Award ascent-specific badges based on peak and ascent level
                 string badgeLocation = GetAscentBadgeLocation(peakName, currentAscent);
@@ -1740,6 +1802,39 @@ namespace Peak.AP
 
         // ===== Harmony Patches =====
 
+        [HarmonyPatch(typeof(Item), "RequestPickup")]
+        public static class ItemRequestPickupPatch
+        {
+            static void Postfix(Item __instance, PhotonView characterView)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    if (!PhotonNetwork.IsMasterClient) return;
+
+                    // Get the character who picked up the item
+                    Character character = characterView.GetComponent<Character>();
+                    if (character == null) return;
+
+                    // Get item name
+                    string itemName = __instance.UIData.itemName;
+                    ushort itemId = __instance.itemID;
+
+                    _instance._log.LogInfo($"[PeakPelago] HOST: Player {character.characterName} (Actor: {characterView.Owner.ActorNumber}) picked up item: {itemName} (ID: {itemId})");
+
+                    _instance.TrackItemAcquisition(itemName, itemId);
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError("[PeakPelago] RequestPickup patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
+                    }
+                }
+            }
+        }
+
         [HarmonyPatch(typeof(Character), "RPCA_Die")]
         public static class CharacterRPCADiePatch
         {
@@ -1798,48 +1893,30 @@ namespace Peak.AP
         [HarmonyPatch(typeof(Luggage), "Interact_CastFinished")]
         public static class LuggageInteractCastFinishedPatch
         {
-            static void Postfix(object __instance, object interactor)
+            static void Postfix(Luggage __instance, Character interactor)
             {
                 try
                 {
                     if (_instance == null) return;
+                    if (!PhotonNetwork.IsMasterClient) return;
                     if (interactor == null) return;
+                    string luggageName = __instance.GetName();
 
-
-                    // Get luggage name for logging using reflection
-                    string luggageName = "Unknown";
-                    if (__instance != null)
-                    {
-                        var getNameMethod = __instance.GetType().GetMethod("GetName");
-                        if (getNameMethod != null)
-                        {
-                            luggageName = (string)getNameMethod.Invoke(__instance, null) ?? "Unknown";
-                        }
-                    }
-
-                    _instance._log.LogInfo("[PeakPelago] Luggage opened: " + luggageName);
-
-                    // Mark that we've opened luggage this session
+                    _instance._log.LogInfo($"[PeakPelago] HOST: Player {interactor.characterName} opened luggage: {luggageName}");
                     _instance._hasOpenedLuggageThisSession = true;
-
-                    // Increment counters
                     _instance._luggageOpenedCount++;
                     _instance._luggageOpenedThisRun++;
                     _instance._totalLuggageOpened++;
-
-                    _instance._log.LogInfo("[PeakPelago] Luggage opened - Total: " + _instance._totalLuggageOpened + ", This run: " + _instance._luggageOpenedThisRun);
-
-                    // Check and report all luggage-related achievements
+                    _instance._log.LogInfo("[PeakPelago] Host luggage count - Total: " + _instance._totalLuggageOpened + ", This run: " + _instance._luggageOpenedThisRun);
                     _instance.CheckLuggageAchievements();
-
-                    // Save state
                     _instance.SaveState();
                 }
                 catch (Exception ex)
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[PeakPelago] Luggage patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] Luggage Interact_CastFinished patch error: " + ex.Message);
+                        _instance._log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
                     }
                 }
             }
@@ -2000,77 +2077,6 @@ namespace Peak.AP
             }
         }
 
-        [HarmonyPatch(typeof(AchievementManager), "TestRequestedItem")]
-        public static class AchievementManagerTestRequestedItemPatch
-        {
-            static void Postfix(Item item, Character character)
-            {
-                try
-                {
-                    if (_instance == null) return;
-
-                    _instance._log.LogDebug("[PeakPelago] TestRequestedItemPatch: Item requested");
-
-                    if (item != null)
-                    {
-                        // Get the item name using reflection
-                        string itemName = "Unknown";
-                        ushort itemId = 0;
-
-                        try
-                        {
-                            // Try to get the item name using the GetName() method first
-                            var getNameMethod = item.GetType().GetMethod("GetName");
-                            if (getNameMethod != null)
-                            {
-                                itemName = (string)getNameMethod.Invoke(item, null) ?? "Unknown";
-                                _instance._log.LogDebug("[PeakPelago] Got item name via GetName(): " + itemName);
-                            }
-                            else
-                            {
-                                // Fallback to UIData.itemName
-                                var uidDataField = item.GetType().GetField("UIData");
-                                if (uidDataField != null)
-                                {
-                                    var uidData = uidDataField.GetValue(item);
-                                    if (uidData != null)
-                                    {
-                                        var itemNameField = uidData.GetType().GetField("itemName");
-                                        if (itemNameField != null)
-                                        {
-                                            itemName = (string)itemNameField.GetValue(uidData) ?? "Unknown";
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Get the item ID using reflection
-                            var itemIdField = item.GetType().GetField("itemID");
-                            if (itemIdField != null)
-                            {
-                                itemId = (ushort)itemIdField.GetValue(item);
-                                _instance._log.LogDebug("[PeakPelago] Got item ID: " + itemId);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _instance._log.LogError("[PeakPelago] Error getting item info: " + ex.Message);
-                        }
-
-                        _instance._log.LogInfo("[PeakPelago] Player requested item: " + itemName + " (ID: " + itemId + ")");
-                        _instance.TrackItemAcquisition(itemName, itemId);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (_instance != null)
-                    {
-                        _instance._log.LogError("[PeakPelago] TestRequestedItem patch error: " + ex.Message);
-                    }
-                }
-            }
-        }
-
         [HarmonyPatch(typeof(MountainProgressHandler), "CheckAreaAchievement")]
         public static class MountainProgressHandlerCheckAreaAchievementPatch
         {
@@ -2119,7 +2125,7 @@ namespace Peak.AP
         // ===== Connection =====
 
         public void Connect()
-        {
+        {    
             if (_isConnecting) return;
 
             _isConnecting = true;
@@ -2317,6 +2323,37 @@ namespace Peak.AP
                             enabledTraps,
                             ApplyItemEffect
                         );
+                    }
+                    if (loginResult.SlotData.ContainsKey("goal"))
+                    {
+                        var value = loginResult.SlotData["goal"];
+                        _slotGoalType = Convert.ToInt32(value);
+                    }
+                    else
+                    {
+                        _slotGoalType = cfgGoalType.Value;
+                    }
+
+                    if (loginResult.SlotData.ContainsKey("ascent_count"))
+                    {
+                        var value = loginResult.SlotData["ascent_count"];
+                        _slotRequiredAscent = Convert.ToInt32(value);
+                    }
+                    else
+                    {
+                        _slotRequiredAscent = cfgRequiredAscent.Value;
+                    }
+
+                    if (loginResult.SlotData.ContainsKey("badge_count"))
+                    {
+                        var value = loginResult.SlotData["badge_count"];
+                        _slotRequiredBadges = Convert.ToInt32(value);
+                        _log.LogInfo($"[PeakPelago] Required badges from slot data: {_slotRequiredBadges}");
+                    }
+                    else
+                    {
+                        _slotRequiredBadges = cfgRequiredBadges.Value;
+                        _log.LogWarning($"[PeakPelago] badge_count not found in slot data, using config: {_slotRequiredBadges}");
                     }
 
                     if (loginResult.SlotData.ContainsKey("death_link_behavior"))

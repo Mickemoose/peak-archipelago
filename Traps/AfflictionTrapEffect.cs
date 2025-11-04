@@ -1,8 +1,7 @@
 using System;
-using System.Collections;
 using System.Linq;
 using BepInEx.Logging;
-using UnityEngine;
+using Photon.Pun;
 
 namespace Peak.AP
 {
@@ -16,30 +15,38 @@ namespace Peak.AP
 
         /// <summary>
         /// Applies an affliction trap to a target character, either the local player or a random player.
-        /// CharacterAfflictions.STATUSTYPE.Injury,
-		/// CharacterAfflictions.STATUSTYPE.Hunger,
-		/// CharacterAfflictions.STATUSTYPE.Cold,
-		/// CharacterAfflictions.STATUSTYPE.Poison,
-		/// CharacterAfflictions.STATUSTYPE.Crab,
-		/// CharacterAfflictions.STATUSTYPE.Curse,
-		/// CharacterAfflictions.STATUSTYPE.Drowsy,
-		/// CharacterAfflictions.STATUSTYPE.Weight,
-		/// CharacterAfflictions.STATUSTYPE.Hot,
-		/// CharacterAfflictions.STATUSTYPE.Thorns
+        /// Available status types:
+        /// - CharacterAfflictions.STATUSTYPE.Injury
+        /// - CharacterAfflictions.STATUSTYPE.Hunger
+        /// - CharacterAfflictions.STATUSTYPE.Cold
+        /// - CharacterAfflictions.STATUSTYPE.Poison
+        /// - CharacterAfflictions.STATUSTYPE.Crab
+        /// - CharacterAfflictions.STATUSTYPE.Curse
+        /// - CharacterAfflictions.STATUSTYPE.Drowsy
+        /// - CharacterAfflictions.STATUSTYPE.Weight
+        /// - CharacterAfflictions.STATUSTYPE.Hot
+        /// - CharacterAfflictions.STATUSTYPE.Thorns
         /// </summary>
-        /// <param name="log"></param>
-        /// <param name="targetMode"></param>
-        /// <param name="amount"></param>
-        /// <param name="type"></param>
-        public static void ApplyAfflictionTrap(ManualLogSource log, TargetMode targetMode = TargetMode.RandomPlayer, float amount = 1.0f, CharacterAfflictions.STATUSTYPE type = CharacterAfflictions.STATUSTYPE.Cold)
+        public static void ApplyAfflictionTrap(
+            ManualLogSource log, 
+            TargetMode targetMode, 
+            float amount, 
+            CharacterAfflictions.STATUSTYPE type,
+            PhotonView modPhotonView)
         {
             try
             {
+                if (modPhotonView == null)
+                {
+                    log.LogError("[PeakPelago] Cannot apply affliction trap - PhotonView is null");
+                    return;
+                }
+
                 Character targetCharacter;
 
                 if (targetMode == TargetMode.RandomPlayer)
                 {
-                    // Use the static AllCharacters list for random selection
+                    // Get all valid characters
                     if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
                     {
                         log.LogWarning("[PeakPelago] Cannot apply trap - no characters found");
@@ -50,7 +57,10 @@ namespace Peak.AP
                     var validCharacters = Character.AllCharacters.Where(c =>
                         c != null &&
                         c.gameObject.activeInHierarchy &&
-                        !c.data.dead
+                        !c.data.dead &&
+                        !c.data.fullyPassedOut &&
+                        c.photonView != null &&
+                        c.photonView.Owner != null
                     ).ToList();
 
                     if (validCharacters.Count == 0)
@@ -65,34 +75,31 @@ namespace Peak.AP
                 }
                 else
                 {
-                    // Default to local player
+                    // Target local player
                     targetCharacter = Character.localCharacter;
                 }
 
-                if (targetCharacter == null || targetCharacter.refs.afflictions == null)
+                if (targetCharacter == null || targetCharacter.photonView == null)
                 {
-                    log.LogWarning("[PeakPelago] Cannot apply trap - target character or afflictions not found");
+                    log.LogWarning("[PeakPelago] Cannot apply trap - target character or PhotonView not found");
                     return;
                 }
 
-                string characterName = targetCharacter == Character.localCharacter ? "local player" : targetCharacter.characterName;
-                log.LogInfo($"[PeakPelago] Applying Trap to {characterName}");
+                int targetActorNumber = targetCharacter.photonView.Owner.ActorNumber;
+                string characterName = targetCharacter == Character.localCharacter 
+                    ? "local player" 
+                    : targetCharacter.characterName;
 
-                // Apply it during the next fixed update to ensure proper timing
-                targetCharacter.StartCoroutine(ApplyStatusNextFrame(targetCharacter, type, amount));
+                log.LogInfo($"[PeakPelago] Sending {type} trap ({amount}) to actor {targetActorNumber} ({characterName})");
 
-                log.LogInfo($"[PeakPelago] Trap scheduled for {characterName}!");
+                // Send RPC to all clients - each client will check if it's their character
+                modPhotonView.RPC("ApplyAfflictionToPlayer", RpcTarget.All, targetActorNumber, (int)type, amount);
             }
             catch (Exception ex)
             {
-                log.LogError($"[PeakPelago] Error applying trap: {ex.Message}");
+                log.LogError($"[PeakPelago] Error applying affliction trap: {ex.Message}");
+                log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
             }
-        }
-
-        private static IEnumerator ApplyStatusNextFrame(Character targetCharacter, CharacterAfflictions.STATUSTYPE type, float amount)
-        {
-            yield return new WaitForFixedUpdate();
-            targetCharacter.refs.afflictions.AddStatus(type, amount);
         }
     }
 }

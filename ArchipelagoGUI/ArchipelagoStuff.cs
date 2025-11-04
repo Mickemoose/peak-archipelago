@@ -2,15 +2,16 @@ using System;
 using BepInEx.Logging;
 using UnityEngine;
 using Archipelago.MultiClient.Net.Enums;
+using Photon.Pun;
 
 namespace Peak.AP
 {
-
     public class ArchipelagoNotificationManager
     {
         private readonly ManualLogSource _log;
         private readonly string _localSlotName;
         private PlayerConnectionLog _connectionLog;
+        private PhotonView _photonView;
 
         // Color for the local player's slot name
         private readonly Color _mySlotColor = new Color(0.7f, 0.4f, 1f);
@@ -19,6 +20,14 @@ namespace Peak.AP
         {
             _log = log;
             _localSlotName = localSlotName;
+        }
+
+        /// <summary>
+        /// Set the PhotonView for broadcasting notifications
+        /// </summary>
+        public void SetPhotonView(PhotonView photonView)
+        {
+            _photonView = photonView;
         }
 
         /// <summary>
@@ -67,10 +76,10 @@ namespace Peak.AP
         }
 
         /// <summary>
-        /// Display a notification when an item is sent
+        /// Display a notification when an item is sent (LOCAL ONLY - use ShowItemNotificationBroadcast for multiplayer)
         /// Format: "fromName sent itemName to toName"
         /// </summary>
-        public void ShowItemNotification(string fromName, string toName, string itemName, ItemFlags classification)
+        private void ShowItemNotificationLocal(string fromName, string toName, string itemName, ItemFlags classification)
         {
             try
             {
@@ -121,9 +130,40 @@ namespace Peak.AP
         }
 
         /// <summary>
-        /// Display a message without player names
+        /// Broadcast item notification to all clients
         /// </summary>
-        public void ShowSimpleMessage(string message)
+        public void ShowItemNotification(string fromName, string toName, string itemName, ItemFlags classification)
+        {
+            try
+            {
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("ShowItemNotificationRPC", RpcTarget.All, fromName, toName, itemName, (int)classification);
+                }
+                else
+                {
+                    ShowItemNotificationLocal(fromName, toName, itemName, classification);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error broadcasting item notification: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// RPC receiver for item notifications (called by PeakArchipelagoPlugin)
+        /// </summary>
+        public void ReceiveItemNotificationRPC(string fromName, string toName, string itemName, int classificationInt)
+        {
+            ItemFlags classification = (ItemFlags)classificationInt;
+            ShowItemNotificationLocal(fromName, toName, itemName, classification);
+        }
+
+        /// <summary>
+        /// Display a message without player names (LOCAL ONLY)
+        /// </summary>
+        private void ShowSimpleMessageLocal(string message)
         {
             try
             {
@@ -155,7 +195,37 @@ namespace Peak.AP
             }
         }
 
-        public void ShowWarningMessage(string message)
+        /// <summary>
+        /// Broadcast simple message to all clients
+        /// </summary>
+        public void ShowSimpleMessage(string message)
+        {
+            try
+            {
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("ShowSimpleMessageRPC", RpcTarget.All, message);
+                }
+                else
+                {
+                    ShowSimpleMessageLocal(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error broadcasting simple message: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// RPC receiver for simple messages
+        /// </summary>
+        public void ReceiveSimpleMessageRPC(string message)
+        {
+            ShowSimpleMessageLocal(message);
+        }
+
+        private void ShowWarningMessageLocal(string message)
         {
             try
             {
@@ -171,8 +241,7 @@ namespace Peak.AP
                     string colorTag = GetColorTag(_connectionLog.leftColor);
                     string formattedMessage = colorTag + message + "</color>";
 
-                    addMessageMethod.Invoke(_connectionLog, [formattedMessage]);
-
+                    addMessageMethod.Invoke(_connectionLog, new object[] { formattedMessage });
                 }
             }
             catch (Exception ex)
@@ -181,7 +250,31 @@ namespace Peak.AP
             }
         }
 
-        public void ShowColoredMessage(string message, Color color)
+        public void ShowWarningMessage(string message)
+        {
+            try
+            {
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("ShowWarningMessageRPC", RpcTarget.All, message);
+                }
+                else
+                {
+                    ShowWarningMessageLocal(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error broadcasting warning message: " + ex.Message);
+            }
+        }
+
+        public void ReceiveWarningMessageRPC(string message)
+        {
+            ShowWarningMessageLocal(message);
+        }
+
+        private void ShowColoredMessageLocal(string message, Color color)
         {
             try
             {
@@ -197,8 +290,7 @@ namespace Peak.AP
                     string colorTag = GetColorTag(color);
                     string formattedMessage = colorTag + message + "</color>";
 
-                    addMessageMethod.Invoke(_connectionLog, [formattedMessage]);
-
+                    addMessageMethod.Invoke(_connectionLog, new object[] { formattedMessage });
                 }
             }
             catch (Exception ex)
@@ -207,7 +299,31 @@ namespace Peak.AP
             }
         }
 
-        public void ShowHeroTitle(string message)
+        public void ShowColoredMessage(string message, Color color)
+        {
+            try
+            {
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("ShowColoredMessageRPC", RpcTarget.All, message, color.r, color.g, color.b);
+                }
+                else
+                {
+                    ShowColoredMessageLocal(message, color);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error broadcasting colored message: " + ex.Message);
+            }
+        }
+
+        public void ReceiveColoredMessageRPC(string message, float r, float g, float b)
+        {
+            ShowColoredMessageLocal(message, new Color(r, g, b));
+        }
+
+        private void ShowHeroTitleLocal(string message)
         {
             try
             {
@@ -226,7 +342,86 @@ namespace Peak.AP
             }
         }
 
-        // some quick helper functions
+        public void ShowHeroTitle(string message)
+        {
+            try
+            {
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("ShowHeroTitleRPC", RpcTarget.All, message);
+                }
+                else
+                {
+                    ShowHeroTitleLocal(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error broadcasting hero title: {ex.Message}");
+            }
+        }
+
+        public void ReceiveHeroTitleRPC(string message)
+        {
+            ShowHeroTitleLocal(message);
+        }
+
+        private void ShowDeathLinkLocal(string cause, string source)
+        {
+            try
+            {
+                FindConnectionLog();
+                if (_connectionLog == null) return;
+
+                var addMessageMethod = _connectionLog.GetType().GetMethod("AddMessage",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                if (addMessageMethod != null)
+                {
+                    string deathTag = GetColorTag(new Color(1f, 0.2f, 0.2f));
+                    string sourceTag = GetColorTag(_connectionLog.userColor);
+                    
+                    string message = $"{deathTag}Death Link:</color> {source} {sourceTag}{cause}</color>";
+                    
+                    addMessageMethod.Invoke(_connectionLog, new object[] { message });
+
+                    if (_connectionLog.sfxLeave != null)
+                    {
+                        _connectionLog.sfxLeave.Play();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error displaying death link: " + ex.Message);
+            }
+        }
+
+        public void ShowDeathLink(string cause, string source)
+        {
+            try
+            {
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("ShowDeathLinkRPC", RpcTarget.All, cause, source);
+                }
+                else
+                {
+                    ShowDeathLinkLocal(cause, source);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error broadcasting death link: " + ex.Message);
+            }
+        }
+
+        public void ReceiveDeathLinkRPC(string cause, string source)
+        {
+            ShowDeathLinkLocal(cause, source);
+        }
+
+        // Helper methods remain the same
         public void ShowGoalComplete()
         {
             ShowSimpleMessage("GOAL COMPLETE!");
@@ -255,37 +450,6 @@ namespace Peak.AP
         public void ShowDisconnected()
         {
             ShowWarningMessage("Disconnected from Archipelago");
-        }
-
-        public void ShowDeathLink(string cause, string source)
-        {
-            try
-            {
-                FindConnectionLog();
-                if (_connectionLog == null) return;
-
-                var addMessageMethod = _connectionLog.GetType().GetMethod("AddMessage",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                if (addMessageMethod != null)
-                {
-                    string deathTag = GetColorTag(new Color(1f, 0.2f, 0.2f));
-                    string sourceTag = GetColorTag(_connectionLog.userColor);
-                    
-                    string message = $"{deathTag} Death Link:</color> {source} {sourceTag} {cause}</color>";
-                    
-                    addMessageMethod.Invoke(_connectionLog, new object[] { message });
-
-                    if (_connectionLog.sfxLeave != null)
-                    {
-                        _connectionLog.sfxLeave.Play();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError("[PeakPelago] Error displaying death link: " + ex.Message);
-            }
         }
     }
 }
