@@ -81,7 +81,7 @@ ITEMS = {
     "Balloon Bunch": (77009, ItemClassification.useful),
     "Scout Cannon": (77010, ItemClassification.useful),
     "Portable Stove": (77011, ItemClassification.useful),
-    "Campfire": (77012, ItemClassification.useful),
+    "Checkpoint Flag": (77012, ItemClassification.useful),
     "Lantern": (77013, ItemClassification.useful),
     "Flare": (77014, ItemClassification.useful),
     "Torch": (77015, ItemClassification.useful),

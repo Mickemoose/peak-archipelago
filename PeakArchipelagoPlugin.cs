@@ -908,7 +908,20 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.DaredevilBadge, "Daredevil Badge" },
                 { ACHIEVEMENTTYPE.MegaentomologyBadge, "Megaentomology Badge" },
                 { ACHIEVEMENTTYPE.AstronomyBadge, "Astronomy Badge" },
-                { ACHIEVEMENTTYPE.BundledUpBadge, "Bundled Up Badge" }
+                { ACHIEVEMENTTYPE.BundledUpBadge, "Bundled Up Badge" },
+                //ROOTS UPDATE BADGES
+                { ACHIEVEMENTTYPE.ForestryBadge, "Forestry Badge" },
+                { ACHIEVEMENTTYPE.DisasterResponseBadge, "Disaster Response Badge" },
+                { ACHIEVEMENTTYPE.UndeadEncounterBadge, "Undead Encounter Badge"},
+                { ACHIEVEMENTTYPE.WebSecurityBadge, "Web Security Badge"},
+                { ACHIEVEMENTTYPE.AdvancedMycologyBadge, "Advanced Mycology Badge"},
+                { ACHIEVEMENTTYPE.AppliedEsotericaBadge, "Applied Esoterica Badge"},
+                { ACHIEVEMENTTYPE.CalciumIntakeBadge, "Calcium Intake Badge"},
+                { ACHIEVEMENTTYPE.CompetitiveEatingBadge, "Competitive Eating Badge"},
+                { ACHIEVEMENTTYPE.CryptogastronomyBadge, "Cryptogastronomy Badge"},
+                { ACHIEVEMENTTYPE.MycoacrobaticsBadge, "Mycoacrobatics Badge"},
+                { ACHIEVEMENTTYPE.TreadLightlyBadge, "Tread Lightly Badge"},
+
             };
         }
 
@@ -1303,7 +1316,7 @@ namespace Peak.AP
                 { "Balloon Bunch", () => SpawnPhysicalItem("BalloonBunch") },
                 { "Scout Cannon", () => SpawnPhysicalItem("ScoutCannonItem") },
                 { "Portable Stove", () => SpawnPhysicalItem("PortableStovetopItem") },
-                { "Campfire", () => SpawnPhysicalItem("FireWood") },
+                { "Checkpoint Flag", () => SpawnPhysicalItem("CheckpointFlag") },
                 { "Lantern", () => SpawnPhysicalItem("Lantern") },
                 { "Flare", () => SpawnPhysicalItem("Flare") },
                 { "Torch", () => SpawnPhysicalItem("Torch") },

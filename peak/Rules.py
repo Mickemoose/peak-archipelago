@@ -34,7 +34,10 @@ def apply_rules(world: "PeakWorld"):
         "Volcanology Badge", "Alpinist Badge", "Esoterica Badge", "Trailblazer Badge",
         "Beachcomber Badge", "Mentorship Badge", "Cool Cucumber Badge", "Naturalist Badge",
         "Aeronautics Badge", "Leave No Trace Badge", "Needlepoint Badge", "Knot Tying Badge",
-        "Bundled Up Badge"
+        "Bundled Up Badge", "Forestry Badge", "Disaster Response Badge", "Competitive Eating Badge",
+        "Tread Lightly Badge", "Cryptogastronomy Badge", "Calcium Intake Badge", "Advanced Mycology Badge",
+        "Applied Esoterica Badge", "Undead Encounter Badge", "Web Security Badge", "Mycoacrobatics Badge",
+        
     ]
     
     for badge_name in regular_badges:
@@ -65,7 +68,9 @@ def apply_rules(world: "PeakWorld"):
             f"Beachcomber {roman_num} Badge (Ascent {ascent_num})", 
             f"Trailblazer {roman_num} Badge (Ascent {ascent_num})",
             f"Desolate {roman_num} Badge (Ascent {ascent_num})", 
-            f"Volcanology {roman_num} Badge (Ascent {ascent_num})"
+            f"Volcanology {roman_num} Badge (Ascent {ascent_num})",
+            f"Nomad {roman_num} Badge (Ascent {ascent_num})",
+            f"Forestry {roman_num} Badge (Ascent {ascent_num})"
         ]
         
         for ascent_name in ascent_locations:
@@ -88,7 +93,7 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Rope Spool", "Acquire Rope Cannon", "Acquire Anti-Rope Spool", "Acquire Anti-Rope Cannon",
         "Acquire Chain Launcher", "Acquire Piton", "Acquire Magic Bean", "Acquire Parasol",
         "Acquire Balloon", "Acquire Balloon Bunch", "Acquire Scout Cannon", "Acquire Portable Stove",
-        "Acquire Campfire", "Acquire Lantern", "Acquire Flare", "Acquire Torch",
+        "Acquire Checkpoint Flag", "Acquire Lantern", "Acquire Flare", "Acquire Torch",
         "Acquire Compass", "Acquire Pirate's Compass", "Acquire Binoculars", "Acquire Flying Disc",
         "Acquire Bandages", "Acquire First-Aid Kit", "Acquire Antidote", "Acquire Heat Pack",
         "Acquire Cure-All", "Acquire Faerie Lantern", "Acquire Scout Effigy",
@@ -137,6 +142,19 @@ def apply_rules(world: "PeakWorld"):
         try:
             set_rule(world.get_location(alpine_item), 
                     lambda state: state.has("Alpine Access", player))
+        except KeyError:
+            pass
+
+    # Roots-locked items require Roots Access
+    roots_locked_items = [
+        "Acquire Red Shroomberry", "Acquire Blue Shroomberry", "Acquire Yellow Shroomberry", "Acquire Green Shroomberry",
+        "Acquire Mandrake"
+    ]
+
+    for roots_item in roots_locked_items:
+        try:
+            set_rule(world.get_location(roots_item), 
+                    lambda state: state.has("Roots Access", player))
         except KeyError:
             pass
     
