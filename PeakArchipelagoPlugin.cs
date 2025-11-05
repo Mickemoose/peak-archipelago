@@ -22,7 +22,7 @@ using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.5")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.6")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
