@@ -20,7 +20,7 @@ class BadgeCount(Range):
     """Select how many badges are required for completion."""
     display_name = "Required Badge Count"
     range_start = 10
-    range_end = 50
+    range_end = 54
     default = 20
 
 class ProgressiveStamina(Toggle):
