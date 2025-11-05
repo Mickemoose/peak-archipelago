@@ -34,23 +34,21 @@ namespace Peak.AP
 
                 // Get the base max stamina from our manager
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
-
-                // Recalculate the outline size to accommodate larger stamina
                 float statusSum = Character.observedCharacter.refs.afflictions.statusSum;
                 
-                // Use the ACTUAL max stamina (base or base + status, whichever is larger)
-                float displayMax = Mathf.Max(baseMaxStamina, statusSum);
-                
-                // Adjust the stamina bar outline to fit the new max
+                // The outline extends to the BASE max (where afflictions end)
                 __instance.staminaBarOutline.sizeDelta = new Vector2(
-                    14f + (baseMaxStamina + statusSum) * __instance.fullBar.sizeDelta.x, 
+                    14f + baseMaxStamina * __instance.fullBar.sizeDelta.x, 
                     __instance.staminaBarOutline.sizeDelta.y
                 );
 
+                // The green bar shows effective stamina (base minus afflictions)
+                float effectiveMax = Mathf.Max(baseMaxStamina - statusSum, 0f);
+                
                 __instance.maxStaminaBar.sizeDelta = new Vector2(
                     Mathf.Lerp(
                         __instance.maxStaminaBar.sizeDelta.x,
-                        Mathf.Max(0f, baseMaxStamina * __instance.fullBar.sizeDelta.x + __instance.staminaBarOffset),
+                        Mathf.Max(0f, effectiveMax * __instance.fullBar.sizeDelta.x + __instance.staminaBarOffset),
                         Time.deltaTime * 10f
                     ),
                     __instance.maxStaminaBar.sizeDelta.y

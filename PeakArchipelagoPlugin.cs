@@ -17,14 +17,16 @@ using UnityEngine;
 using static MountainProgressHandler;
 using Newtonsoft.Json.Linq;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
     [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.5")]
-    public class PeakArchipelagoPlugin : BaseUnityPlugin
+    public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
-        private ManualLogSource _log;
+        public ManualLogSource _log;
         private Harmony _harmony;
 
         // ===== Config =====
@@ -89,12 +91,12 @@ namespace Peak.AP
         private string _lastDeathLinkSource = "None";
         private string _lastDeathLinkCause = "None";
         private bool _isDyingFromDeathLink = false;
-        private static PeakArchipelagoPlugin _instance;
+        public static PeakArchipelagoPlugin _instance { get; private set; }
         public string Status => _status;
         private ArchipelagoUI _ui;
-        private LinkedList<(string itemName, bool isTrap)> _itemQueue = new LinkedList<(string, bool)>();
+        private LinkedList<(string itemName, bool isTrap, int itemIndex)> _itemQueue = new LinkedList<(string, bool, int)>();
         private float _lastItemProcessed = 0f;
-        private const float ITEM_PROCESSING_COOLDOWN = 0.5f;
+        private const float ITEM_PROCESSING_COOLDOWN = 1f;
         private void Awake()
         {
             try
@@ -118,13 +120,18 @@ namespace Peak.AP
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
                 CharacterClampStaminaPatch.SetStaminaManager(_staminaManager);
+                CharacterHandleLifePatch.SetStaminaManager(_staminaManager);
                 StaminaBarUpdatePatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
+                BarAfflictionChangeAfflictionPatch.SetStaminaManager(_staminaManager);
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
+                SwapTrapEffect.Initialize(_log, this);
+                AfflictionTrapEffect.Initialize(_log);
+                LuggageInteractCastFinishedPatch.SetPlugin(this);
                 // Check for port changes and initialize port-specific caching
                 CheckAndHandlePortChange();
-
+                
                 LoadState();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
@@ -138,6 +145,7 @@ namespace Peak.AP
                 // Subscribe to achievement events for badge checking
                 GlobalEvents.OnAchievementThrown += OnAchievementThrown;
                 GlobalEvents.OnItemRequested += OnItemRequested;
+                GlobalEvents.OnLuggageOpened += OnLuggageOpened;
 
                 // Apply Harmony patches
                 _log.LogInfo("[PeakPelago] About to apply Harmony patches...");
@@ -147,6 +155,7 @@ namespace Peak.AP
 
 
                 SetupPhotonView();
+
                 _notifications.SetPhotonView(_photonView);
                 // Hide existing badges after a short delay to let the game initialize
                 Invoke(nameof(HideExistingBadges), 1f);
@@ -155,11 +164,12 @@ namespace Peak.AP
                 Invoke(nameof(StoreOriginalAscent), 1f);
 
                 _status = "Ready";
+                PhotonNetwork.AddCallbackTarget(this);
                 _log.LogInfo("[PeakPelago] Plugin ready.");
 
-                
+
                 Invoke(nameof(CountExistingBadges), 1.5f);
-                
+
             }
             catch (System.Exception ex)
             {
@@ -168,11 +178,109 @@ namespace Peak.AP
             }
         }
 
+        public void ApplyAfflictionViaRPC(int actorNumber, int statusType, float amount)
+        {
+            if (_photonView != null && PhotonNetwork.IsConnected)
+            {
+                // Find the target player
+                var targetPlayer = PhotonNetwork.PlayerList.FirstOrDefault(p => p.ActorNumber == actorNumber);
+
+                if (targetPlayer != null)
+                {
+                    _photonView.RPC("ApplyAfflictionToPlayer", targetPlayer, actorNumber, statusType, amount);
+                    _log.LogInfo($"[PeakPelago] Sent affliction RPC to actor {actorNumber}");
+                }
+                else
+                {
+                    _log.LogWarning($"[PeakPelago] Could not find player with actor number {actorNumber}");
+                }
+            }
+        }
+
+        public void IncrementLuggageCount()
+        {
+            _hasOpenedLuggageThisSession = true;
+            _luggageOpenedCount++;
+            _luggageOpenedThisRun++;
+            _totalLuggageOpened++;
+            _log.LogInfo($"[PeakPelago] Luggage count - Total: {_totalLuggageOpened}, This run: {_luggageOpenedThisRun}");
+            
+            CheckLuggageAchievements();
+            SaveState();
+        }
+        
+        private void OnLuggageOpened(Luggage luggage, Character interactor)
+        {
+            try
+            {
+                _log.LogInfo("[PeakPelago] ===== OnLuggageOpened EVENT FIRED =====");
+                _log.LogInfo($"[PeakPelago] Luggage: {luggage?.GetName() ?? "NULL"}");
+                _log.LogInfo($"[PeakPelago] Interactor: {interactor?.characterName ?? "NULL"}");
+                
+                if (interactor == null)
+                {
+                    _log.LogWarning("[PeakPelago] Interactor is null, returning");
+                    return;
+                }
+                
+                // Only track if the interactor is the local player
+                if (interactor != Character.localCharacter)
+                {
+                    _log.LogInfo($"[PeakPelago] Interactor is not local character, ignoring");
+                    return;
+                }
+                
+                string luggageName = luggage?.GetName() ?? "Unknown";
+                _log.LogInfo($"[PeakPelago] Local player opened luggage: {luggageName}");
+                
+                // Send to host via RPC
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("ReportLuggageOpened", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber);
+                    _log.LogInfo($"[PeakPelago] Sent luggage RPC to host");
+                }
+                else
+                {
+                    _log.LogWarning("[PeakPelago] PhotonView or network not available");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] OnLuggageOpened error: " + ex.Message);
+                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
+            }
+        }
+        
+        [PunRPC]
+        private void ReportLuggageOpened(int actorNumber)
+        {
+            try
+            {
+                // Only host processes
+                if (!PhotonNetwork.IsMasterClient) return;
+                
+                _log.LogInfo($"[PeakPelago] HOST: Received luggage open from actor {actorNumber}");
+                
+                _hasOpenedLuggageThisSession = true;
+                _luggageOpenedCount++;
+                _luggageOpenedThisRun++;
+                _totalLuggageOpened++;
+                _log.LogInfo($"[PeakPelago] Host luggage count - Total: {_totalLuggageOpened}, This run: {_luggageOpenedThisRun}");
+                
+                CheckLuggageAchievements();
+                SaveState();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in ReportLuggageOpened RPC: {ex.Message}");
+            }
+        }
+
         private void OnDestroy()
         {
             // Unsubscribe from achievement events
             GlobalEvents.OnAchievementThrown -= OnAchievementThrown;
-
+            GlobalEvents.OnLuggageOpened -= OnLuggageOpened;
             // Unsubscribe from item acquisition events
             GlobalEvents.OnItemRequested -= OnItemRequested;
             _ringLinkService?.Cleanup();
@@ -202,6 +310,62 @@ namespace Peak.AP
             {
                 _log.LogError("[PeakPelago] Failed to setup PhotonView: " + ex.Message);
                 _log.LogWarning("[PeakPelago] Network synchronization may not work properly");
+            }
+        }
+
+        public void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] Player {newPlayer.NickName} joined the room");
+
+                // Only the host syncs stamina to new players
+                if (PhotonNetwork.IsMasterClient && _photonView != null)
+                {
+                    // Get the current stamina configuration
+                    bool progressiveEnabled = _staminaManager?.IsProgressiveStaminaEnabled() ?? false;
+                    int totalUpgrades = _staminaManager?.GetStaminaUpgradesReceived() ?? 0;
+
+                    _log.LogInfo($"[PeakPelago] Host syncing to {newPlayer.NickName}: progressive={progressiveEnabled}, upgrades={totalUpgrades}");
+
+                    // Always send the configuration, even if progressive is disabled
+                    _photonView.RPC("SyncStaminaConfiguration", newPlayer, progressiveEnabled, totalUpgrades);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in OnPlayerEnteredRoom: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        private void SyncStaminaConfiguration(bool progressiveEnabled, int totalUpgrades)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] CLIENT: Received stamina configuration: progressive={progressiveEnabled}, upgrades={totalUpgrades}");
+                
+                if (_staminaManager == null)
+                {
+                    _log.LogError("[PeakPelago] CLIENT: StaminaManager is null!");
+                    return;
+                }
+                
+                _staminaManager.Initialize(progressiveEnabled, true);
+                _log.LogInfo($"[PeakPelago] CLIENT: Initialized stamina manager");
+                for (int i = 0; i < totalUpgrades; i++)
+                {
+                    _staminaManager.ApplyStaminaUpgrade();
+                    _log.LogInfo($"[PeakPelago] CLIENT: Applied upgrade {i + 1}/{totalUpgrades}");
+                }
+                _log.LogInfo($"[PeakPelago] CLIENT: Final base max stamina: {_staminaManager.GetBaseMaxStamina()}");
+                StartCoroutine(ForceStaminaUIUpdate());
+                
+                _log.LogInfo($"[PeakPelago] CLIENT: Successfully configured stamina system");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] CLIENT: Error in SyncStaminaConfiguration: {ex.Message}");
+                _log.LogError($"[PeakPelago] CLIENT: Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -752,7 +916,7 @@ namespace Peak.AP
 
         private void CheckLuggageAchievements()
         {
-            if (_session == null || !_hasOpenedLuggageThisSession) return; // Don't check until we've actually opened luggage
+            if (_session == null || !_hasOpenedLuggageThisSession) return;
 
             try
             {
@@ -1246,42 +1410,41 @@ namespace Peak.AP
         }
 
         [PunRPC]
-        public void ApplyAfflictionToPlayer(int targetActorNumber, int statusType, float amount)
+        private void ApplyAfflictionToPlayer(int targetActorNumber, int statusType, float amount)
         {
             try
             {
                 _log.LogInfo($"[PeakPelago] RPC received: ApplyAfflictionToPlayer for actor {targetActorNumber}, type {statusType}, amount {amount}");
 
-                // Find the character belonging to this actor
-                var targetCharacter = Character.AllCharacters.FirstOrDefault(c => 
-                    c != null && 
-                    c.photonView != null && 
-                    c.photonView.Owner != null &&
-                    c.photonView.Owner.ActorNumber == targetActorNumber
-                );
-
-                if (targetCharacter == null)
+                // Find our local character
+                if (Character.localCharacter == null)
                 {
-                    _log.LogWarning($"[PeakPelago] Could not find character for actor {targetActorNumber}");
+                    _log.LogWarning("[PeakPelago] Local character is null!");
                     return;
                 }
 
-                // Only apply if this is OUR character (we own it)
-                if (targetCharacter.IsLocal)
-                {
-                    _log.LogInfo($"[PeakPelago] Applying {(CharacterAfflictions.STATUSTYPE)statusType} ({amount}) to local character");
-                    targetCharacter.refs.afflictions.AddStatus((CharacterAfflictions.STATUSTYPE)statusType, amount);
-                    _log.LogInfo($"[PeakPelago] Affliction applied successfully!");
-                }
-                else
-                {
-                    _log.LogDebug($"[PeakPelago] Ignoring RPC for non-local character");
-                }
+                // Apply the affliction to our local character
+                _log.LogInfo($"[PeakPelago] Applying {(CharacterAfflictions.STATUSTYPE)statusType} ({amount}) to local character");
+                Character.localCharacter.refs.afflictions.AddStatus((CharacterAfflictions.STATUSTYPE)statusType, amount);
+                _log.LogInfo($"[PeakPelago] Affliction applied successfully!");
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in ApplyAfflictionToPlayer RPC: {ex.Message}");
                 _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
+            }
+        }
+        
+        private void OnPlayerJoined()
+        {
+            if (PhotonNetwork.IsMasterClient && _photonView != null && PhotonNetwork.IsConnected)
+            {
+                int totalUpgrades = _staminaManager?.GetStaminaUpgradesReceived() ?? 0;
+                if (totalUpgrades > 0)
+                {
+                    _photonView.RPC("SyncStaminaUpgrade", RpcTarget.Others, totalUpgrades);
+                    _log.LogInfo($"[PeakPelago] Synced {totalUpgrades} stamina upgrades to new player");
+                }
             }
         }
 
@@ -1305,8 +1468,17 @@ namespace Peak.AP
                 {
                     _staminaManager.ApplyStaminaUpgrade();
                     return;
-                }          
+                }
+                
                 _staminaManager.ApplyStaminaUpgrade();
+                
+                // Broadcast the upgrade to all players
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    int totalUpgrades = _staminaManager.GetStaminaUpgradesReceived();
+                    _photonView.RPC("SyncStaminaUpgrade", RpcTarget.All, totalUpgrades);
+                    _log.LogInfo($"[PeakPelago] Broadcasted stamina upgrade sync: {totalUpgrades} total");
+                }
             }
             catch (Exception ex)
             {
@@ -1320,24 +1492,8 @@ namespace Peak.AP
         {
             try
             {
-                if (Character.localCharacter == null)
-                {
-                    return;
-                }
-
-                // Find the item by searching through all possible item IDs
+                // Find the item in the database first
                 Item itemToSpawn = null;
-
-                // DEBUG: Log all available items in the database
-                _log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
-                for (ushort itemID = 1; itemID < 300; itemID++) // Limit to first 200 for now
-                {
-                    if (ItemDatabase.TryGetItem(itemID, out Item item))
-                    {
-                        _log.LogInfo("[PeakPelago] Item ID " + itemID + ": " + item.name);
-                    }
-                }
-                _log.LogInfo("[PeakPelago] === END OF AVAILABLE ITEMS ===");
 
                 for (ushort itemID = 1; itemID < 1000; itemID++)
                 {
@@ -1357,12 +1513,47 @@ namespace Peak.AP
                     return;
                 }
 
-                // Spawn item directly without adding to inventory (drop only)
-                Vector3 spawnPosition = Character.localCharacter.Center + Character.localCharacter.transform.forward * 2f;
-                spawnPosition += Vector3.up * 0.5f; // Slightly above ground
+                // Get all valid characters
+                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
+                {
+                    _log.LogWarning("[PeakPelago] Cannot spawn items - no characters found");
+                    return;
+                }
 
-                // Spawn the item prefab directly without calling RequestPickup
-                GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
+                // Filter to only active, alive characters
+                var validCharacters = Character.AllCharacters.Where(c =>
+                    c != null &&
+                    c.gameObject.activeInHierarchy &&
+                    !c.data.dead
+                ).ToList();
+
+                if (validCharacters.Count == 0)
+                {
+                    _log.LogWarning("[PeakPelago] Cannot spawn items - no valid characters found");
+                    return;
+                }
+
+                _log.LogInfo($"[PeakPelago] Spawning {itemName} for {validCharacters.Count} players");
+
+                // Spawn item for each valid character
+                foreach (var character in validCharacters)
+                {
+                    try
+                    {
+                        Vector3 spawnPosition = character.Center + character.transform.forward * 2f;
+                        spawnPosition += Vector3.up * 0.5f; // Slightly above ground
+
+                        // Spawn the item prefab
+                        GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
+                        
+                        string characterName = character == Character.localCharacter ? "local player" : character.characterName;
+                        _log.LogInfo($"[PeakPelago] Spawned {itemName} for {characterName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError($"[PeakPelago] Error spawning item for character: {ex.Message}");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -1800,7 +1991,89 @@ namespace Peak.AP
             }
         }
 
+        private System.Collections.IEnumerator ForceStaminaUIUpdate()
+        {
+            // Wait a bit for the character and UI to be fully initialized
+            yield return new WaitForSeconds(0.5f);
+            
+            _log.LogInfo("[PeakPelago] CLIENT: Forcing stamina UI update...");
+            
+            // Force update the character's stamina
+            if (Character.localCharacter != null && _staminaManager != null)
+            {
+                // Recalculate and clamp stamina
+                float baseMax = _staminaManager.GetBaseMaxStamina();
+                float statusSum = Character.localCharacter.refs.afflictions.statusSum;
+                float effectiveMax = Mathf.Max(baseMax - statusSum, 0f);
+                Character.localCharacter.data.currentStamina = Mathf.Min(Character.localCharacter.data.currentStamina, effectiveMax);
+                
+                _log.LogInfo($"[PeakPelago] CLIENT: Set stamina to {Character.localCharacter.data.currentStamina} (max: {effectiveMax}, base: {baseMax})");
+                
+                // Force the stamina bar UI to refresh
+                if (GUIManager.instance != null && GUIManager.instance.bar != null)
+                {
+                    GUIManager.instance.bar.ChangeBar();
+                    _log.LogInfo("[PeakPelago] CLIENT: Stamina bar UI refreshed");
+                }
+                else
+                {
+                    _log.LogWarning("[PeakPelago] CLIENT: GUIManager or bar is null, couldn't refresh UI");
+                }
+            }
+            else
+            {
+                _log.LogWarning("[PeakPelago] CLIENT: Character or stamina manager is null, couldn't update");
+            }
+        }
+
         // ===== Harmony Patches =====
+
+        [HarmonyPatch(typeof(Luggage), "Interact_CastFinished")]
+        public static class LuggageInteractCastFinishedPatch
+        {
+            private static PeakArchipelagoPlugin _plugin;
+
+            public static void SetPlugin(PeakArchipelagoPlugin plugin)
+            {
+                _plugin = plugin;
+            }
+
+            static void Postfix(Luggage __instance, Character interactor)
+            {
+                try
+                {
+                    if (_plugin == null)
+                    {
+                        Debug.LogWarning("[PeakPelago] Plugin is null in luggage patch!");
+                        return;
+                    }
+
+
+                    if (interactor == null)
+                    {
+                        _plugin._log.LogWarning("[PeakPelago] Interactor is null!");
+                        return;
+                    }
+
+                    string luggageName = __instance.GetName();
+                    string characterName = interactor.characterName ?? "Unknown";
+                    
+                    _plugin._log.LogInfo($"[PeakPelago] Player {characterName} opened luggage: {luggageName} (IsMaster: {PhotonNetwork.IsMasterClient})");
+                    
+                    if (PhotonNetwork.IsMasterClient)
+                    {
+                        _plugin.IncrementLuggageCount();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_plugin != null)
+                    {
+                        _plugin._log.LogError($"[PeakPelago] LuggageInteractCastFinishedPatch error: {ex.Message}");
+                    }
+                }
+            }
+        }
 
         [HarmonyPatch(typeof(Item), "RequestPickup")]
         public static class ItemRequestPickupPatch
@@ -1820,7 +2093,7 @@ namespace Peak.AP
                     string itemName = __instance.UIData.itemName;
                     ushort itemId = __instance.itemID;
 
-                    _instance._log.LogInfo($"[PeakPelago] HOST: Player {character.characterName} (Actor: {characterView.Owner.ActorNumber}) picked up item: {itemName} (ID: {itemId})");
+                    _instance._log.LogDebug($"[PeakPelago] HOST: Player {character.characterName} (Actor: {characterView.Owner.ActorNumber}) picked up item: {itemName} (ID: {itemId})");
 
                     _instance.TrackItemAcquisition(itemName, itemId);
                 }
@@ -1889,39 +2162,6 @@ namespace Peak.AP
                 }
             }
         }
-
-        [HarmonyPatch(typeof(Luggage), "Interact_CastFinished")]
-        public static class LuggageInteractCastFinishedPatch
-        {
-            static void Postfix(Luggage __instance, Character interactor)
-            {
-                try
-                {
-                    if (_instance == null) return;
-                    if (!PhotonNetwork.IsMasterClient) return;
-                    if (interactor == null) return;
-                    string luggageName = __instance.GetName();
-
-                    _instance._log.LogInfo($"[PeakPelago] HOST: Player {interactor.characterName} opened luggage: {luggageName}");
-                    _instance._hasOpenedLuggageThisSession = true;
-                    _instance._luggageOpenedCount++;
-                    _instance._luggageOpenedThisRun++;
-                    _instance._totalLuggageOpened++;
-                    _instance._log.LogInfo("[PeakPelago] Host luggage count - Total: " + _instance._totalLuggageOpened + ", This run: " + _instance._luggageOpenedThisRun);
-                    _instance.CheckLuggageAchievements();
-                    _instance.SaveState();
-                }
-                catch (Exception ex)
-                {
-                    if (_instance != null)
-                    {
-                        _instance._log.LogError("[PeakPelago] Luggage Interact_CastFinished patch error: " + ex.Message);
-                        _instance._log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
-                    }
-                }
-            }
-        }
-
         [HarmonyPatch(typeof(AchievementManager), "ThrowAchievement")]
         public static class AchievementManagerThrowAchievementPatch
         {
@@ -2212,15 +2452,20 @@ namespace Peak.AP
                         string itemName = helper.GetItemName(info.ItemId, info.ItemGame) ?? ("Item " + info.ItemId);
                         string fromName = _session.Players.GetPlayerName(info.Player) ?? ("Player " + info.Player);
                         string toName = cfgSlot.Value;
-                        _lastProcessedItemIndex = Mathf.Max(_lastProcessedItemIndex, helper.Index);
-                        SaveState();
                         ItemFlags classification = info.Flags;
-                        _notifications.ShowItemNotification(fromName, toName, itemName, classification);
                         
-                        bool isTrap = IsTrapItem(itemName);
-                        _itemQueue.AddLast((itemName, isTrap));
-                        
-                        _log.LogInfo($"[PeakPelago] Queued item: {itemName} (Queue size: {_itemQueue.Count})");
+                        if (helper.Index > _lastProcessedItemIndex)
+                        {
+                            _notifications.ShowItemNotification(fromName, toName, itemName, classification);
+                            bool isTrap = IsTrapItem(itemName);
+                            _itemQueue.AddLast((itemName, isTrap, helper.Index));
+                            
+                            _log.LogInfo($"[PeakPelago] Queued NEW item #{helper.Index}: {itemName} (Queue size: {_itemQueue.Count})");
+                        }
+                        else
+                        {
+                            _log.LogDebug($"[PeakPelago] Skipping already-processed item #{helper.Index}: {itemName}");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -2491,17 +2736,23 @@ namespace Peak.AP
         /// </summary>
         private void ProcessItemQueue()
         {
+            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (!currentScene.StartsWith("Level_"))
+            {
+                return;
+            }
+            
             if (_itemQueue.Count == 0 || Time.time - _lastItemProcessed < ITEM_PROCESSING_COOLDOWN)
             {
                 return;
             }
             
-            var (itemName, isTrap) = _itemQueue.First.Value;
+            var (itemName, isTrap, itemIndex) = _itemQueue.First.Value;
             _itemQueue.RemoveFirst();
             
             try
             {
-                _log.LogInfo($"[PeakPelago] Processing queued item: {itemName} (Remaining: {_itemQueue.Count})");
+                _log.LogInfo($"[PeakPelago] Processing queued item #{itemIndex}: {itemName} (Remaining: {_itemQueue.Count})");
                 
                 if (isTrap)
                 {
@@ -2511,7 +2762,8 @@ namespace Peak.AP
                 {
                     ApplyItemEffect(itemName);
                 }
-                
+                _lastProcessedItemIndex = itemIndex;
+                SaveState();
                 _lastItemProcessed = Time.time;
             }
             catch (Exception ex)
@@ -2657,7 +2909,7 @@ namespace Peak.AP
                 string line3 = _totalLuggageOpened.ToString();
                 string line4 = string.Join(",", _itemAcquisitionCounts.Select(kvp => kvp.Key + ":" + kvp.Value).ToArray());
                 string line5 = _staminaManager?.SaveState() ?? "0,1.00";
-                File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4, line5});
+                File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4, line5 });
                 _log.LogDebug("[PeakPelago] Saved state to port-specific file: " + _currentPort);
             }
             catch (Exception ex)
@@ -2665,7 +2917,6 @@ namespace Peak.AP
                 _log.LogWarning("[PeakPelago] Failed to save state file: " + ex.Message);
             }
         }
-
         /// <summary>Handle achievement events to report badge checks to Archipelago</summary>
         private void OnAchievementThrown(ACHIEVEMENTTYPE achievementType)
         {
@@ -2713,6 +2964,26 @@ namespace Peak.AP
             {
                 _log.LogError("[PeakPelago] Error handling item request event: " + ex.Message);
             }
+        }
+
+        public void OnPlayerLeftRoom(Photon.Realtime.Player otherPlayer)
+        {
+            _log.LogWarning("[PeakPelago] Player left room: " + otherPlayer.NickName);
+        }
+
+        public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+        {
+
+        }
+
+        public void OnPlayerPropertiesUpdate(Photon.Realtime.Player targetPlayer, Hashtable changedProps)
+        {
+
+        }
+
+        public void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)
+        {
+            _log.LogInfo("[PeakPelago] Master client switched to: " + newMasterClient.NickName);
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using BepInEx.Logging;
 using HarmonyLib;
+using Photon.Pun;
 using UnityEngine;
 
 namespace Peak.AP
@@ -52,6 +53,7 @@ namespace Peak.AP
         {
             if (!_progressiveStaminaEnabled)
             {
+                _log.LogWarning("[PeakPelago] Cannot apply stamina upgrade - progressive stamina is disabled");
                 return;
             }
 
@@ -64,18 +66,21 @@ namespace Peak.AP
             }
 
             _baseMaxStamina = 0.25f + (_staminaUpgradesReceived * 0.25f);
+            _log.LogInfo($"[PeakPelago] Applied stamina upgrade #{_staminaUpgradesReceived}: new base max = {_baseMaxStamina}");
+            
             UpdateCharacterStamina();
         }
 
         /// <summary>
         /// Force update the character's stamina to match current max
         /// </summary>
-        private void UpdateCharacterStamina()
+        public void UpdateCharacterStamina()
         {
             if (Character.localCharacter != null)
             {
-                // Get the effective max stamina (accounting for status effects)
-                float effectiveMax = GetEffectiveMaxStamina();
+                // Calculate effective max for LOCAL character specifically
+                float statusSum = Character.localCharacter.refs.afflictions.statusSum;
+                float effectiveMax = Mathf.Max(_baseMaxStamina - statusSum, 0f);
 
                 // Set current stamina to the new max
                 Character.localCharacter.data.currentStamina = effectiveMax;
@@ -101,18 +106,19 @@ namespace Peak.AP
         /// </summary>
         public float GetEffectiveMaxStamina()
         {
-            if (!_progressiveStaminaEnabled || Character.localCharacter == null)
+            if (!_progressiveStaminaEnabled)
             {
-                // If disabled or no character, use default calculation
-                if (Character.localCharacter != null)
+                if (Character.observedCharacter != null)
                 {
-                    return Mathf.Max(1.0f - Character.localCharacter.refs.afflictions.statusSum, 0f);
+                    return Mathf.Max(1.0f - Character.observedCharacter.refs.afflictions.statusSum, 0f);
                 }
                 return 1.0f;
             }
-
-            // Calculate effective max = base - status effects, minimum 0
-            float statusSum = Character.localCharacter.refs.afflictions.statusSum;
+            if (Character.observedCharacter == null)
+            {
+                return _baseMaxStamina;
+            }
+            float statusSum = Character.observedCharacter.refs.afflictions.statusSum;
             return Mathf.Max(_baseMaxStamina - statusSum, 0f);
         }
 
@@ -165,10 +171,39 @@ namespace Peak.AP
             }
         }
     }
-    
-    /// <summary>
-    /// Harmony patch to reposition afflictions at the end of the actual max stamina bar
-    /// </summary>
+
+    [HarmonyPatch(typeof(BarAffliction), "ChangeAffliction")]
+    public static class BarAfflictionChangeAfflictionPatch
+    {
+        private static ProgressiveStaminaManager _staminaManager;
+
+        public static void SetStaminaManager(ProgressiveStaminaManager manager)
+        {
+            _staminaManager = manager;
+        }
+
+        static void Postfix(BarAffliction __instance, StaminaBar bar)
+        {
+            try
+            {
+                if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
+                {
+                    return;
+                }
+                if (Character.observedCharacter == null)
+                {
+                    return;
+                }
+                float currentStatus = Character.observedCharacter.refs.afflictions.GetCurrentStatus(__instance.afflictionType);
+                __instance.size = bar.fullBar.sizeDelta.x * currentStatus;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PeakPelago] BarAffliction ChangeAffliction patch error: {ex.Message}");
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(BarAffliction), "UpdateAffliction")]
     public static class BarAfflictionUpdateAfflictionPatch
     {
@@ -180,49 +215,56 @@ namespace Peak.AP
             Debug.Log("[PeakPelago] Stamina manager set for BarAffliction UpdateAffliction patch");
         }
 
-        static void Postfix(BarAffliction __instance, StaminaBar bar)
+        static bool Prefix(BarAffliction __instance, StaminaBar bar)
         {
             try
             {
                 if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
                 {
-                    return;
+                    return true;
                 }
-
                 if (Character.observedCharacter == null)
                 {
-                    return;
+                    return true;
+                }
+                float currentStatus = Character.observedCharacter.refs.afflictions.GetCurrentStatus(__instance.afflictionType);
+                if (currentStatus <= 0f)
+                {
+                    __instance.gameObject.SetActive(false);
+                    return false;
                 }
 
-                // Calculate where this affliction should be positioned
-                float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
-                
-                // Position the affliction at the end of the max stamina bar
-                float xPosition = baseMaxStamina * bar.fullBar.sizeDelta.x;
-                
-                // Get all afflictions and find our index to stack them properly
-                float offsetX = 0f;
+                __instance.gameObject.SetActive(true);
+                __instance.size = bar.fullBar.sizeDelta.x * currentStatus;
+                __instance.width = __instance.size;
+                __instance.rtf.sizeDelta = new Vector2(__instance.width, __instance.rtf.sizeDelta.y);
+                float startX = bar.maxStaminaBar.sizeDelta.x + (__instance.width * 0.5f);
+                float stackOffset = 0f;
                 for (int i = 0; i < bar.afflictions.Length; i++)
                 {
                     if (bar.afflictions[i] == __instance)
                     {
                         break;
                     }
-                    if (bar.afflictions[i].gameObject.activeSelf)
+                    
+                    if (bar.afflictions[i].gameObject.activeSelf && bar.afflictions[i].width > 0.01f)
                     {
-                        offsetX += bar.afflictions[i].width;
+                        stackOffset += bar.afflictions[i].width;
                     }
                 }
                 
-                __instance.rtf.anchoredPosition = new Vector2(xPosition + offsetX, __instance.rtf.anchoredPosition.y);
+                float finalX = startX + stackOffset;
+                __instance.rtf.anchoredPosition = new Vector2(finalX, __instance.rtf.anchoredPosition.y);
+
+                return false;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[PeakPelago] BarAffliction UpdateAffliction patch error: {ex.Message}");
+                return true;
             }
         }
     }
-
     /// <summary>
     /// Harmony patch to override Character.GetMaxStamina() when progressive stamina is enabled
     /// </summary>
@@ -243,7 +285,6 @@ namespace Peak.AP
             {
                 if (_staminaManager != null && _staminaManager.IsProgressiveStaminaEnabled())
                 {
-                    // Calculate: baseMax - statusEffects, minimum 0
                     float baseMax = _staminaManager.GetBaseMaxStamina();
                     float statusSum = __instance.refs.afflictions.statusSum;
                     __result = Mathf.Max(baseMax - statusSum, 0f);
@@ -280,13 +321,65 @@ namespace Peak.AP
             {
                 if (_staminaManager != null && _staminaManager.IsProgressiveStaminaEnabled())
                 {
-                    float effectiveMax = _staminaManager.GetEffectiveMaxStamina();
+                    float baseMax = _staminaManager.GetBaseMaxStamina();
+                    float statusSum = __instance.refs.afflictions.statusSum;
+                    float effectiveMax = Mathf.Max(baseMax - statusSum, 0f);
                     __instance.data.currentStamina = Mathf.Clamp(__instance.data.currentStamina, 0f, effectiveMax);
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[PeakPelago] ClampStamina patch error: {ex.Message}");
+            }
+        }
+    }
+    /// <summary>
+    /// Patch HandleLife to respect progressive stamina for pass out threshold
+    /// </summary>
+    [HarmonyPatch(typeof(Character), "HandleLife")]
+    public static class CharacterHandleLifePatch
+    {
+        private static ProgressiveStaminaManager _staminaManager;
+
+        public static void SetStaminaManager(ProgressiveStaminaManager manager)
+        {
+            _staminaManager = manager;
+            Debug.Log("[PeakPelago] Stamina manager set for HandleLife patch");
+        }
+
+        static bool Prefix(Character __instance)
+        {
+            try
+            {
+                if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
+                {
+                    return true;
+                }
+
+                // Custom HandleLife logic that respects progressive stamina
+                float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
+                float statusSum = __instance.refs.afflictions.statusSum;
+                
+                // Pass out when afflictions meet or exceed the base max stamina
+                if (statusSum >= baseMaxStamina)
+                {
+                    __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
+                    if (__instance.data.passOutValue > 0.999f)
+                    {
+                        __instance.photonView.RPC("RPCA_PassOut", RpcTarget.All);
+                    }
+                }
+                else
+                {
+                    __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 0f, Time.deltaTime / 5f);
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PeakPelago] HandleLife patch error: {ex.Message}");
+                return true;
             }
         }
     }
