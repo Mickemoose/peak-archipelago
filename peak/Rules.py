@@ -106,7 +106,8 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Dynamite", "Acquire Bing Bong", "Acquire Red Crispberry", "Acquire Green Crispberry",
         "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Brown Berrynana",
         "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", "Acquire Yellow Winterberry",
-        "Acquire Strange Gem", "Acquire Egg", "Acquire Cooked Bird", "Acquire Honeycomb", "Acquire Beehive", "Acquire Big Egg"
+        "Acquire Strange Gem", "Acquire Egg", "Acquire Cooked Bird", "Acquire Honeycomb", "Acquire Beehive", "Acquire Big Egg",
+        "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk"
     ]
     
     for acquire_name in acquire_locations:
@@ -147,7 +148,7 @@ def apply_rules(world: "PeakWorld"):
 
     # Roots-locked items require Roots Access
     roots_locked_items = [
-        "Acquire Red Shroomberry", "Acquire Blue Shroomberry", "Acquire Yellow Shroomberry", "Acquire Green Shroomberry",
+        "Acquire Red Shroomberry", "Acquire Blue Shroomberry", "Acquire Yellow Shroomberry", "Acquire Green Shroomberry", "Acquire Purple Shroomberry",
         "Acquire Mandrake"
     ]
 

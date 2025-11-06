@@ -70,7 +70,10 @@ namespace Peak.AP
                 { "Cactus Ball Trap", "Spike Ball Trap" },
                 { "Instant Death Trap", "Instant Death Trap" },
                 { "Yeet Trap", "Whoops! Trap" },
-                { "Tumbleweed Trap", "Tip Trap"}
+                { "Tumbleweed Trap", "Tip Trap"},
+                { "Zombie Horde Trap", "Spooky Time"},
+                { "Gust Trap", "Get Out Trap"},
+                { "Mandrake Trap", "OmoTrap"}
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -113,6 +116,11 @@ namespace Peak.AP
                 { "One Hit KO", "Instant Death Trap" },
                 { "Tip Trap", "Tumbleweed Trap"},
                 { "Items to Bombs", "Items to Bombs"},
+                { "Spooky Time", "Zombie Horde Trap"},
+                { "Meteor Trap", "Tornado Trap" },
+                { "Get Out Trap", "Gust Trap"},
+                { "Resistance Trap", "Gust Trap"},
+                { "Mandrake Trap", "OmoTrap"}
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
@@ -169,10 +177,12 @@ namespace Peak.AP
                 {
                     standardizedTrapName = mappedName;
                     _log.LogDebug($"[PeakPelago] Mapped '{peakTrapName}' to '{standardizedTrapName}' for sending");
+                    
                 }
                 else
                 {
                     _log.LogWarning($"[PeakPelago] No standardized mapping for '{peakTrapName}', sending as-is");
+                    return;
                 }
 
                 var trapLinkData = new Dictionary<string, JToken>

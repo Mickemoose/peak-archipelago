@@ -362,6 +362,14 @@ namespace Peak.AP
                     {
                         totalRings += 0.35f;
                     }
+                    if (name.Contains("Glizzy"))
+                    {
+                        totalRings += 0.69f;
+                    }
+                    if (name.Contains("Milk"))
+                    {
+                        totalRings += 0.40f;
+                    }
                     if (name.Contains("Turkey"))
                     {
                         totalRings += 0.75f;

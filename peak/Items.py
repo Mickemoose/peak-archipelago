@@ -56,6 +56,9 @@ ITEMS = {
     "Slip Trap": (76041, ItemClassification.trap),
     "Yeet Trap": (76042, ItemClassification.trap),
     "Tumbleweed Trap": (76043, ItemClassification.trap),
+    "Zombie Horde Trap": (76044, ItemClassification.trap),
+    "Gust Trap": (76045, ItemClassification.trap),
+    "Mandrake Trap": (76046, ItemClassification.trap),
     #endregion
     
     #region Progression Items
@@ -66,7 +69,11 @@ ITEMS = {
     "Ascent 5 Unlock": (76023, ItemClassification.progression),
     "Ascent 6 Unlock": (76024, ItemClassification.progression),
     "Ascent 7 Unlock": (76025, ItemClassification.progression),
-    "Progressive Stamina Bar": (77080, ItemClassification.useful),
+    "Progressive Stamina Bar": (78001, ItemClassification.useful),
+    #endregion
+
+    #region Item Bundles
+    "Bundle: Glizzy Gobbler" : (79000, ItemClassification.useful),
     #endregion
     
     #region Game Items
@@ -144,5 +151,17 @@ ITEMS = {
     "Gold Prickleberry": (77072, ItemClassification.filler),
     "Big Egg": (77073, ItemClassification.filler),
     "Scorpion": (77074, ItemClassification.trap),
+    "Book of Bones": (77075, ItemClassification.useful),
+    "Red Shroomberry": (77076, ItemClassification.filler),
+    "Blue Shroomberry": (77077, ItemClassification.filler),
+    "Yellow Shroomberry": (77078, ItemClassification.filler),
+    "Green Shroomberry": (77079, ItemClassification.filler),
+    "Purple Shroomberry": (77080, ItemClassification.filler),
+    "Mandrake": (77081, ItemClassification.trap),
+    "Marshmallow": (77082, ItemClassification.useful),
+    "Glizzy": (77083, ItemClassification.useful),
+    "Rescue Claw": (77084, ItemClassification.useful),
+    "Fortified Milk": (77085, ItemClassification.useful),
+    "Cloud Fungus": (77086, ItemClassification.useful),
     #endregion
 }

@@ -122,8 +122,10 @@ namespace Peak.AP
                 CharacterClampStaminaPatch.SetStaminaManager(_staminaManager);
                 CharacterHandleLifePatch.SetStaminaManager(_staminaManager);
                 StaminaBarUpdatePatch.SetStaminaManager(_staminaManager);
+                CharacterHandlePassedOutPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionChangeAfflictionPatch.SetStaminaManager(_staminaManager);
+                
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
                 SwapTrapEffect.Initialize(_log, this);
@@ -1206,6 +1208,7 @@ namespace Peak.AP
                 { "ANTI-ROPE CANNON", "Acquire Anti-Rope Cannon" },
                 { "CHAIN LAUNCHER", "Acquire Chain Launcher" },
                 { "PITON", "Acquire Piton" },
+                { "RESCUE CLAW", "Acquire Rescue Claw" },
                 
                 // Special items
                 { "MAGIC BEAN", "Acquire Magic Bean" },
@@ -1240,6 +1243,9 @@ namespace Peak.AP
                 { "MEDICINAL ROOT", "Acquire Medicinal Root" },
                 { "ALOE VERA", "Acquire Aloe Vera" },
                 { "SUNSCREEN", "Acquire Sunscreen" },
+                { "MARSHMALLOW", "Acquire Marshmallow" },
+                { "GLIZZY", "Acquire Glizzy" },
+                { "FORTIFIED MILK", "Acquire Fortified Milk" },
                 
                 // Special objects
                 { "SCOUT EFFIGY", "Acquire Scout Effigy" },
@@ -1247,6 +1253,7 @@ namespace Peak.AP
                 { "PANDORA'S LUNCHBOX", "Acquire Pandora's Lunchbox" },
                 { "ANCIENT IDOL", "Acquire Ancient Idol" },
                 { "STRANGE GEM", "Acquire Strange Gem" },
+                { "BOOK OF BONES", "Acquire Book of Bones" },
                 
                 // Musical items
                 { "BUGLE OF FRIENDSHIP", "Acquire Bugle of Friendship" },
@@ -1316,12 +1323,13 @@ namespace Peak.AP
                 { "Balloon Bunch", () => SpawnPhysicalItem("BalloonBunch") },
                 { "Scout Cannon", () => SpawnPhysicalItem("ScoutCannonItem") },
                 { "Portable Stove", () => SpawnPhysicalItem("PortableStovetopItem") },
-                { "Checkpoint Flag", () => SpawnPhysicalItem("CheckpointFlag") },
+                { "Checkpoint Flag", () => SpawnPhysicalItem("Flag_Plantable_Checkpoint") },
                 { "Lantern", () => SpawnPhysicalItem("Lantern") },
                 { "Flare", () => SpawnPhysicalItem("Flare") },
                 { "Torch", () => SpawnPhysicalItem("Torch") },
                 { "Cactus", () => SpawnPhysicalItem("CactusBall") },
                 { "Compass", () => SpawnPhysicalItem("Compass") },
+                { "Mandrake", () => SpawnPhysicalItem("Mandrake") },
                 { "Pirate Compass", () => SpawnPhysicalItem("Pirate Compass") },
                 { "Binoculars", () => SpawnPhysicalItem("Binoculars") },
                 { "Flying Disc", () => SpawnPhysicalItem("Frisbee") },
@@ -1334,6 +1342,11 @@ namespace Peak.AP
                 { "Medicinal Root", () => SpawnPhysicalItem("MedicinalRoot") },
                 { "Guidebook", () => SpawnPhysicalItem("Guidebook") },
                 { "Aloe Vera", () => SpawnPhysicalItem("AloeVera") },
+                { "Marshmallow", () => SpawnPhysicalItem("Marshmallow") },
+                { "Glizzy", () => SpawnPhysicalItem("Glizzy") },
+                { "Fortified Milk", () => SpawnPhysicalItem("FortifiedMilk") },
+                { "Rescue Claw", () => SpawnPhysicalItem("RescueHook") },
+                { "Book of Bones", () => SpawnPhysicalItem("BookOfBones") },
                 { "Sunscreen", () => SpawnPhysicalItem("Sunscreen") },
                 { "Scout Effigy", () => SpawnPhysicalItem("ScoutEffigy") },
                 { "Cursed Skull", () => SpawnPhysicalItem("Cursed Skull") },
@@ -1379,6 +1392,11 @@ namespace Peak.AP
                 { "Yellow Winterberry", () => SpawnPhysicalItem("Winterberry Yellow") },
                 { "Red Prickleberry", () => SpawnPhysicalItem("Prickleberry_Red") },
                 { "Gold Prickleberry", () => SpawnPhysicalItem("Prickleberry_Gold") },
+                { "Red Shroomberry", () => SpawnPhysicalItem("Shroomberry_Red") },
+                { "Green Shroomberry", () => SpawnPhysicalItem("Shroomberry_Green") },
+                { "Blue Shroomberry", () => SpawnPhysicalItem("Shroomberry_Blue") },
+                { "Yellow Shroomberry", () => SpawnPhysicalItem("Shroomberry_Yellow") },
+                { "Purple Shroomberry", () => SpawnPhysicalItem("Shroomberry_Purple") },
 
 
                 // Progression Items (76019-76025) - Unlock ascents
@@ -1413,10 +1431,14 @@ namespace Peak.AP
                 { "Hot Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Hot) },
                 { "Injury Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Injury) },
                 { "Bounce Fungus", () => SpawnPhysicalItem("BounceShroom") },
+                { "Cloud Fungus", () => SpawnPhysicalItem("CloudFungus") },
                 { "Instant Death Trap", () => InstantDeathTrapEffect.ApplyInstantDeathTrap(_log) },
                 { "Yeet Trap", () => YeetItemTrapEffect.ApplyYeetTrap(_log)},
                 { "Tumbleweed Trap", () => TumbleweedTrapEffect.ApplyTumbleweedTrap(_log) },
                 { "Items to Bombs", () => ItemToBombTrapEffect.ApplyItemToBombTrap(_log) },
+                { "Zombie Horde Trap", () => ZombieHordeTrapEffect.ApplyZombieHordeTrap(_log) },
+                { "Gust Trap", () => GustTrapEffect.ApplyGustTrap(_log) },
+                { "Mandrake Trap", () => ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "Mandrake") },
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
@@ -1507,6 +1529,17 @@ namespace Peak.AP
             {
                 // Find the item in the database first
                 Item itemToSpawn = null;
+
+                // DEBUG: Log all available items in the database
+                _log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
+                for (ushort itemID = 1; itemID < 300; itemID++) // Limit to first 200 for now
+                {
+                    if (ItemDatabase.TryGetItem(itemID, out Item item))
+                    {
+                        _log.LogInfo("[PeakPelago] Item ID " + itemID + ": " + item.name);
+                    }
+                }
+                _log.LogInfo("[PeakPelago] === END OF AVAILABLE ITEMS ===");
 
                 for (ushort itemID = 1; itemID < 1000; itemID++)
                 {

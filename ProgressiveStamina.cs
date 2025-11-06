@@ -3,6 +3,7 @@ using BepInEx.Logging;
 using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
+using Zorro.Core;
 
 namespace Peak.AP
 {
@@ -333,9 +334,78 @@ namespace Peak.AP
             }
         }
     }
+
+    [HarmonyPatch(typeof(Character), "HandlePassedOut")]
+    public static class CharacterHandlePassedOutPatch
+    {
+        private static ProgressiveStaminaManager _staminaManager;
+
+        public static void SetStaminaManager(ProgressiveStaminaManager manager)
+        {
+            _staminaManager = manager;
+            Debug.Log("[PeakPelago] Stamina manager set for HandlePassedOut patch");
+        }
+
+        static bool Prefix(Character __instance)
+        {
+            try
+            {
+                if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
+                {
+                    return true;
+                }
+
+                float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
+                float statusSum = __instance.refs.afflictions.statusSum;
+                
+                // Only allow recovery if afflictions drop below the threshold
+                if (statusSum < baseMaxStamina && Time.time - __instance.data.lastPassedOut > 3f)
+                {
+                    if (!__instance.photonView.IsMine)
+                    {
+                        return false;
+                    }
+                    
+                    __instance.photonView.RPC("RPCA_UnPassOut", RpcTarget.All);
+                }
+                
+                // Handle death timer (copied from original method)
+                if (__instance.data.deathTimer > 1f)
+                {
+                    __instance.refs.items.EquipSlot(Optionable<byte>.None);
+                    
+                    // Check for zombification
+                    if (__instance.refs.afflictions.GetCurrentStatus(CharacterAfflictions.STATUSTYPE.Spores) >= 0.5f 
+                        && !__instance.data.zombified)
+                    {
+                        if (!PhotonNetwork.IsMasterClient)
+                        {
+                            __instance.data.zombified = true;
+                        }
+                        __instance.photonView.RPC("RPCA_Zombify", RpcTarget.MasterClient, 
+                            __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
+                    }
+                    else
+                    {
+                        __instance.photonView.RPC("RPCA_Die", RpcTarget.All, 
+                            __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PeakPelago] HandlePassedOut patch error: {ex.Message}");
+                return true;
+            }
+        }
+    }
     /// <summary>
     /// Patch HandleLife to respect progressive stamina for pass out threshold
+    /// Uses hysteresis to prevent oscillation between knocked out and awake states
     /// </summary>
+
     [HarmonyPatch(typeof(Character), "HandleLife")]
     public static class CharacterHandleLifePatch
     {
@@ -356,24 +426,47 @@ namespace Peak.AP
                     return true;
                 }
 
-                // Custom HandleLife logic that respects progressive stamina
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
                 float statusSum = __instance.refs.afflictions.statusSum;
                 
-                // Pass out when afflictions meet or exceed the base max stamina
-                if (statusSum >= baseMaxStamina)
+                // Check if we should pass out based on progressive stamina threshold
+                bool shouldPassOut = statusSum >= baseMaxStamina;
+                
+                if (__instance.data.isSkeleton)
                 {
-                    __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
-                    if (__instance.data.passOutValue > 0.999f)
+                    // Skeletons die instead of passing out
+                    if (shouldPassOut)
                     {
-                        __instance.photonView.RPC("RPCA_PassOut", RpcTarget.All);
+                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
+                        if (__instance.data.passOutValue > 0.999f)
+                        {
+                            __instance.photonView.RPC("RPCA_Die", RpcTarget.All, 
+                                __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
+                        }
+                    }
+                    else
+                    {
+                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 0f, Time.deltaTime / 5f);
                     }
                 }
                 else
                 {
-                    __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 0f, Time.deltaTime / 5f);
+                    // Normal character pass out logic
+                    if (shouldPassOut)
+                    {
+                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
+                        if (__instance.data.passOutValue > 0.999f)
+                        {
+                            __instance.photonView.RPC("RPCA_PassOut", RpcTarget.All);
+                        }
+                    }
+                    else
+                    {
+                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 0f, Time.deltaTime / 5f);
+                    }
                 }
 
+                // Skip the original method since we handled it
                 return false;
             }
             catch (Exception ex)

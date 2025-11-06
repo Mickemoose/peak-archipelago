@@ -178,6 +178,17 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Gold Prickleberry": 76272,
     "Acquire Big Egg": 76273,
     "Acquire Scorpion": 76274,
+    "Acquire Book of Bones": 76275,
+    "Acquire Red Shroomberry": 76276,  # [Locked behind Roots]
+    "Acquire Blue Shroomberry": 76277,  # [Locked behind Roots]
+    "Acquire Yellow Shroomberry": 76278,  # [Locked behind Roots]
+    "Acquire Green Shroomberry": 76279,  # [Locked behind Roots]
+    "Acquire Purple Shroomberry": 76280,  # [Locked behind Roots]
+    "Acquire Mandrake": 76281,  # [Locked behind Roots]
+    "Acquire Marshmallow": 76282,
+    "Acquire Glizzy": 76283,
+    "Acquire Rescue Claw": 76284,
+    "Acquire Fortified Milk": 76285,
     
     # Peak Badge
     "Peak Badge": 76305,
