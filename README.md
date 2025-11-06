@@ -4,6 +4,8 @@
 
 An Archipelago integration mod for the game PEAK, allowing the game to be played as part of a multiworld randomizer.
 
+Also available on Thunderstore: https://thunderstore.io/c/peak/p/PeakArchipelago/PEAKPELAGO/
+
 ## Overview
 
 This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld randomizer system. Ascent unlocks, badges, and other progression items are randomized across multiple games and players, creating a unique cooperative or competitive experience.
