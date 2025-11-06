@@ -1,3 +1,5 @@
+![PEAKPELAGO](PeakPelagoLogo.png)
+
 # PEAK Archipelago Mod
 
 An Archipelago integration mod for the game PEAK, allowing the game to be played as part of a multiworld randomizer.
