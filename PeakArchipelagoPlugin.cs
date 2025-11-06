@@ -61,10 +61,11 @@ namespace Peak.AP
 
         // ===== State persistence =====
         private int _totalLuggageOpened = 0;
-        private bool _hasOpenedLuggageThisSession = false; // Track if we've actually opened luggage this session
+        private bool _hasOpenedLuggageThisSession = false;
         private ProgressiveStaminaManager _staminaManager;
         private ArchipelagoNotificationManager _notifications;
         private PhotonView _photonView;
+        public PhotonView PhotonView => _photonView;
         private const string CHECK_RPC_NAME = "ReceiveCheckFromClient";
 
         // ===== Badge Management =====
@@ -103,10 +104,7 @@ namespace Peak.AP
             {
                 _log = Logger;
                 _instance = this;
-
-                // Debug log to confirm plugin is loading
                 _log.LogInfo("[PeakPelago] Plugin is initializing...");
-
                 cfgServer = Config.Bind("Connection", "Server", "archipelago.gg", "Host, or host:port");
                 cfgPort = Config.Bind("Connection", "Port", 38281, "Port (ignored if Server already contains :port)");
                 cfgSlot = Config.Bind("Connection", "Slot", "Player", "Your AP slot name");
@@ -125,51 +123,31 @@ namespace Peak.AP
                 CharacterHandlePassedOutPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionChangeAfflictionPatch.SetStaminaManager(_staminaManager);
-                
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
-                LuggageInteractCastFinishedPatch.SetPlugin(this);
-                // Check for port changes and initialize port-specific caching
                 CheckAndHandlePortChange();
-                
                 LoadState();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
-
-                // Initialize item to location mapping
                 InitializeItemMapping();
-
-                // Initialize item effect handlers
                 InitializeItemEffectHandlers();
-
-                // Subscribe to achievement events for badge checking
                 GlobalEvents.OnAchievementThrown += OnAchievementThrown;
                 GlobalEvents.OnItemRequested += OnItemRequested;
-                GlobalEvents.OnLuggageOpened += OnLuggageOpened;
-
-                // Apply Harmony patches
                 _log.LogInfo("[PeakPelago] About to apply Harmony patches...");
                 _harmony = new Harmony("com.mickemoose.peak.ap");
                 _harmony.PatchAll();
                 _log.LogInfo("[PeakPelago] Harmony patches applied successfully");
-
-
                 SetupPhotonView();
-
                 _notifications.SetPhotonView(_photonView);
                 // Hide existing badges after a short delay to let the game initialize
                 Invoke(nameof(HideExistingBadges), 1f);
-
                 // Store original ascent level
                 Invoke(nameof(StoreOriginalAscent), 1f);
-
                 _status = "Ready";
                 PhotonNetwork.AddCallbackTarget(this);
                 _log.LogInfo("[PeakPelago] Plugin ready.");
-
-
                 Invoke(nameof(CountExistingBadges), 1.5f);
 
             }
@@ -210,79 +188,11 @@ namespace Peak.AP
             CheckLuggageAchievements();
             SaveState();
         }
-        
-        private void OnLuggageOpened(Luggage luggage, Character interactor)
-        {
-            try
-            {
-                _log.LogInfo("[PeakPelago] ===== OnLuggageOpened EVENT FIRED =====");
-                _log.LogInfo($"[PeakPelago] Luggage: {luggage?.GetName() ?? "NULL"}");
-                _log.LogInfo($"[PeakPelago] Interactor: {interactor?.characterName ?? "NULL"}");
-                
-                if (interactor == null)
-                {
-                    _log.LogWarning("[PeakPelago] Interactor is null, returning");
-                    return;
-                }
-                
-                // Only track if the interactor is the local player
-                if (interactor != Character.localCharacter)
-                {
-                    _log.LogInfo($"[PeakPelago] Interactor is not local character, ignoring");
-                    return;
-                }
-                
-                string luggageName = luggage?.GetName() ?? "Unknown";
-                _log.LogInfo($"[PeakPelago] Local player opened luggage: {luggageName}");
-                
-                // Send to host via RPC
-                if (_photonView != null && PhotonNetwork.IsConnected)
-                {
-                    _photonView.RPC("ReportLuggageOpened", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber);
-                    _log.LogInfo($"[PeakPelago] Sent luggage RPC to host");
-                }
-                else
-                {
-                    _log.LogWarning("[PeakPelago] PhotonView or network not available");
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError("[PeakPelago] OnLuggageOpened error: " + ex.Message);
-                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
-            }
-        }
-        
-        [PunRPC]
-        private void ReportLuggageOpened(int actorNumber)
-        {
-            try
-            {
-                // Only host processes
-                if (!PhotonNetwork.IsMasterClient) return;
-                
-                _log.LogInfo($"[PeakPelago] HOST: Received luggage open from actor {actorNumber}");
-                
-                _hasOpenedLuggageThisSession = true;
-                _luggageOpenedCount++;
-                _luggageOpenedThisRun++;
-                _totalLuggageOpened++;
-                _log.LogInfo($"[PeakPelago] Host luggage count - Total: {_totalLuggageOpened}, This run: {_luggageOpenedThisRun}");
-                
-                CheckLuggageAchievements();
-                SaveState();
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error in ReportLuggageOpened RPC: {ex.Message}");
-            }
-        }
 
         private void OnDestroy()
         {
             // Unsubscribe from achievement events
             GlobalEvents.OnAchievementThrown -= OnAchievementThrown;
-            GlobalEvents.OnLuggageOpened -= OnLuggageOpened;
             // Unsubscribe from item acquisition events
             GlobalEvents.OnItemRequested -= OnItemRequested;
             _ringLinkService?.Cleanup();
@@ -337,6 +247,37 @@ namespace Peak.AP
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in OnPlayerEnteredRoom: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        private void SyncStaminaUpgrade(int totalUpgrades)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] RPC received: SyncStaminaUpgrade - total upgrades: {totalUpgrades}");
+
+                if (_staminaManager == null)
+                {
+                    _log.LogError("[PeakPelago] StaminaManager is null!");
+                    return;
+                }
+                int currentUpgrades = _staminaManager.GetStaminaUpgradesReceived();
+                while (currentUpgrades < totalUpgrades)
+                {
+                    _staminaManager.ApplyStaminaUpgrade();
+                    currentUpgrades++;
+                    _log.LogInfo($"[PeakPelago] Applied stamina upgrade {currentUpgrades}/{totalUpgrades}");
+                }
+
+                // Force UI update
+                StartCoroutine(ForceStaminaUIUpdate());
+                
+                _log.LogInfo($"[PeakPelago] Stamina sync complete - now at {currentUpgrades} upgrades");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in SyncStaminaUpgrade: {ex.Message}");
+                _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
             }
         }
         [PunRPC]
@@ -967,7 +908,6 @@ namespace Peak.AP
         {
             try
             {
-                // If we're not the host, send the check to the host via RPC
                 if (!PhotonNetwork.IsMasterClient)
                 {
                     if (_photonView != null && PhotonNetwork.IsConnected)
@@ -1425,7 +1365,7 @@ namespace Peak.AP
                 { "Slip Trap", () => SlipTrapEffect.ApplySlipTrap(_log) },
                 { "Clear All Effects", () => ClearAllEffects() },
                 { "Speed Upgrade", () => ApplySpeedUpgrade() },
-                { "Cactus Ball Trap", () => SpawnPhysicalItem("CactusBall") },
+                { "Cactus Ball Trap", () =>ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "CactusBall") },
                 { "Freeze Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Cold) },
                 { "Cold Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Cold) },
                 { "Hot Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Hot) },
@@ -1439,9 +1379,118 @@ namespace Peak.AP
                 { "Zombie Horde Trap", () => ZombieHordeTrapEffect.ApplyZombieHordeTrap(_log) },
                 { "Gust Trap", () => GustTrapEffect.ApplyGustTrap(_log) },
                 { "Mandrake Trap", () => ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "Mandrake") },
+                { "Fungal Infection Trap", () => StatusOverTimeTrapEffect.ApplyStatusOverTime(_log, StatusOverTimeTrapEffect.TargetMode.RandomPlayer,
+                CharacterAfflictions.STATUSTYPE.Spores,
+                amountPerTick: 0.1f,
+                tickInterval: 1.0f,
+                duration: 5.0f
+                ) },
+
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
+        }
+
+        [PunRPC]
+        private void ExpandWindBoundsRPC(float centerX, float centerY, float centerZ)
+        {
+            try
+            {
+                Vector3 center = new Vector3(centerX, centerY, centerZ);
+                _log.LogInfo($"[PeakPelago] RPC received: ExpandWindBounds at ({centerX}, {centerY}, {centerZ})");
+                GustTrapEffect.ExpandWindBounds(center);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in ExpandWindBoundsRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void RestoreWindBoundsRPC()
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] RPC received: RestoreWindBounds");
+                GustTrapEffect.RestoreWindBounds();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in RestoreWindBoundsRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void StartDOTTrapRPC(int targetActorNumber, int statusType, float amountPerTick, float tickInterval, float duration)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] RPC received: StartDOTTrap for actor {targetActorNumber}, type {statusType}");
+
+                // Only apply if this is OUR character
+                if (Character.localCharacter == null)
+                {
+                    _log.LogWarning("[PeakPelago] Local character is null!");
+                    return;
+                }
+
+                if (Character.localCharacter.photonView.Owner.ActorNumber != targetActorNumber)
+                {
+                    _log.LogDebug($"[PeakPelago] DOT RPC not for us (we are {Character.localCharacter.photonView.Owner.ActorNumber}, target is {targetActorNumber})");
+                    return;
+                }
+
+                // Start the DOT coroutine on our local character
+                _log.LogInfo($"[PeakPelago] Starting DOT on local character: {(CharacterAfflictions.STATUSTYPE)statusType}");
+                StartCoroutine(StatusOverTimeTrapEffect.ApplyStatusOverTimeCoroutine(
+                    Character.localCharacter,
+                    (CharacterAfflictions.STATUSTYPE)statusType,
+                    amountPerTick,
+                    tickInterval,
+                    duration,
+                    _log
+                ));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartDOTTrapRPC: {ex.Message}");
+                _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
+            }
+        }
+
+        [PunRPC]
+        private void SwapTrapWarpRPC(int targetActorNumber, float posX, float posY, float posZ)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] RPC received: SwapTrapWarp for actor {targetActorNumber} to ({posX}, {posY}, {posZ})");
+
+                // Only apply if this is OUR character
+                if (Character.localCharacter == null)
+                {
+                    _log.LogWarning("[PeakPelago] Local character is null!");
+                    return;
+                }
+
+                if (Character.localCharacter.photonView.Owner.ActorNumber != targetActorNumber)
+                {
+                    _log.LogDebug($"[PeakPelago] Swap RPC not for us (we are {Character.localCharacter.photonView.Owner.ActorNumber}, target is {targetActorNumber})");
+                    return;
+                }
+
+                // Warp our local character to the target position
+                Vector3 targetPosition = new Vector3(posX, posY, posZ);
+                _log.LogInfo($"[PeakPelago] Warping local character to {targetPosition}");
+                
+                Character.localCharacter.WarpPlayerRPC(targetPosition, true);
+                
+                _log.LogInfo($"[PeakPelago] Warp executed successfully!");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in SwapTrapWarpRPC: {ex.Message}");
+                _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
+            }
         }
 
         [PunRPC]
@@ -1458,6 +1507,15 @@ namespace Peak.AP
                     return;
                 }
 
+                // Check if this RPC is for US
+                int myActorNumber = Character.localCharacter.photonView.Owner.ActorNumber;
+                
+                if (myActorNumber != targetActorNumber)
+                {
+                    _log.LogDebug($"[PeakPelago] RPC not for us (we are {myActorNumber}, target is {targetActorNumber})");
+                    return;
+                }
+
                 // Apply the affliction to our local character
                 _log.LogInfo($"[PeakPelago] Applying {(CharacterAfflictions.STATUSTYPE)statusType} ({amount}) to local character");
                 Character.localCharacter.refs.afflictions.AddStatus((CharacterAfflictions.STATUSTYPE)statusType, amount);
@@ -1469,7 +1527,7 @@ namespace Peak.AP
                 _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
             }
         }
-        
+                
         private void OnPlayerJoined()
         {
             if (PhotonNetwork.IsMasterClient && _photonView != null && PhotonNetwork.IsConnected)
@@ -1499,40 +1557,40 @@ namespace Peak.AP
                     return;
                 }
                 
-                if (Character.localCharacter == null)
-                {
-                    _staminaManager.ApplyStaminaUpgrade();
-                    return;
-                }
+                int upgradesBeforeApply = _staminaManager.GetStaminaUpgradesReceived();
                 
                 _staminaManager.ApplyStaminaUpgrade();
                 
-                // Broadcast the upgrade to all players
+                int totalUpgradesAfterApply = upgradesBeforeApply + 1;
                 if (_photonView != null && PhotonNetwork.IsConnected)
                 {
-                    int totalUpgrades = _staminaManager.GetStaminaUpgradesReceived();
-                    _photonView.RPC("SyncStaminaUpgrade", RpcTarget.All, totalUpgrades);
-                    _log.LogInfo($"[PeakPelago] Broadcasted stamina upgrade sync: {totalUpgrades} total");
+                    _photonView.RPC("SyncStaminaUpgrade", RpcTarget.Others, totalUpgradesAfterApply);
+                    _log.LogInfo($"[PeakPelago] Broadcasted stamina upgrade to others: {totalUpgradesAfterApply} total");
                 }
+
+                if (Character.localCharacter != null)
+                {
+                    StartCoroutine(ForceStaminaUIUpdate());
+                }
+            
+                SaveState();
+                _log.LogInfo("[PeakPelago] Saved stamina state after upgrade");
             }
             catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error in ApplyProgressiveStamina: " + ex.Message);
-                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
             }
         }
 
-        // Item Effect Implementation Methods
         private void SpawnPhysicalItem(string itemName)
         {
             try
             {
-                // Find the item in the database first
                 Item itemToSpawn = null;
 
                 // DEBUG: Log all available items in the database
                 _log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
-                for (ushort itemID = 1; itemID < 300; itemID++) // Limit to first 200 for now
+                for (ushort itemID = 1; itemID < 300; itemID++)
                 {
                     if (ItemDatabase.TryGetItem(itemID, out Item item))
                     {
@@ -2041,9 +2099,9 @@ namespace Peak.AP
         {
             // Wait a bit for the character and UI to be fully initialized
             yield return new WaitForSeconds(0.5f);
-            
+
             _log.LogInfo("[PeakPelago] CLIENT: Forcing stamina UI update...");
-            
+
             // Force update the character's stamina
             if (Character.localCharacter != null && _staminaManager != null)
             {
@@ -2052,9 +2110,9 @@ namespace Peak.AP
                 float statusSum = Character.localCharacter.refs.afflictions.statusSum;
                 float effectiveMax = Mathf.Max(baseMax - statusSum, 0f);
                 Character.localCharacter.data.currentStamina = Mathf.Min(Character.localCharacter.data.currentStamina, effectiveMax);
-                
+
                 _log.LogInfo($"[PeakPelago] CLIENT: Set stamina to {Character.localCharacter.data.currentStamina} (max: {effectiveMax}, base: {baseMax})");
-                
+
                 // Force the stamina bar UI to refresh
                 if (GUIManager.instance != null && GUIManager.instance.bar != null)
                 {
@@ -2074,48 +2132,83 @@ namespace Peak.AP
 
         // ===== Harmony Patches =====
 
+        [HarmonyPatch(typeof(Luggage), "OpenLuggageRPC")]
+        public static class LuggageOpenRPCPatch
+        {
+            static void Postfix(Luggage __instance)
+            {
+                try
+                {
+                    if (_instance == null || !PhotonNetwork.IsMasterClient)
+                    {
+                        return;
+                    }
+
+                    // Host observes ALL luggage opens via the RPC
+                    _instance._log.LogInfo($"[PeakPelago] HOST: Luggage opened: {__instance.GetName()}");
+                    _instance.IncrementLuggageCount();
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] OpenLuggageRPC patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
+        
         [HarmonyPatch(typeof(Luggage), "Interact_CastFinished")]
         public static class LuggageInteractCastFinishedPatch
         {
-            private static PeakArchipelagoPlugin _plugin;
-
-            public static void SetPlugin(PeakArchipelagoPlugin plugin)
-            {
-                _plugin = plugin;
-            }
-
             static void Postfix(Luggage __instance, Character interactor)
             {
                 try
                 {
-                    if (_plugin == null)
+                    if (_instance == null)
                     {
-                        Debug.LogWarning("[PeakPelago] Plugin is null in luggage patch!");
                         return;
                     }
-
 
                     if (interactor == null)
                     {
-                        _plugin._log.LogWarning("[PeakPelago] Interactor is null!");
                         return;
                     }
 
+                    // Get the actor number of who opened it
+                    if (interactor.photonView == null || interactor.photonView.Owner == null)
+                    {
+                        return;
+                    }
+
+                    int actorNumber = interactor.photonView.Owner.ActorNumber;
                     string luggageName = __instance.GetName();
-                    string characterName = interactor.characterName ?? "Unknown";
                     
-                    _plugin._log.LogInfo($"[PeakPelago] Player {characterName} opened luggage: {luggageName} (IsMaster: {PhotonNetwork.IsMasterClient})");
-                    
+                    _instance._log.LogInfo($"[PeakPelago] Luggage opened: {luggageName} by actor {actorNumber}");
+
+                    // Only send RPC if WE are the host
                     if (PhotonNetwork.IsMasterClient)
                     {
-                        _plugin.IncrementLuggageCount();
+                        // We're the host, just process it directly
+                        _instance._log.LogInfo($"[PeakPelago] HOST: Processing luggage open from actor {actorNumber}");
+                        _instance.IncrementLuggageCount();
+                    }
+                    else
+                    {
+                        // We're a client, send to host
+                        if (_instance._photonView != null && PhotonNetwork.IsConnected)
+                        {
+                            _instance._photonView.RPC("ReportLuggageOpened", RpcTarget.MasterClient, actorNumber);
+                            _instance._log.LogInfo($"[PeakPelago] CLIENT: Sent luggage RPC to host for actor {actorNumber}");
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    if (_plugin != null)
+                    if (_instance != null)
                     {
-                        _plugin._log.LogError($"[PeakPelago] LuggageInteractCastFinishedPatch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] LuggageInteractCastFinishedPatch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
                     }
                 }
             }
@@ -2149,6 +2242,60 @@ namespace Peak.AP
                     {
                         _instance._log.LogError("[PeakPelago] RequestPickup patch error: " + ex.Message);
                         _instance._log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// PATCH ZOMBIFYING TOO BECAUSE IT DOESNT CALL DEATH FUNCTIONS >:[ THANKS ROOTS UPDATE
+        /// </summary>
+        [HarmonyPatch(typeof(Character), "FinishZombifying")]
+        public static class CharacterFinishZombifyingPatch
+        {
+            static void Postfix(Character __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    if (_instance._deathLinkService == null) return;
+
+                    if (_instance._isDyingFromDeathLink)
+                    {
+                        _instance._log.LogInfo("[PeakPelago] Zombification was caused by DeathLink, not sending another DeathLink");
+                        return;
+                    }
+
+                    _instance._log.LogInfo($"[PeakPelago] Character zombified: {__instance.characterName}");
+                    if (_instance._deathLinkSendBehavior == 0)
+                    {
+                        _instance._log.LogInfo("[PeakPelago] Sending Death Link (zombification - any player mode)");
+                        _instance.SendDeathLink($"{_instance.cfgSlot.Value} turned into a zombie");
+                    }
+                    else if (_instance._deathLinkSendBehavior == 1)
+                    {
+                        bool allDead = true;
+                        foreach (var character in Character.AllCharacters)
+                        {
+                            if (!character.data.dead && !character.data.zombified)
+                            {
+                                allDead = false;
+                                break;
+                            }
+                        }
+                        
+                        if (allDead)
+                        {
+                            _instance._log.LogInfo("[PeakPelago] Sending Death Link (all players dead/zombified mode)");
+                            _instance.SendDeathLink("Everyone is dead or zombified");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError("[PeakPelago] FinishZombifying patch error: " + ex.Message);
                     }
                 }
             }
@@ -2688,6 +2835,7 @@ namespace Peak.AP
                         _log.LogWarning("[PeakPelago] additional_stamina_bars not found in slot data");
                     }
 
+                    _log.LogInfo($"[PeakPelago] Initializing stamina manager with progressive={progressiveEnabled}, additional={additionalEnabled}");
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
                 }
                 else

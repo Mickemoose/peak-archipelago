@@ -59,6 +59,7 @@ ITEMS = {
     "Zombie Horde Trap": (76044, ItemClassification.trap),
     "Gust Trap": (76045, ItemClassification.trap),
     "Mandrake Trap": (76046, ItemClassification.trap),
+    "Fungal Infection Trap": (76047, ItemClassification.trap),
     #endregion
     
     #region Progression Items

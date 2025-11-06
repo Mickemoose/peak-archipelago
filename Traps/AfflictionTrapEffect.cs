@@ -34,10 +34,12 @@ namespace Peak.AP
                         return;
                     }
 
+                    // Filter to only ALIVE characters
                     var validCharacters = Character.AllCharacters.Where(c =>
                         c != null &&
                         c.gameObject.activeInHierarchy &&
                         !c.data.dead &&
+                        !c.data.fullyPassedOut &&
                         c.photonView != null &&
                         c.photonView.Owner != null
                     ).ToList();
@@ -73,26 +75,30 @@ namespace Peak.AP
                 
                 log.LogInfo($"[PeakPelago] Applying {type} ({amount}) trap to {characterName} (Actor {actorNumber})");
 
-                // Apply directly using the CharacterAfflictions' own RPC system
-                // This should broadcast to all clients, and each client will apply it to their local character if they own it
-                targetCharacter.refs.afflictions.photonView.RPC("ApplyStatusesFromFloatArrayRPC", RpcTarget.All, CreateStatusArray(type, amount));
+                // Send RPC to ALL clients with the target actor number
+                if (PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
+                {
+                    PeakArchipelagoPlugin._instance.PhotonView.RPC(
+                        "ApplyAfflictionToPlayer", 
+                        RpcTarget.All,  // Send to ALL clients
+                        actorNumber,    // They'll check if it's for them
+                        (int)type, 
+                        amount
+                    );
+                    log.LogInfo($"[PeakPelago] Sent affliction RPC to all clients for actor {actorNumber}");
+                }
+                else
+                {
+                    log.LogWarning("[PeakPelago] Plugin PhotonView not available");
+                }
                 
-                log.LogInfo($"[PeakPelago] Sent affliction RPC via character's PhotonView!");
+                log.LogInfo($"[PeakPelago] Applied affliction successfully!");
             }
             catch (Exception ex)
             {
                 log.LogError($"[PeakPelago] Error applying trap: {ex.Message}");
                 log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
             }
-        }
-
-        private static float[] CreateStatusArray(CharacterAfflictions.STATUSTYPE type, float amount)
-        {
-            // Create an array with all status types set to 0, except the target type
-            int statusCount = Enum.GetNames(typeof(CharacterAfflictions.STATUSTYPE)).Length;
-            float[] statusArray = new float[statusCount];
-            statusArray[(int)type] = amount;
-            return statusArray;
         }
     }
 }

@@ -1,55 +1,97 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using BepInEx.Logging;
 using HarmonyLib;
 using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
+using ExitGames.Client.Photon;
 using Zorro.Core;
 
 namespace Peak.AP
 {
-    /// <summary>
-    /// Manages progressive stamina bar upgrades received from Archipelago
-    /// </summary>
     public class ProgressiveStaminaManager
     {
         private readonly ManualLogSource _log;
-        private float _baseMaxStamina = 1.0f;
-        private int _staminaUpgradesReceived = 0;
+        private const string STAMINA_KEY = "AP_Stamina";
         private bool _progressiveStaminaEnabled = false;
         private bool _additionalBarsEnabled = false;
+        
+        // Store the loaded stamina value to apply later when Photon is ready
+        private float? _pendingStaminaLoad = null;
 
         public ProgressiveStaminaManager(ManualLogSource log)
         {
             _log = log;
         }
 
-        /// <summary>
-        /// Initialize the stamina system based on options
-        /// </summary>
         public void Initialize(bool progressiveStaminaEnabled, bool additionalBarsEnabled)
         {
             _progressiveStaminaEnabled = progressiveStaminaEnabled;
             _additionalBarsEnabled = additionalBarsEnabled;
 
+            // Check if we have a pending stamina load from the state file
+            if (_pendingStaminaLoad.HasValue)
+            {
+                _log.LogInfo($"[PeakPelago] Applying pending stamina load: {_pendingStaminaLoad.Value:F2}");
+                if (PhotonNetwork.LocalPlayer != null)
+                {
+                    SetPlayerStamina(PhotonNetwork.LocalPlayer, _pendingStaminaLoad.Value);
+                    _pendingStaminaLoad = null; 
+                    return;
+                }
+                else
+                {
+                    _log.LogWarning("[PeakPelago] Cannot apply pending load - Photon not connected yet");
+                    return;
+                }
+            }
+
+            // Check if player already has stamina set from a previous load
+            if (PhotonNetwork.LocalPlayer != null)
+            {
+                if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(STAMINA_KEY, out object existingStamina))
+                {
+                    float existing = (float)existingStamina;
+                    if (existing != 1.0f) // Has non-default stamina
+                    {
+                        _log.LogInfo($"[PeakPelago] Player already has stamina: {existing:F2} - preserving it");
+                        return;
+                    }
+                }
+            }
+
             if (_progressiveStaminaEnabled)
             {
-                _baseMaxStamina = 0.25f;
-                _staminaUpgradesReceived = 0;
-                _log.LogInfo("[PeakPelago] Progressive Stamina ENABLED - base max stamina set to 0.25");
+                _log.LogInfo("[PeakPelago] Progressive Stamina ENABLED - base max stamina set to 0.25 for new players");
 
-                // Force update current character's stamina
-                UpdateCharacterStamina();
+                // Set our local player's stamina property
+                if (PhotonNetwork.LocalPlayer != null)
+                {
+                    SetPlayerStamina(PhotonNetwork.LocalPlayer, 0.25f);
+                }
             }
             else
             {
-                _baseMaxStamina = 1.0f;
                 _log.LogInfo("[PeakPelago] Progressive Stamina DISABLED - using normal 1.0 max stamina");
+                
+                // Reset to default
+                if (PhotonNetwork.LocalPlayer != null)
+                {
+                    SetPlayerStamina(PhotonNetwork.LocalPlayer, 1.0f);
+                }
             }
         }
 
-        /// <summary>
-        /// Apply a stamina bar upgrade
-        /// </summary>
+        private void SetPlayerStamina(Photon.Realtime.Player player, float baseMax)
+        {
+            Hashtable props = new Hashtable();
+            props[STAMINA_KEY] = baseMax;
+            player.SetCustomProperties(props);
+            _log.LogInfo($"[PeakPelago] Set stamina for player {player.ActorNumber} to {baseMax}");
+        }
+
         public void ApplyStaminaUpgrade()
         {
             if (!_progressiveStaminaEnabled)
@@ -58,53 +100,68 @@ namespace Peak.AP
                 return;
             }
 
-            _staminaUpgradesReceived++;
+            if (PhotonNetwork.LocalPlayer == null) return;
+
+            float currentStamina = GetPlayerStamina(PhotonNetwork.LocalPlayer);
             int maxUpgrades = _additionalBarsEnabled ? 7 : 4;
-
-            if (_staminaUpgradesReceived > maxUpgrades)
-            {
-                _staminaUpgradesReceived = maxUpgrades;
-            }
-
-            _baseMaxStamina = 0.25f + (_staminaUpgradesReceived * 0.25f);
-            _log.LogInfo($"[PeakPelago] Applied stamina upgrade #{_staminaUpgradesReceived}: new base max = {_baseMaxStamina}");
+            int currentUpgrades = Mathf.RoundToInt((currentStamina - 0.25f) / 0.25f);
             
-            UpdateCharacterStamina();
-        }
-
-        /// <summary>
-        /// Force update the character's stamina to match current max
-        /// </summary>
-        public void UpdateCharacterStamina()
-        {
-            if (Character.localCharacter != null)
+            if (currentUpgrades >= maxUpgrades)
             {
-                // Calculate effective max for LOCAL character specifically
-                float statusSum = Character.localCharacter.refs.afflictions.statusSum;
-                float effectiveMax = Mathf.Max(_baseMaxStamina - statusSum, 0f);
-
-                // Set current stamina to the new max
-                Character.localCharacter.data.currentStamina = effectiveMax;
-
-                // Force UI update
-                if (GUIManager.instance != null && GUIManager.instance.bar != null)
-                {
-                    GUIManager.instance.bar.ChangeBar();
-                }
+                _log.LogInfo($"[PeakPelago] Already at max stamina upgrades ({maxUpgrades})");
+                return;
             }
+
+            float newStamina = currentStamina + 0.25f;
+            SetPlayerStamina(PhotonNetwork.LocalPlayer, newStamina);
+            
+            _log.LogInfo($"[PeakPelago] Applied stamina upgrade: new base max = {newStamina}");
         }
 
-        /// <summary>
-        /// Get the base maximum stamina (without status effects)
-        /// </summary>
+        public float GetPlayerStamina(Photon.Realtime.Player player)
+        {
+            if (player == null || player.CustomProperties == null)
+            {
+                return _progressiveStaminaEnabled ? 0.25f : 1.0f;
+            }
+
+            if (player.CustomProperties.TryGetValue(STAMINA_KEY, out object staminaObj) && staminaObj is float stamina)
+            {
+                return stamina;
+            }
+
+            return _progressiveStaminaEnabled ? 0.25f : 1.0f;
+        }
+
+        public float GetBaseMaxStamina(Character character)
+        {
+            if (!_progressiveStaminaEnabled) return 1.0f;
+            
+            if (character == null || character.photonView == null || character.photonView.Owner == null)
+            {
+                return 0.25f;
+            }
+
+            return GetPlayerStamina(character.photonView.Owner);
+        }
+
+        public float GetBaseMaxStamina(int actorNumber)
+        {
+            if (!_progressiveStaminaEnabled) return 1.0f;
+
+            Photon.Realtime.Player player = PhotonNetwork.PlayerList.FirstOrDefault(p => p.ActorNumber == actorNumber);
+            return GetPlayerStamina(player);
+        }
+
         public float GetBaseMaxStamina()
         {
-            return _baseMaxStamina;
+            if (Character.observedCharacter != null)
+            {
+                return GetBaseMaxStamina(Character.observedCharacter);
+            }
+            return _progressiveStaminaEnabled ? 0.25f : 1.0f;
         }
 
-        /// <summary>
-        /// Get the effective maximum stamina (base - status effects)
-        /// </summary>
         public float GetEffectiveMaxStamina()
         {
             if (!_progressiveStaminaEnabled)
@@ -115,41 +172,58 @@ namespace Peak.AP
                 }
                 return 1.0f;
             }
+            
             if (Character.observedCharacter == null)
             {
-                return _baseMaxStamina;
+                return 0.25f;
             }
+            
+            float baseMax = GetBaseMaxStamina(Character.observedCharacter);
             float statusSum = Character.observedCharacter.refs.afflictions.statusSum;
-            return Mathf.Max(_baseMaxStamina - statusSum, 0f);
+            return Mathf.Max(baseMax - statusSum, 0f);
         }
 
-        /// <summary>
-        /// Get the number of stamina upgrades received
-        /// </summary>
         public int GetStaminaUpgradesReceived()
         {
-            return _staminaUpgradesReceived;
+            if (!_progressiveStaminaEnabled) return 0;
+            
+            if (PhotonNetwork.LocalPlayer == null) return 0;
+            
+            float currentStamina = GetPlayerStamina(PhotonNetwork.LocalPlayer);
+            return Mathf.RoundToInt((currentStamina - 0.25f) / 0.25f);
         }
 
-        /// <summary>
-        /// Check if progressive stamina is enabled
-        /// </summary>
         public bool IsProgressiveStaminaEnabled()
         {
             return _progressiveStaminaEnabled;
         }
 
-        /// <summary>
-        /// Save stamina state to string for persistence
-        /// </summary>
-        public string SaveState()
+        public void UpdateCharacterStamina()
         {
-            return $"{_staminaUpgradesReceived},{_baseMaxStamina:F2}";
+            if (Character.localCharacter != null)
+            {
+                float baseMax = GetBaseMaxStamina(Character.localCharacter);
+                float statusSum = Character.localCharacter.refs.afflictions.statusSum;
+                float effectiveMax = Mathf.Max(baseMax - statusSum, 0f);
+
+                Character.localCharacter.data.currentStamina = Mathf.Min(Character.localCharacter.data.currentStamina, effectiveMax);
+
+                if (GUIManager.instance != null && GUIManager.instance.bar != null)
+                {
+                    GUIManager.instance.bar.ChangeBar();
+                }
+            }
         }
 
-        /// <summary>
-        /// Load stamina state from string
-        /// </summary>
+        public string SaveState()
+        {
+            if (PhotonNetwork.LocalPlayer == null) return "0,0.25";
+            
+            int upgrades = GetStaminaUpgradesReceived();
+            float stamina = GetPlayerStamina(PhotonNetwork.LocalPlayer);
+            return $"{upgrades},{stamina:F2}";
+        }
+
         public void LoadState(string stateData)
         {
             if (string.IsNullOrEmpty(stateData)) return;
@@ -159,11 +233,19 @@ namespace Peak.AP
                 var parts = stateData.Split(',');
                 if (parts.Length >= 2)
                 {
-                    _staminaUpgradesReceived = int.Parse(parts[0]);
-                    _baseMaxStamina = float.Parse(parts[1]);
-                    _log.LogInfo($"[PeakPelago] Loaded stamina state: {_staminaUpgradesReceived} upgrades, {_baseMaxStamina:F2} max");
-
-                    UpdateCharacterStamina();
+                    float stamina = float.Parse(parts[1]);
+                    
+                    // Try to apply immediately if Photon is ready, otherwise store it
+                    if (PhotonNetwork.LocalPlayer != null)
+                    {
+                        SetPlayerStamina(PhotonNetwork.LocalPlayer, stamina);
+                        _log.LogInfo($"[PeakPelago] Loaded stamina state: {stamina:F2} max");
+                    }
+                    else
+                    {
+                        _pendingStaminaLoad = stamina;
+                        _log.LogInfo($"[PeakPelago] Stored pending stamina load: {stamina:F2} max (will apply when Photon connects)");
+                    }
                 }
             }
             catch (Exception ex)
@@ -173,6 +255,7 @@ namespace Peak.AP
         }
     }
 
+    // Keep all your existing Harmony patches - they stay the same
     [HarmonyPatch(typeof(BarAffliction), "ChangeAffliction")]
     public static class BarAfflictionChangeAfflictionPatch
     {
@@ -213,7 +296,6 @@ namespace Peak.AP
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
             _staminaManager = manager;
-            Debug.Log("[PeakPelago] Stamina manager set for BarAffliction UpdateAffliction patch");
         }
 
         static bool Prefix(BarAffliction __instance, StaminaBar bar)
@@ -266,9 +348,7 @@ namespace Peak.AP
             }
         }
     }
-    /// <summary>
-    /// Harmony patch to override Character.GetMaxStamina() when progressive stamina is enabled
-    /// </summary>
+
     [HarmonyPatch(typeof(Character), "GetMaxStamina")]
     public static class CharacterGetMaxStaminaPatch
     {
@@ -277,7 +357,6 @@ namespace Peak.AP
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
             _staminaManager = manager;
-            Debug.Log("[PeakPelago] Stamina manager set for GetMaxStamina patch");
         }
 
         static bool Prefix(Character __instance, ref float __result)
@@ -286,7 +365,7 @@ namespace Peak.AP
             {
                 if (_staminaManager != null && _staminaManager.IsProgressiveStaminaEnabled())
                 {
-                    float baseMax = _staminaManager.GetBaseMaxStamina();
+                    float baseMax = _staminaManager.GetBaseMaxStamina(__instance);
                     float statusSum = __instance.refs.afflictions.statusSum;
                     __result = Mathf.Max(baseMax - statusSum, 0f);
                     
@@ -302,9 +381,6 @@ namespace Peak.AP
         }
     }
 
-    /// <summary>
-    /// Harmony patch to override Character.ClampStamina() to respect our custom max
-    /// </summary>
     [HarmonyPatch(typeof(Character), "ClampStamina")]
     public static class CharacterClampStaminaPatch
     {
@@ -313,7 +389,6 @@ namespace Peak.AP
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
             _staminaManager = manager;
-            Debug.Log("[PeakPelago] Stamina manager set for ClampStamina patch");
         }
 
         static void Postfix(Character __instance)
@@ -322,7 +397,7 @@ namespace Peak.AP
             {
                 if (_staminaManager != null && _staminaManager.IsProgressiveStaminaEnabled())
                 {
-                    float baseMax = _staminaManager.GetBaseMaxStamina();
+                    float baseMax = _staminaManager.GetBaseMaxStamina(__instance);
                     float statusSum = __instance.refs.afflictions.statusSum;
                     float effectiveMax = Mathf.Max(baseMax - statusSum, 0f);
                     __instance.data.currentStamina = Mathf.Clamp(__instance.data.currentStamina, 0f, effectiveMax);
@@ -343,7 +418,6 @@ namespace Peak.AP
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
             _staminaManager = manager;
-            Debug.Log("[PeakPelago] Stamina manager set for HandlePassedOut patch");
         }
 
         static bool Prefix(Character __instance)
@@ -355,10 +429,9 @@ namespace Peak.AP
                     return true;
                 }
 
-                float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
+                float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
                 
-                // Only allow recovery if afflictions drop below the threshold
                 if (statusSum < baseMaxStamina && Time.time - __instance.data.lastPassedOut > 3f)
                 {
                     if (!__instance.photonView.IsMine)
@@ -369,12 +442,10 @@ namespace Peak.AP
                     __instance.photonView.RPC("RPCA_UnPassOut", RpcTarget.All);
                 }
                 
-                // Handle death timer (copied from original method)
                 if (__instance.data.deathTimer > 1f)
                 {
                     __instance.refs.items.EquipSlot(Optionable<byte>.None);
                     
-                    // Check for zombification
                     if (__instance.refs.afflictions.GetCurrentStatus(CharacterAfflictions.STATUSTYPE.Spores) >= 0.5f 
                         && !__instance.data.zombified)
                     {
@@ -401,10 +472,6 @@ namespace Peak.AP
             }
         }
     }
-    /// <summary>
-    /// Patch HandleLife to respect progressive stamina for pass out threshold
-    /// Uses hysteresis to prevent oscillation between knocked out and awake states
-    /// </summary>
 
     [HarmonyPatch(typeof(Character), "HandleLife")]
     public static class CharacterHandleLifePatch
@@ -414,7 +481,6 @@ namespace Peak.AP
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
             _staminaManager = manager;
-            Debug.Log("[PeakPelago] Stamina manager set for HandleLife patch");
         }
 
         static bool Prefix(Character __instance)
@@ -426,15 +492,13 @@ namespace Peak.AP
                     return true;
                 }
 
-                float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
+                float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
                 
-                // Check if we should pass out based on progressive stamina threshold
                 bool shouldPassOut = statusSum >= baseMaxStamina;
                 
                 if (__instance.data.isSkeleton)
                 {
-                    // Skeletons die instead of passing out
                     if (shouldPassOut)
                     {
                         __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
@@ -451,7 +515,6 @@ namespace Peak.AP
                 }
                 else
                 {
-                    // Normal character pass out logic
                     if (shouldPassOut)
                     {
                         __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
@@ -466,7 +529,6 @@ namespace Peak.AP
                     }
                 }
 
-                // Skip the original method since we handled it
                 return false;
             }
             catch (Exception ex)

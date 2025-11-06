@@ -27,7 +27,8 @@ namespace Peak.AP
         TumbleweedTrapEffect,
         ZombieHordeTrap,
         GustTrap,
-        MandrakeTrap
+        MandrakeTrap,
+        FungalInfectionTrap,
     }
 
     public static class TrapTypeExtensions
@@ -54,7 +55,8 @@ namespace Peak.AP
             { TrapType.TumbleweedTrapEffect, "Tumbleweed Trap" },
             { TrapType.ZombieHordeTrap, "Zombie Horde Trap" },
             { TrapType.GustTrap, "Gust Trap" },
-            { TrapType.MandrakeTrap, "Mandrake Trap" }
+            { TrapType.MandrakeTrap, "Mandrake Trap" },
+            { TrapType.FungalInfectionTrap, "Fungal Infection Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

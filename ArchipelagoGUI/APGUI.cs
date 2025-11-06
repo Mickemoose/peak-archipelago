@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using Photon.Pun;
 
 namespace Peak.AP
 {
@@ -64,78 +65,105 @@ namespace Peak.AP
             int yPos = 36;
             int labelWidth = rectWidth / 2;
 
-            if (_plugin == null || _plugin.Status != "Connected")
+            // Check if we're connected (either as host or synced from host)
+            bool isConnected = _plugin != null && _plugin.Status == "Connected";
+            bool isHost = PhotonNetwork.IsMasterClient;
+            bool inMultiplayer = PhotonNetwork.IsConnected && PhotonNetwork.CurrentRoom != null;
+
+            if (!isConnected)
             {
-                int totalHeight = 12 + rowHeight * 6;
-                _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
-
-                GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "PeakPelago font size: ", labelStyle);
-                if (GUI.Button(new Rect(xPos + labelWidth, yPos, _fontSize * 2, rowHeight), "-", buttonStyle))
+                // Show connection UI only if we're the host or in single player
+                if (isHost || !inMultiplayer)
                 {
-                    _fontSize = Mathf.Max(8, _fontSize - 1);
-                    SaveSettings(); // Save when font size changes
+                    int totalHeight = 12 + rowHeight * 6;
+                    _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
+
+                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "PeakPelago font size: ", labelStyle);
+                    if (GUI.Button(new Rect(xPos + labelWidth, yPos, _fontSize * 2, rowHeight), "-", buttonStyle))
+                    {
+                        _fontSize = Mathf.Max(8, _fontSize - 1);
+                        SaveSettings();
+                    }
+                    if (GUI.Button(new Rect(xPos + labelWidth + _fontSize * 2 + 8, yPos, _fontSize * 2, rowHeight), "+", buttonStyle))
+                    {
+                        _fontSize = Mathf.Min(24, _fontSize + 1);
+                        SaveSettings();
+                    }
+                    yPos += rowHeight;
+
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+
+                    int fieldWidth = rectWidth - labelWidth;
+                    bool enterPressed = Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return;
+
+                    // Track if any field changed
+                    string oldServerUrl = _serverUrl;
+                    string oldPort = _port;
+                    string oldSlotName = _slotName;
+                    string oldPassword = _password;
+
+                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Server: ", labelStyle);
+                    _serverUrl = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _serverUrl, textFieldStyle);
+                    yPos += rowHeight;
+
+                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Port: ", labelStyle);
+                    _port = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _port, textFieldStyle);
+                    yPos += rowHeight;
+
+                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Slot Name: ", labelStyle);
+                    _slotName = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _slotName, textFieldStyle);
+                    yPos += rowHeight;
+
+                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Password: ", labelStyle);
+                    _password = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _password, textFieldStyle);
+                    yPos += rowHeight;
+
+                    // Save settings if any field changed
+                    if (_serverUrl != oldServerUrl || _port != oldPort || _slotName != oldSlotName || _password != oldPassword)
+                    {
+                        SaveSettings();
+                    }
+
+                    if (enterPressed && Event.current.type == EventType.KeyDown)
+                    {
+                        enterPressed = false;
+                    }
+
+                    if ((GUI.Button(new Rect(xPos, yPos, 76 + _fontSize * 2, rowHeight), "Connect", buttonStyle) || enterPressed) 
+                        && !string.IsNullOrEmpty(_serverUrl) 
+                        && !string.IsNullOrEmpty(_slotName))
+                    {
+                        SaveSettings();
+                        _plugin.SetConnectionDetails(_serverUrl, _port, _slotName, _password);
+                        _plugin.Connect();
+                    }
                 }
-                if (GUI.Button(new Rect(xPos + labelWidth + _fontSize * 2 + 8, yPos, _fontSize * 2, rowHeight), "+", buttonStyle))
+                else
                 {
-                    _fontSize = Mathf.Min(24, _fontSize + 1);
-                    SaveSettings(); // Save when font size changes
-                }
-                yPos += rowHeight;
-
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-
-                int fieldWidth = rectWidth - labelWidth;
-                bool enterPressed = Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return;
-
-                // Track if any field changed
-                string oldServerUrl = _serverUrl;
-                string oldPort = _port;
-                string oldSlotName = _slotName;
-                string oldPassword = _password;
-
-                GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Server: ", labelStyle);
-                _serverUrl = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _serverUrl, textFieldStyle);
-                yPos += rowHeight;
-
-                GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Port: ", labelStyle);
-                _port = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _port, textFieldStyle);
-                yPos += rowHeight;
-
-                GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Slot Name: ", labelStyle);
-                _slotName = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _slotName, textFieldStyle);
-                yPos += rowHeight;
-
-                GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Password: ", labelStyle);
-                _password = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _password, textFieldStyle);
-                yPos += rowHeight;
-
-                // Save settings if any field changed
-                if (_serverUrl != oldServerUrl || _port != oldPort || _slotName != oldSlotName || _password != oldPassword)
-                {
-                    SaveSettings();
-                }
-
-                if (enterPressed && Event.current.type == EventType.KeyDown)
-                {
-                    enterPressed = false;
-                }
-
-                if ((GUI.Button(new Rect(xPos, yPos, 76 + _fontSize * 2, rowHeight), "Connect", buttonStyle) || enterPressed) 
-                    && !string.IsNullOrEmpty(_serverUrl) 
-                    && !string.IsNullOrEmpty(_slotName))
-                {
-                    SaveSettings(); // Save before connecting
-                    _plugin.SetConnectionDetails(_serverUrl, _port, _slotName, _password);
-                    _plugin.Connect();
+                    // Client in multiplayer
+                    int totalHeight = 12 + rowHeight;
+                    _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
+                    GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), "Archipelago: Connected to Host", labelStyle);
                 }
             }
             else
             {
+                // Connected - show different message based on role
                 int totalHeight = 12 + rowHeight;
                 _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
-                GUI.Label(new Rect(xPos, yPos, 900f, rowHeight), "Archipelago configured.", labelStyle);
                 
+                string message;
+                if (isHost || !inMultiplayer)
+                {
+                    message = "Archipelago configured.";
+                }
+                else
+                {
+                    message = "Archipelago connected through host.";
+                }
+                
+                GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), message, labelStyle);
             }
         }
 

@@ -19,10 +19,12 @@ namespace Peak.AP
                     return;
                 }
 
+                // Filter to only ALIVE characters
                 var validCharacters = Character.AllCharacters.Where(c => 
                     c != null && 
                     c.gameObject.activeInHierarchy && 
-                    !c.data.dead
+                    !c.data.dead &&
+                    !c.data.fullyPassedOut
                 ).ToList();
 
                 if (validCharacters.Count == 0)
@@ -40,7 +42,12 @@ namespace Peak.AP
                 
                 log.LogInfo($"[PeakPelago] Spawning Zombie Horde near: {characterName}");
                 Vector3 targetPosition = targetCharacter.Center;
-                PeakArchipelagoPlugin._instance.StartCoroutine(SpawnZombieHorde(targetPosition, characterName, log));
+                
+                // The host spawns the zombies - they'll be synced via Photon automatically
+                if (PhotonNetwork.IsMasterClient)
+                {
+                    PeakArchipelagoPlugin._instance.StartCoroutine(SpawnZombieHorde(targetPosition, characterName, log));
+                }
             }
             catch (Exception ex)
             {

@@ -4,7 +4,6 @@ using System.Linq;
 using BepInEx.Logging;
 using UnityEngine;
 using Photon.Pun;
-using HarmonyLib;
 
 namespace Peak.AP
 {
@@ -85,14 +84,30 @@ namespace Peak.AP
                     log.LogInfo("[PeakPelago] Forced swap between first two players");
                 }
 
-                // Log the swaps we're about to do
+                // Log and send swaps via RPC
                 for (int i = 0; i < actorNumbers.Count; i++)
                 {
                     log.LogInfo($"[PeakPelago] Will swap Actor {actorNumbers[i]} from {originalPositions[i]} to {shuffledPositions[i]}");
+                    
+                    // Send RPC to each player to warp them
+                    var targetPlayer = PhotonNetwork.PlayerList.FirstOrDefault(p => p.ActorNumber == actorNumbers[i]);
+                    
+                    if (targetPlayer != null && PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
+                    {
+                        PeakArchipelagoPlugin._instance.PhotonView.RPC(
+                            "SwapTrapWarpRPC",
+                            targetPlayer,
+                            actorNumbers[i],
+                            shuffledPositions[i].x,
+                            shuffledPositions[i].y,
+                            shuffledPositions[i].z
+                        );
+                    }
+                    else
+                    {
+                        log.LogWarning($"[PeakPelago] Could not find player or PhotonView for actor {actorNumbers[i]}");
+                    }
                 }
-
-                // Execute the swaps via RPC handler
-                SwapTrapRPCHandler.ExecuteSwaps(_plugin, actorNumbers.ToArray(), shuffledPositions.ToArray());
 
                 log.LogInfo("[PeakPelago] Position swap trap complete!");
             }
@@ -100,82 +115,6 @@ namespace Peak.AP
             {
                 log.LogError($"[PeakPelago] Error applying position swap trap: {ex.Message}");
                 log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
-            }
-        }
-    }
-
-    // Helper class to handle the RPC on the Character class
-    public static class SwapTrapRPCHandler
-    {
-        public static void ExecuteSwaps(PeakArchipelagoPlugin plugin, int[] actorNumbers, Vector3[] positions)
-        {
-            // Use the local character's PhotonView to broadcast
-            if (Character.localCharacter != null && Character.localCharacter.photonView != null)
-            {
-                Character.localCharacter.photonView.RPC("SwapTrapWarpRPC", RpcTarget.All, actorNumbers, positions);
-            }
-            else
-            {
-                plugin._log.LogError("[PeakPelago] Cannot execute swaps - no local character!");
-            }
-        }
-    }
-
-    // Harmony patch to add the RPC method to the Character class
-    [HarmonyPatch(typeof(Character))]
-    public static class CharacterSwapTrapPatch
-    {
-        [HarmonyPatch("Awake")]
-        [HarmonyPostfix]
-        public static void Awake_Postfix(Character __instance)
-        {
-            // Register our custom RPC method
-            // This runs after every Character is created
-        }
-
-        // Our custom RPC method that gets added to Character
-        [PunRPC]
-        public static void SwapTrapWarpRPC(int[] actorNumbers, Vector3[] positions)
-        {
-            try
-            {
-                var plugin = PeakArchipelagoPlugin._instance;
-                if (plugin == null) return;
-
-                plugin._log.LogInfo($"[PeakPelago] CLIENT: Received position swap RPC with {actorNumbers.Length} swaps");
-                
-                if (Character.localCharacter == null)
-                {
-                    plugin._log.LogWarning("[PeakPelago] CLIENT: No local character!");
-                    return;
-                }
-
-                int myActorNumber = Character.localCharacter.photonView.Owner.ActorNumber;
-                plugin._log.LogInfo($"[PeakPelago] CLIENT: I am actor {myActorNumber}");
-                
-                // Find my target position
-                for (int i = 0; i < actorNumbers.Length; i++)
-                {
-                    if (actorNumbers[i] == myActorNumber)
-                    {
-                        Vector3 targetPosition = positions[i];
-                        plugin._log.LogInfo($"[PeakPelago] CLIENT: Warping to {targetPosition}");
-                        
-                        var warpMethod = Character.localCharacter.GetType().GetMethod("WarpPlayer",
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        
-                        if (warpMethod != null)
-                        {
-                            warpMethod.Invoke(Character.localCharacter, new object[] { targetPosition, true });
-                            plugin._log.LogInfo($"[PeakPelago] CLIENT: Warp executed!");
-                        }
-                        return;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[PeakPelago] Error in SwapTrapWarpRPC: {ex.Message}");
             }
         }
     }
