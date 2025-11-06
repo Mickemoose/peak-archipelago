@@ -1,4 +1,4 @@
-![PEAKPELAGO](PeakPelagoLogo.png)
+![PEAKPELAGO](Peak2PelagoLogo.png)
 
 # PEAK Archipelago Mod
 
