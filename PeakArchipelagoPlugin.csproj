@@ -13,6 +13,7 @@
   </PropertyGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="PeakArchipelagoPluginDLL\" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="peakpelago\plugins\PeakArchipelagoPluginDLL\" />
   </Target>
 
   <ItemGroup>
