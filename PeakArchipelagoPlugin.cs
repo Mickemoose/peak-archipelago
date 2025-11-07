@@ -82,6 +82,7 @@ namespace Peak.AP
 
         // ===== AP Link Management =====
         private RingLinkService _ringLinkService;
+        private HardRingLinkService _hardRingLinkService;
         private TrapLinkService _trapLinkService;
         private DeathLinkService _deathLinkService;
         private int _deathLinkBehavior = 0;
@@ -91,7 +92,7 @@ namespace Peak.AP
         private DateTime _lastDeathLinkReceived = DateTime.MinValue;
         private string _lastDeathLinkSource = "None";
         private string _lastDeathLinkCause = "None";
-        private bool _isDyingFromDeathLink = false;
+        public bool _isDyingFromDeathLink = false;
         public static PeakArchipelagoPlugin _instance { get; private set; }
         public string Status => _status;
         private ArchipelagoUI _ui;
@@ -124,6 +125,7 @@ namespace Peak.AP
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionChangeAfflictionPatch.SetStaminaManager(_staminaManager);
                 _ringLinkService = new RingLinkService(_log, _notifications);
+                _hardRingLinkService = new HardRingLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
@@ -196,6 +198,7 @@ namespace Peak.AP
             // Unsubscribe from item acquisition events
             GlobalEvents.OnItemRequested -= OnItemRequested;
             _ringLinkService?.Cleanup();
+            _hardRingLinkService?.Cleanup();
             _trapLinkService?.Cleanup();
             // Remove Harmony patches
             _harmony?.UnpatchSelf();
@@ -496,11 +499,17 @@ namespace Peak.AP
                     // Get checkpoint position
                     Vector3 checkpointPos = GetLastCheckpointPosition();
                     
-                    // Move all players to checkpoint
                     foreach (var character in validCharacters)
                     {
-                        character.transform.position = checkpointPos;
-                        _log.LogInfo($"[PeakPelago] Moved {character.characterName ?? "player"} to last checkpoint due to death link");
+                        try
+                        {
+                            character.WarpPlayerRPC(checkpointPos, true);
+                            _log.LogInfo($"[PeakPelago] Warped {character.characterName ?? "player"} to checkpoint at {checkpointPos}");
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogError($"[PeakPelago] Failed to warp {character.characterName ?? "player"}: {ex.Message}");
+                        }
                     }
                 }
                 else
@@ -1116,8 +1125,8 @@ namespace Peak.AP
 
         // ===== Item Acquisition Tracking =====
 
-        private Dictionary<string, int> _itemAcquisitionCounts = new Dictionary<string, int>();
-        private Dictionary<string, int> _itemAcquisitionCountsThisRun = new Dictionary<string, int>();
+        //private Dictionary<string, int> _itemAcquisitionCounts = new Dictionary<string, int>();
+        //private Dictionary<string, int> _itemAcquisitionCountsThisRun = new Dictionary<string, int>();
 
         // Track most recently acquired item
         private string _lastAcquiredItemName = "None";
@@ -1338,6 +1347,18 @@ namespace Peak.AP
                 { "Yellow Shroomberry", () => SpawnPhysicalItem("Shroomberry_Yellow") },
                 { "Purple Shroomberry", () => SpawnPhysicalItem("Shroomberry_Purple") },
 
+                //Item Bundles
+                { "Bundle: Glizzy Gobbler", () => SpawnPhysicalItems("Glizzy", 3) },
+                { "Bundle: Marshmallow Muncher", () => SpawnPhysicalItems("Marshmallow", 3) },
+                { "Bundle: Trailblazer Snacks", () => {
+                    SpawnPhysicalItems("Granola Bar", 2);
+                    SpawnPhysicalItems("TrailMix", 2);
+                }},
+                { "Bundle: Lovely Bunch", () => SpawnPhysicalItems("Item_Coconut", 3) },
+                { "Bundle: Bear Favorite", () => SpawnPhysicalItems("Item_Honeycomb", 6) },
+                { "Bundle: Rainy Day", () => SpawnPhysicalItems("Parasol", 4) },
+                { "Bundle: Turkey Day", () => SpawnPhysicalItems("EggTurkey", 3) },
+
 
                 // Progression Items (76019-76025) - Unlock ascents
                 { "Ascent 1 Unlock", () => UnlockAscent(1) },
@@ -1550,17 +1571,17 @@ namespace Peak.AP
                     _log.LogError("[PeakPelago] Stamina manager is NULL!");
                     return;
                 }
-                
+
                 if (!_staminaManager.IsProgressiveStaminaEnabled())
                 {
                     _log.LogWarning("[PeakPelago] Progressive stamina is DISABLED");
                     return;
                 }
-                
+
                 int upgradesBeforeApply = _staminaManager.GetStaminaUpgradesReceived();
-                
+
                 _staminaManager.ApplyStaminaUpgrade();
-                
+
                 int totalUpgradesAfterApply = upgradesBeforeApply + 1;
                 if (_photonView != null && PhotonNetwork.IsConnected)
                 {
@@ -1572,13 +1593,23 @@ namespace Peak.AP
                 {
                     StartCoroutine(ForceStaminaUIUpdate());
                 }
-            
+
                 SaveState();
                 _log.LogInfo("[PeakPelago] Saved stamina state after upgrade");
             }
             catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error in ApplyProgressiveStamina: " + ex.Message);
+            }
+        }
+        
+
+        private void SpawnPhysicalItems(string itemName, int quantity)
+        {
+            for (int i = 0; i < quantity; i++)
+            {
+                System.Threading.Thread.Sleep(500);
+                SpawnPhysicalItem(itemName);
             }
         }
 
@@ -1837,41 +1868,6 @@ namespace Peak.AP
                 _log.LogError("[PeakPelago] Error tracking received item: " + ex.Message);
             }
         }
-        private void CheckItemAcquisitionAchievements()
-        {
-            if (_session == null) return;
-
-            try
-            {
-                // Check total item acquisition achievements for each item type
-                foreach (var kvp in _itemAcquisitionCounts)
-                {
-                    string itemName = kvp.Key;
-                    int totalCount = kvp.Value;
-
-                    // Check various milestone achievements
-                    CheckAndReportItemAchievement("Acquire " + itemName, 1, totalCount);
-                    CheckAndReportItemAchievement("Acquire 5 " + itemName, 5, totalCount);
-                    CheckAndReportItemAchievement("Acquire 10 " + itemName, 10, totalCount);
-                    CheckAndReportItemAchievement("Acquire 25 " + itemName, 25, totalCount);
-                }
-
-                // Check single run achievements for each item type
-                foreach (var kvp in _itemAcquisitionCountsThisRun)
-                {
-                    string itemName = kvp.Key;
-                    int runCount = kvp.Value;
-
-                    CheckAndReportItemAchievement("Acquire 3 " + itemName + " in a single run", 3, runCount);
-                    CheckAndReportItemAchievement("Acquire 5 " + itemName + " in a single run", 5, runCount);
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError("[PeakPelago] CheckItemAcquisitionAchievements error: " + ex.Message);
-            }
-        }
-
         private void CheckAndReportItemAchievement(string achievementName, int requiredCount, int currentCount)
         {
             if (currentCount >= requiredCount)
@@ -1889,16 +1885,6 @@ namespace Peak.AP
             _lastAcquiredItemId = itemId;
             _lastAcquiredItemTime = Time.time;
 
-            // Increment total count
-            if (!_itemAcquisitionCounts.ContainsKey(itemName))
-                _itemAcquisitionCounts[itemName] = 0;
-            _itemAcquisitionCounts[itemName]++;
-
-            // Increment run count
-            if (!_itemAcquisitionCountsThisRun.ContainsKey(itemName))
-                _itemAcquisitionCountsThisRun[itemName] = 0;
-            _itemAcquisitionCountsThisRun[itemName]++;
-
             // Check if this item has an Archipelago location to report
             if (_itemToLocationMapping.TryGetValue(itemName.ToUpper(), out string locationName))
             {
@@ -1908,11 +1894,6 @@ namespace Peak.AP
             {
                 _log.LogDebug("[PeakPelago] No Archipelago location found for item: " + itemName);
             }
-
-            // Check and report achievements
-            CheckItemAcquisitionAchievements();
-
-            // Save state
             SaveState();
         }
 
@@ -1920,7 +1901,6 @@ namespace Peak.AP
         public void ResetRunCounters()
         {
             _luggageOpenedThisRun = 0;
-            _itemAcquisitionCountsThisRun.Clear();
             _log.LogInfo("[PeakPelago] Run counters reset for new run");
         }
 
@@ -2153,62 +2133,6 @@ namespace Peak.AP
                     if (_instance != null)
                     {
                         _instance._log.LogError($"[PeakPelago] OpenLuggageRPC patch error: {ex.Message}");
-                    }
-                }
-            }
-        }
-        
-        [HarmonyPatch(typeof(Luggage), "Interact_CastFinished")]
-        public static class LuggageInteractCastFinishedPatch
-        {
-            static void Postfix(Luggage __instance, Character interactor)
-            {
-                try
-                {
-                    if (_instance == null)
-                    {
-                        return;
-                    }
-
-                    if (interactor == null)
-                    {
-                        return;
-                    }
-
-                    // Get the actor number of who opened it
-                    if (interactor.photonView == null || interactor.photonView.Owner == null)
-                    {
-                        return;
-                    }
-
-                    int actorNumber = interactor.photonView.Owner.ActorNumber;
-                    string luggageName = __instance.GetName();
-                    
-                    _instance._log.LogInfo($"[PeakPelago] Luggage opened: {luggageName} by actor {actorNumber}");
-
-                    // Only send RPC if WE are the host
-                    if (PhotonNetwork.IsMasterClient)
-                    {
-                        // We're the host, just process it directly
-                        _instance._log.LogInfo($"[PeakPelago] HOST: Processing luggage open from actor {actorNumber}");
-                        _instance.IncrementLuggageCount();
-                    }
-                    else
-                    {
-                        // We're a client, send to host
-                        if (_instance._photonView != null && PhotonNetwork.IsConnected)
-                        {
-                            _instance._photonView.RPC("ReportLuggageOpened", RpcTarget.MasterClient, actorNumber);
-                            _instance._log.LogInfo($"[PeakPelago] CLIENT: Sent luggage RPC to host for actor {actorNumber}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (_instance != null)
-                    {
-                        _instance._log.LogError($"[PeakPelago] LuggageInteractCastFinishedPatch error: {ex.Message}");
-                        _instance._log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
                     }
                 }
             }
@@ -2697,6 +2621,7 @@ namespace Peak.AP
                     bool deathLinkEnabled = false;
                     bool trapLinkEnabled = false;
                     bool ringLinkEnabled = false;
+                    bool hardRingLinkEnabled = false;
 
                     List<string> tags = new List<string>();
 
@@ -2705,10 +2630,22 @@ namespace Peak.AP
                         var value = loginResult.SlotData["ring_link"];
                         ringLinkEnabled = Convert.ToInt32(value) != 0;
                         _log.LogInfo($"[PeakPelago] Ring Link from slot data: {ringLinkEnabled}");
-                        
+
                         if (ringLinkEnabled)
                         {
                             tags.Add("RingLink");
+                        }
+                    }
+                    
+                    if (loginResult.SlotData.ContainsKey("hard_ring_link"))
+                    {
+                        var value = loginResult.SlotData["hard_ring_link"];
+                        hardRingLinkEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Hard Ring Link from slot data: {hardRingLinkEnabled}");
+
+                        if (hardRingLinkEnabled)
+                        {
+                            tags.Add("HardRingLink");
                         }
                     }
 
@@ -2750,6 +2687,10 @@ namespace Peak.AP
                     if (ringLinkEnabled)
                     {
                         _ringLinkService.Initialize(_session, ringLinkEnabled);
+                    }
+                    if (hardRingLinkEnabled)
+                    {
+                        _hardRingLinkService.Initialize(_session, hardRingLinkEnabled);
                     }
                     if (trapLinkEnabled)
                     {
@@ -3001,8 +2942,6 @@ namespace Peak.AP
                 _lastProcessedItemIndex = 0;
                 _reportedChecks.Clear();
                 _totalLuggageOpened = 0;
-                _itemAcquisitionCounts.Clear();
-                _itemAcquisitionCountsThisRun.Clear();
                 _lastAcquiredItemName = "None";
                 _lastAcquiredItemId = 0;
                 _lastAcquiredItemTime = 0f;
@@ -3016,7 +2955,7 @@ namespace Peak.AP
 
                 _log.LogInfo("[PeakPelago] Cleared all cached data for port change");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error clearing cache for port change: " + ex.Message);
             }
@@ -3026,7 +2965,6 @@ namespace Peak.AP
         {
             try
             {
-                // Check for port changes before loading state
                 CheckAndHandlePortChange();
 
                 if (!File.Exists(StateFilePath))
@@ -3034,66 +2972,98 @@ namespace Peak.AP
                     _log.LogInfo("[PeakPelago] No state file found for port " + _currentPort + " - starting fresh");
                     return;
                 }
+                
                 string[] lines = File.ReadAllLines(StateFilePath);
+                _log.LogInfo($"[PeakPelago] Loading state file with {lines.Length} lines");
 
-                // Load item index
+                // Load item index (Line 1)
                 if (lines.Length >= 1)
                 {
-                    int idx;
-                    if (int.TryParse(lines[0].Trim(), out idx))
+                    if (int.TryParse(lines[0].Trim(), out int idx))
+                    {
                         _lastProcessedItemIndex = idx;
+                        _log.LogDebug($"[PeakPelago] Loaded item index: {idx}");
+                    }
+                    else
+                    {
+                        _log.LogWarning($"[PeakPelago] Failed to parse item index from: '{lines[0]}', using 0");
+                    }
                 }
 
-                // Load reported checks
+                // Load reported checks (Line 2)
                 if (lines.Length >= 2 && !string.IsNullOrEmpty(lines[1]))
                 {
-                    var parts = lines[1].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var p in parts)
+                    try
                     {
-                        long id;
-                        if (long.TryParse(p.Trim(), out id))
-                            _reportedChecks.Add(id);
-                    }
-                }
-
-                // Load total luggage count
-                if (lines.Length >= 3)
-                {
-                    int total;
-                    if (int.TryParse(lines[2].Trim(), out total))
-                        _totalLuggageOpened = total;
-                }
-
-                // Load item acquisition counts
-                if (lines.Length >= 4 && !string.IsNullOrEmpty(lines[3]))
-                {
-                    var parts = lines[3].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var part in parts)
-                    {
-                        var colonIndex = part.IndexOf(':');
-                        if (colonIndex > 0)
+                        var parts = lines[1].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        int successCount = 0;
+                        int failCount = 0;
+                        
+                        foreach (var p in parts)
                         {
-                            string itemName = part.Substring(0, colonIndex);
-                            string countStr = part.Substring(colonIndex + 1);
-                            if (int.TryParse(countStr, out int count))
+                            if (long.TryParse(p.Trim(), out long id))
                             {
-                                _itemAcquisitionCounts[itemName] = count;
+                                _reportedChecks.Add(id);
+                                successCount++;
+                            }
+                            else
+                            {
+                                _log.LogWarning($"[PeakPelago] Failed to parse check ID: '{p}'");
+                                failCount++;
                             }
                         }
+                        
+                        _log.LogInfo($"[PeakPelago] Loaded {successCount} reported checks ({failCount} failed)");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError($"[PeakPelago] Error parsing reported checks: {ex.Message}");
                     }
                 }
 
+                // Load total luggage count (Line 3)
+                if (lines.Length >= 3)
+                {
+                    if (int.TryParse(lines[2].Trim(), out int total))
+                    {
+                        _totalLuggageOpened = total;
+                        _log.LogDebug($"[PeakPelago] Loaded luggage count: {total}");
+                    }
+                    else
+                    {
+                        _log.LogWarning($"[PeakPelago] Failed to parse luggage count from: '{lines[2]}', using 0");
+                    }
+                }
+
+                // Skip line 4 (was item acquisition counts, but not needed atm)
+
+                // Load stamina state (Line 5)
                 if (lines.Length >= 5 && !string.IsNullOrEmpty(lines[4]))
                 {
-                    _staminaManager?.LoadState(lines[4]);
+                    try
+                    {
+                        _staminaManager?.LoadState(lines[4]);
+                        _log.LogDebug("[PeakPelago] Loaded stamina state");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogWarning($"[PeakPelago] Failed to load stamina state: {ex.Message}");
+                    }
                 }
+                
+                _log.LogInfo($"[PeakPelago] State loaded successfully: {_reportedChecks.Count} checks, {_totalLuggageOpened} luggage");
             }
             catch (Exception ex)
             {
-                _log.LogWarning("[PeakPelago] Failed to load state file: " + ex.Message);
+                _log.LogError("[PeakPelago] CRITICAL ERROR loading state file: " + ex.Message);
+                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
+                _log.LogWarning("[PeakPelago] Starting with fresh state to avoid crashes");
+                
+                _reportedChecks.Clear();
+                _totalLuggageOpened = 0;
+                _lastProcessedItemIndex = 0;
             }
         }
-
         private void SaveState()
         {
             try
@@ -3101,14 +3071,26 @@ namespace Peak.AP
                 string line1 = _lastProcessedItemIndex.ToString();
                 string line2 = string.Join(",", _reportedChecks.Select(x => x.ToString()).ToArray());
                 string line3 = _totalLuggageOpened.ToString();
-                string line4 = string.Join(",", _itemAcquisitionCounts.Select(kvp => kvp.Key + ":" + kvp.Value).ToArray());
+                string line4 = ""; // Reserved for future use (was item acquisition counts but we decided we dont need that atm so no point in saving it)
                 string line5 = _staminaManager?.SaveState() ?? "0,1.00";
-                File.WriteAllLines(StateFilePath, new[] { line1, line2, line3, line4, line5 });
+                
+                // Write to temp file first, then rename to try and stop corruption
+                string tempPath = StateFilePath + ".tmp";
+                File.WriteAllLines(tempPath, new[] { line1, line2, line3, line4, line5 });
+                
+                if (File.Exists(StateFilePath))
+                {
+                    File.Delete(StateFilePath);
+                }
+                File.Move(tempPath, StateFilePath);
+                
                 _log.LogDebug("[PeakPelago] Saved state to port-specific file: " + _currentPort);
             }
             catch (Exception ex)
             {
-                _log.LogWarning("[PeakPelago] Failed to save state file: " + ex.Message);
+                _log.LogError("[PeakPelago] Failed to save state file: " + ex.Message);
+                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
+                // Don't crash the game just because we couldn't save >:[
             }
         }
         /// <summary>Handle achievement events to report badge checks to Archipelago</summary>

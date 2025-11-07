@@ -263,9 +263,9 @@ namespace Peak.AP
                         if (_instance == null || !_instance._isEnabled) return;
 
                         // Add a handler to OnConsumed event
-                        __instance.OnConsumed = (System.Action)System.Delegate.Combine(
+                        __instance.OnConsumed = (Action)Delegate.Combine(
                             __instance.OnConsumed,
-                            (System.Action)delegate
+                            (Action)delegate
                             {
                                 if (_instance == null || !_instance._isEnabled) return;
 
@@ -346,7 +346,7 @@ namespace Peak.AP
                     {
                         totalRings += 0.25f;
                     }
-                    if (name.Contains("Winterberry"))
+                    if (name.Contains("Winterberry") || name.Contains("Shroomberry"))
                     {
                         totalRings += 0.35f;
                     }
