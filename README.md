@@ -16,6 +16,8 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
 - **Badge Randomization**: Badges are tracked and managed through Archipelago
 - **Location Checks**: Game events and collectibles send progression to other players
 - **DeathLink Support**: Optional death synchronization with other players
+- **RingLink Support**: Optional support for linking Stamina to Rings in participating games. Consuming edible items will have effects on Rings
+- **HardRingLink Support**: Optional support for linking Stamina to Rings in participating games. Certain actions and events will have effects on Rings
 - **Auto-Reconnect**: Automatically reconnects to the Archipelago server if disconnected
 - **Persistent State**: Tracks received items and checked locations across game sessions
 - **Real-time Integration**: Seamlessly integrates with PEAK's gameplay
@@ -76,12 +78,13 @@ When generating an Archipelago game, the following PEAK-specific options are ava
 - **Additional Stamina**: With Progressive Stamina enabled, find 4 extra Stamina Bars to reach a total of 200% Stamina
 - **Trap Weigh Percent**: Determine the amount of filler items to get replaced with traps.
 - **Ring Link**: Enable RingLink with other linked players.
+- **Hard Ring Link**: Enable HardRingLink with other linked players.
 - **Trap Link**: Enable TrapLink with other linked players.
 - **Death Link**: Enable death synchronization with other players
 - **Death Link Behavior**: Choose between full run reset or checkpoint reset
 - **Death Link Send Behavior**: Choose between sending on any players death or on failed run
 
-**HardRingLink and EnergyLink options will appear but are non functioning at this current time**
+**EnergyLink option will appear but is non functioning at this current time**
 
 ## How to Play
 
@@ -161,7 +164,7 @@ The Python world code follows Archipelago's world API:
 
 ## Version
 
-Current Version: **0.4.6**
+Current Version: **0.4.8**
 
 ## License
 

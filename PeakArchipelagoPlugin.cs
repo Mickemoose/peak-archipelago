@@ -22,7 +22,7 @@ using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.6")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.8")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -130,7 +130,6 @@ namespace Peak.AP
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
                 CheckAndHandlePortChange();
-                LoadState();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
                 InitializeItemMapping();
@@ -2035,6 +2034,8 @@ namespace Peak.AP
                 case "CALDERA":
                 case "THE KILN":
                     return "Volcanology " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                case "ROOTS":
+                    return "Forestry " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 default:
                     _log.LogWarning("[PeakPelago] Unknown peak name for ascent badge: " + peakName);
                     return null;
@@ -2111,7 +2112,47 @@ namespace Peak.AP
         }
 
         // ===== Harmony Patches =====
-
+        
+        ///This updates the DeathLink checkpoint spawn when we initialize a new map segment (like when we activate a campfire at the top of one of the biomes)
+        [HarmonyPatch(typeof(MapHandler), "GoToSegment")]
+        public static class MapHandlerGoToSegmentPatch
+        {
+            static void Postfix(MapHandler __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    int currentSegment = (int)__instance.GetCurrentSegment();
+                    if (currentSegment >= 0 && currentSegment < __instance.segments.Length)
+                    {
+                        var segment = __instance.segments[currentSegment];
+                        if (segment.reconnectSpawnPos != null)
+                        {
+                            foreach (var character in Character.AllCharacters)
+                            {
+                                if (character != null)
+                                {
+                                    character.data.spawnPoint = segment.reconnectSpawnPos;
+                                }
+                            }
+                            
+                            _instance._log.LogInfo($"[PeakPelago] Updated spawn point for all players to segment {currentSegment}: {segment.reconnectSpawnPos.position}");
+                        }
+                        else
+                        {
+                            _instance._log.LogWarning($"[PeakPelago] Segment {currentSegment} has no reconnect spawn position");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] GoToSegment patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
         [HarmonyPatch(typeof(Luggage), "OpenLuggageRPC")]
         public static class LuggageOpenRPCPatch
         {
@@ -2495,7 +2536,7 @@ namespace Peak.AP
 
                 string host = cfgServer.Value;
                 string url = host.Contains(":") ? host : (host + ":" + cfgPort.Value);
-
+                LoadState();
                 _log.LogInfo("[PeakPelago] Connecting to " + url + " as " + cfgSlot.Value + " (game=" + cfgGameId.Value + ")");
 
                 _session = ArchipelagoSessionFactory.CreateSession(url);
@@ -2558,9 +2599,6 @@ namespace Peak.AP
                         _log.LogError($"[PeakPelago] Error handling death link: {ex.Message}");
                     }
                 };
-
-
-
                 _session.Items.ItemReceived += helper =>
                 {
                     try
@@ -2590,7 +2628,7 @@ namespace Peak.AP
                     }
                 };
 
-                // After (re)login, resync index (defensive) and resend any checks we tracked locally
+
                 _session.Socket.SendPacket(new SyncPacket());
                 if (_reportedChecks.Count > 0)
                 {

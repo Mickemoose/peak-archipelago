@@ -1,6 +1,6 @@
 {
     "name": "PEAKPELAGO",
-    "version_number": "0.4.7",
+    "version_number": "0.4.8",
 	"website_url": "https://github.com/Mickemoose/peak-archipelago/releases",
     "description": "Adds Archipelago Randomizer compatibility to PEAK which allows players to randomize their game along side other Archipelago compatible games",
     "dependencies": [

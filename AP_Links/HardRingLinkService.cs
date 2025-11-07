@@ -279,6 +279,11 @@ namespace Peak.AP
                             ringAmount = 200;
                             _instance._log.LogInfo($"[PeakPelago] Final PEAK reached, sending +{ringAmount} rings via Hard Ring Link");
                         }
+                        else if (peakName.ToUpper() == "SHORE")
+                        {
+                            ringAmount = 25;
+                            _instance._log.LogInfo($"[PeakPelago] SHORE reached, sending +{ringAmount} rings via Hard Ring Link");
+                        }
                         else if (!string.IsNullOrEmpty(peakName) && peakName.ToUpper() != "UNKNOWN")
                         {
                             ringAmount = 100;

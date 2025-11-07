@@ -72,10 +72,6 @@ ITEMS = {
     "Ascent 7 Unlock": (76025, ItemClassification.progression),
     "Progressive Stamina Bar": (78001, ItemClassification.useful),
     #endregion
-
-    #region Item Bundles
-    "Bundle: Glizzy Gobbler" : (79000, ItemClassification.useful),
-    #endregion
     
     #region Game Items
     "Rope Spool": (77000, ItemClassification.useful),
