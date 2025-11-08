@@ -3,25 +3,30 @@ import math
 from collections import Counter
 
 from BaseClasses import ItemClassification, CollectionState
-from worlds.AutoWorld import World
-from .Items import ITEMS, PeakItem
+from worlds.AutoWorld import World, WebWorld
+from .Items import PeakItem, item_table, progression_table, useful_table, filler_table, trap_table, lookup_id_to_name, item_groups
 from .Locations import LOCATION_TABLE, EXCLUDED_LOCATIONS
-from .Options import PeakOptions
-from .Rules import (
-    apply_rules
-)
+from .Options import PeakOptions, peak_option_groups
+from .Rules import apply_rules
 
+class PeakWeb(WebWorld):
+    theme = "stone"
+    option_groups = peak_option_groups
 
 class PeakWorld(World):
+    """
+    PEAK is a multiplayer climbing game where you and your friends must reach the summit of a procedurally generated mountain.
+    """
     game = "PEAK"
     options_dataclass = PeakOptions
     options: PeakOptions
+    topology_present = False
 
-    # Pre-calculate mappings for items and locations.
-    item_name_to_id = {name: data[0] for name, data in ITEMS.items()}
+    item_name_groups = item_groups
+    item_name_to_id = {name: data.code for name, data in item_table.items()}
     location_name_to_id = LOCATION_TABLE.copy()
     
-    # Add event locations to the mapping (they have None as ID)
+    # Add event locations to the mapping
     event_locations = [
         "Ascent 1 Completed",
         "Ascent 2 Completed",
@@ -35,6 +40,7 @@ class PeakWorld(World):
         "Survivalist Badge",
         "Mesa Access",
         "Alpine Access",
+        "Roots Access",
         "24 Karat Badge"
     ]
     for event_loc in event_locations:
@@ -62,13 +68,18 @@ class PeakWorld(World):
         self.validate_ids()
         create_peak_regions(self)
 
-    def create_item(self, name: str, classification: ItemClassification = ItemClassification.filler) -> PeakItem:
+    def create_item(self, name: str, classification: ItemClassification = None) -> PeakItem:
         """Create a Peak item from the given name."""
-        if name in self.item_name_to_id:
-            item_id = self.item_name_to_id[name]
-        else:
-            raise ValueError(f"Item '{name}' not found in ITEMS")
-        return PeakItem(name, classification, item_id, self.player)
+        if name not in item_table:
+            raise ValueError(f"Item '{name}' not found in item_table")
+        
+        data = item_table[name]
+        
+        # Use provided classification or default to item's classification
+        if classification is None:
+            classification = data.classification
+            
+        return PeakItem(name, classification, data.code, self.player)
 
     def create_items(self):
         """Create the initial item pool based on the location table."""
@@ -77,8 +88,8 @@ class PeakWorld(World):
         item_pool = []
         
         # Add progression items (Ascent unlocks)
-        for i in range(1, 8):  # Ascent 1-7 unlocks
-            item_pool.append(self.create_item(f"Ascent {i} Unlock", classification=ItemClassification.progression))
+        for item_name in progression_table.keys():
+            item_pool.append(self.create_item(item_name))
         
         # Add progressive stamina items if enabled
         if self.options.progressive_stamina.value:
@@ -87,14 +98,14 @@ class PeakWorld(World):
                 max_stamina_upgrades = 7
             
             for i in range(max_stamina_upgrades):
-                item_pool.append(self.create_item("Progressive Stamina Bar", classification=ItemClassification.progression))
+                item_pool.append(self.create_item("Progressive Stamina Bar"))
             
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {max_stamina_upgrades} progressive stamina items")
 
         # Add useful items
-        useful_items = [name for name, (code, classification) in ITEMS.items() if classification == ItemClassification.useful]
-        for item_name in useful_items:
-            item_pool.append(self.create_item(item_name, classification=ItemClassification.useful))
+        for item_name in useful_table.keys():
+            if item_name != "Progressive Stamina Bar":  # Skip stamina bar since we handled it above
+                item_pool.append(self.create_item(item_name))
         
         # Calculate how many slots are left for traps and fillers
         remaining_slots = total_locations - len(item_pool)
@@ -104,21 +115,21 @@ class PeakWorld(World):
         
         # Add trap items
         if trap_count > 0:
-            trap_items = [name for name, (code, classification) in ITEMS.items() if classification == ItemClassification.trap]
-            trap_index = 0
-            for _ in range(trap_count):
-                trap_name = trap_items[trap_index % len(trap_items)]
-                item_pool.append(self.create_item(trap_name, classification=ItemClassification.trap))
-                trap_index += 1
+            trap_items = list(trap_table.keys())
+            for i in range(trap_count):
+                trap_name = trap_items[i % len(trap_items)]
+                item_pool.append(self.create_item(trap_name))
         
         # Fill remaining slots with filler items
+        filler_items = list(filler_table.keys())
         while len(item_pool) < total_locations:
-            filler_name = self.get_filler_item_name()
+            filler_name = self.random.choice(filler_items)
             item_pool.append(self.create_item(filler_name))
         
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total item pool count: {len(item_pool)}")
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total locations: {total_locations}")
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Trap items added: {trap_count}")
+        
         self.multiworld.itempool.extend(item_pool)
 
     def set_rules(self):
@@ -145,7 +156,6 @@ class PeakWorld(World):
             )
 
         elif goal == 2:  # 24 Karat Badge
-            # DUNK THE IDOL IN THE HOT DRINK
             self.multiworld.completion_condition[self.player] = (
                 lambda state: state.has("24 Karat Badge", self.player)
             )
@@ -192,10 +202,6 @@ class PeakWorld(World):
 
     def get_filler_item_name(self):
         """Randomly select a filler item from the available candidates."""
-        filler_candidates = [
-            name for name, (code, classification) in ITEMS.items()
-            if classification == ItemClassification.filler
-        ]
-        if not filler_candidates:
-            raise Exception("No filler items available in ITEMS.")
-        return self.random.choice(filler_candidates)
+        if not filler_table:
+            raise Exception("No filler items available in item_table.")
+        return self.random.choice(list(filler_table.keys()))

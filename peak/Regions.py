@@ -43,6 +43,7 @@ def create_peak_regions(world: "PeakWorld"):
         ("Peak Badge", "Peak Badge"),
         ("Survivalist Badge", "Survivalist Badge"),
         ("Mesa Access", "Mesa Access"),
+        ("Roots Access", "Roots Access"),
         ("Alpine Access", "Alpine Access"),
         ("24 Karat Badge", "24 Karat Badge")
     ]
