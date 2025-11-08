@@ -22,7 +22,7 @@ using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.8")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.9")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -63,7 +63,7 @@ namespace Peak.AP
         private int _totalLuggageOpened = 0;
         private bool _hasOpenedLuggageThisSession = false;
         private ProgressiveStaminaManager _staminaManager;
-        private ArchipelagoNotificationManager _notifications;
+        public ArchipelagoNotificationManager _notifications;
         private PhotonView _photonView;
         public PhotonView PhotonView => _photonView;
         private const string CHECK_RPC_NAME = "ReceiveCheckFromClient";
@@ -129,6 +129,7 @@ namespace Peak.AP
                 _trapLinkService = new TrapLinkService(_log, _notifications);
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
+                PokemonTriviaTrapEffect.Initialize(_log, this);
                 CheckAndHandlePortChange();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
@@ -1378,6 +1379,7 @@ namespace Peak.AP
                 { "Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.53f, CharacterAfflictions.STATUSTYPE.Poison) },
                 { "Deadly Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.95f, CharacterAfflictions.STATUSTYPE.Poison) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
+                { "Pokemon Trivia Trap", () => PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },
                 { "Swap Trap", () => SwapTrapEffect.ApplyPositionSwapTrap(_log) },
                 { "Nap Time Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Drowsy) },
                 { "Hungry Hungry Camper Trap", () => HungryHungryCamperTrapEffect.ApplyHungerTrap(_log) },
@@ -1409,6 +1411,21 @@ namespace Peak.AP
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
+        }
+        
+
+        [PunRPC]
+        private void StartPokemonTriviaRPC()
+        {
+            try
+            {
+                _log.LogInfo("[PeakPelago] RPC received: Start Pokemon Trivia");
+                PokemonTriviaTrapEffect.ApplyPokemonTriviaTrapLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartPokemonTriviaRPC: {ex.Message}");
+            }
         }
 
         [PunRPC]

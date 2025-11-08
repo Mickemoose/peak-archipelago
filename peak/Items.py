@@ -140,6 +140,7 @@ trap_table = {
     "Tornado Trap":               ItemData(76035, ItemClassification.trap),
     "Tumbleweed Trap":            ItemData(76043, ItemClassification.trap),
     "Zombie Horde Trap":          ItemData(76044, ItemClassification.trap),
+    "Pokemon Trivia Trap":        ItemData(77087, ItemClassification.trap),
 }
 
 item_table = {

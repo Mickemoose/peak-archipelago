@@ -1,4 +1,9 @@
 
+### v0.4.9
+<ul>
+    <li>Updated for Archipelago 0.6.4's new manifest</li>
+</ul>
+
 ### v0.4.8
 <ul>
     <li>Fixed save state loading was happening too early resulting in mixed up Luggage Checks</li>
