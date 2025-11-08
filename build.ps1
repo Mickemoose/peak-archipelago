@@ -44,22 +44,6 @@ if (-not (Test-Path "F:\Game Dev Stuff\Archipelago-Peak\worlds")) {
     New-Item -Path "F:\Game Dev Stuff\Archipelago-Peak\worlds" -ItemType Directory
 }
 
-
-$sourcePkmns = "pkmns"
-$pkmnsPath = "F:\Game Dev Stuff\peak-archipelago\peakpelago\plugins\PeakArchipelagoPluginDLL\pkmns"
-
-if (Test-Path $sourcePkmns) {
-    # Only delete and copy if source exists
-    if (Test-Path $pkmnsPath) {
-        Remove-Item -Path $pkmnsPath -Recurse -Force
-    }
-    Copy-Item -Path $sourcePkmns -Destination "F:\Game Dev Stuff\peak-archipelago\peakpelago\plugins\PeakArchipelagoPluginDLL" -Recurse
-    Write-Host "Copied pkmns folder" -ForegroundColor Green
-} else {
-    Write-Host "Warning: pkmns folder not found, skipping..." -ForegroundColor Yellow
-}
-
-
 # Remove old peak folder if it exists
 if (Test-Path $destinationPath) {
     Remove-Item -Path $destinationPath -Recurse -Force
