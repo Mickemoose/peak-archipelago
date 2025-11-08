@@ -60,17 +60,6 @@ class AdditionalStaminaBars(Toggle):
     """
     display_name = "Additional Stamina Bars"
 
-
-class TrapPercentage(Range):
-    """
-    Replace a percentage of junk items in the item pool with random traps
-    """
-    display_name = "Trap Percentage"
-    range_start = 0
-    range_end = 100
-    default = 10
-
-
 class RingLink(Toggle):
     """
     When enabled, ring pickups are shared among all players with Ring Link enabled
@@ -135,6 +124,155 @@ class DeathLinkSendBehavior(Choice):
     option_all_players_dead = 1
     default = 0
 
+class BaseTrapWeight(Choice):
+    """
+    Base Class for Trap Weights
+    """
+    option_none = 0
+    option_low = 1
+    option_medium = 2
+    option_high = 4
+    default = 2
+
+class InstantDeathTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which instantly kills a player
+    """
+    display_name = "InstantDeathTrap Weight"
+class ItemsToBombsWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which drops the currently held item and replaces it with Dynamite
+    """
+    display_name = "ItemsToBombs Weight"
+class PokemonTriviaTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which quizzes the player with Pokemon trivia
+    """
+    display_name = "PokemonTriviaTrap Weight"
+class BlackoutTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which blacks out the player's screen temporarily
+    """
+    display_name = "BlackoutTrap Weight"
+class SpawnBeeSwarmWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a swarm of bees
+    """
+    display_name = "SpawnBeeSwarm Weight"
+class BananaPeelTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a berrynana peel in front of a player
+    """
+    display_name = "BananaPeelTrap Weight"
+class MinorPoisonTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a weak Poison Affliction to a player
+    """
+    display_name = "MinorPoisonTrap Weight"
+class PoisonTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a Poison Affliction to a player
+    """
+    display_name = "PoisonTrap Weight"
+class DeadlyPoisonTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a strong Poison Affliction to a player
+    """
+    display_name = "DeadlyPoisonTrap Weight"   
+class TornadoTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a tornado on a player
+    """
+    display_name = "TornadoTrap Weight"
+class SwapTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which swaps the position of all players
+    """
+    display_name = "SwapTrap Weight"
+class NapTimeTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a Drowsy Affliction to a player
+    """
+    display_name = "NapTimeTrap Weight"
+class HungryHungryCamperTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a Hunger Affliction to a player
+    """
+    display_name = "HungryHungryCamperTrap Weight"
+class BalloonTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which ties a bundle of balloons to a player
+    """
+    display_name = "BalloonTrap Weight"
+class SlipTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which makes a player slip and fall
+    """
+    display_name = "SlipTrap Weight"
+class FreezeTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a Cold Affliction to a player
+    """
+    display_name = "FreezeTrap Weight"
+class ColdTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a mild Cold Affliction to a player
+    """
+    display_name = "ColdTrap Weight"
+class HotTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a Hot Affliction to a player
+    """
+    display_name = "HotTrap Weight"
+class InjuryTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies an Injury Affliction to a player
+    """
+    display_name = "InjuryTrap Weight"
+class CactusBallTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which replaces a players currently held item with a Cactus Ball
+    """
+    display_name = "CactusBallTrap Weight"
+class YeetTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which causes a player to throw their currently held item at max force
+    """
+    display_name = "YeetTrap Weight"
+class TumbleweedTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a tumbleweed that chases a player
+    """
+    display_name = "TumbleweedTrap Weight"
+class ZombieHordeTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a horde of mushroom zombies
+    """
+    display_name = "ZombieHordeTrap Weight"
+class GustTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a wind storm that pushes players around
+    """
+    display_name = "GustTrap Weight"
+class MandrakeTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which replaces a player's currently held item with a Mandrake
+    """
+    display_name = "MandrakeTrap Weight"
+class FungalInfectionTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which applies a Possession Affliction over time to a player
+    """
+    display_name = "FungalInfectionTrap Weight"
+
+class TrapPercentage(Range):
+    """
+    Replace a percentage of junk items in the item pool with random traps
+    """
+    display_name = "Trap Fill Percentage"
+    range_start = 0
+    range_end = 100
+    default = 10
 
 
 # Option Groups for better organization in the web UI
@@ -143,7 +281,6 @@ peak_option_groups = [
         Goal,
         AscentCount,
         BadgeCount,
-        TrapPercentage,
     ]),
     OptionGroup("Stamina", [
         ProgressiveStamina,
@@ -158,6 +295,35 @@ peak_option_groups = [
         DeathLinkBehavior,
         DeathLinkSendBehavior,
     ]),
+    OptionGroup("Traps", [
+        TrapPercentage,
+        InstantDeathTrapWeight,
+        ItemsToBombsWeight,
+        PokemonTriviaTrapWeight,
+        BlackoutTrapWeight,
+        SpawnBeeSwarmWeight,
+        BananaPeelTrapWeight,
+        MinorPoisonTrapWeight,
+        PoisonTrapWeight,
+        DeadlyPoisonTrapWeight,
+        TornadoTrapWeight,
+        SwapTrapWeight,
+        NapTimeTrapWeight,
+        HungryHungryCamperTrapWeight,
+        BalloonTrapWeight,
+        SlipTrapWeight,
+        FreezeTrapWeight,
+        ColdTrapWeight,
+        HotTrapWeight,
+        InjuryTrapWeight,
+        CactusBallTrapWeight,
+        YeetTrapWeight,
+        TumbleweedTrapWeight,
+        ZombieHordeTrapWeight,
+        GustTrapWeight,
+        MandrakeTrapWeight,
+        FungalInfectionTrapWeight,
+    ]),
 ]
 
 
@@ -168,7 +334,7 @@ class PeakOptions(PerGameCommonOptions):
     badge_count: BadgeCount
     progressive_stamina: ProgressiveStamina
     additional_stamina_bars: AdditionalStaminaBars
-    trap_percentage: TrapPercentage
+
     ring_link: RingLink
     hard_ring_link: HardRingLink
     energy_link: EnergyLink
@@ -176,3 +342,31 @@ class PeakOptions(PerGameCommonOptions):
     death_link: DeathLink
     death_link_behavior: DeathLinkBehavior
     death_link_send_behavior: DeathLinkSendBehavior
+
+    trap_percentage: TrapPercentage
+    instant_death_trap_weight: InstantDeathTrapWeight
+    items_to_bombs_weight: ItemsToBombsWeight
+    pokemon_trivia_trap_weight: PokemonTriviaTrapWeight
+    blackout_trap_weight: BlackoutTrapWeight
+    spawn_bee_swarm_weight: SpawnBeeSwarmWeight
+    banana_peel_trap_weight: BananaPeelTrapWeight
+    minor_poison_trap_weight: MinorPoisonTrapWeight
+    poison_trap_weight: PoisonTrapWeight
+    deadly_poison_trap_weight: DeadlyPoisonTrapWeight
+    tornado_trap_weight: TornadoTrapWeight
+    swap_trap_weight: SwapTrapWeight
+    nap_time_trap_weight: NapTimeTrapWeight
+    hungry_hungry_camper_trap_weight: HungryHungryCamperTrapWeight
+    balloon_trap_weight: BalloonTrapWeight
+    slip_trap_weight: SlipTrapWeight
+    freeze_trap_weight: FreezeTrapWeight
+    cold_trap_weight: ColdTrapWeight
+    hot_trap_weight: HotTrapWeight
+    injury_trap_weight: InjuryTrapWeight
+    cactus_ball_trap_weight: CactusBallTrapWeight
+    yeet_trap_weight: YeetTrapWeight
+    tumbleweed_trap_weight: TumbleweedTrapWeight
+    zombie_horde_trap_weight: ZombieHordeTrapWeight
+    gust_trap_weight: GustTrapWeight
+    mandrake_trap_weight: MandrakeTrapWeight
+    fungal_infection_trap_weight: FungalInfectionTrapWeight

@@ -145,6 +145,7 @@ trap_table = {
     "Pokemon Trivia Trap":        ItemData(77087, ItemClassification.trap),
     "Items to Bombs":             ItemData(77088, ItemClassification.trap),
     "Instant Death Trap":         ItemData(76028, ItemClassification.trap),
+    "Blackout Trap":              ItemData(77089, ItemClassification.trap),
 }
 
 item_table = {

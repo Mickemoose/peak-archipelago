@@ -130,6 +130,7 @@ namespace Peak.AP
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
                 PokemonTriviaTrapEffect.Initialize(_log, this);
+                BlackoutTrapEffect.Initialize(_log, this);
                 CheckAndHandlePortChange();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
@@ -1401,6 +1402,7 @@ namespace Peak.AP
                 { "Zombie Horde Trap", () => ZombieHordeTrapEffect.ApplyZombieHordeTrap(_log) },
                 { "Gust Trap", () => GustTrapEffect.ApplyGustTrap(_log) },
                 { "Mandrake Trap", () => ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "Mandrake") },
+                { "Blackout Trap", () => BlackoutTrapEffect.ApplyBlackoutTrap(_log) },
                 { "Fungal Infection Trap", () => StatusOverTimeTrapEffect.ApplyStatusOverTime(_log, StatusOverTimeTrapEffect.TargetMode.RandomPlayer,
                 CharacterAfflictions.STATUSTYPE.Spores,
                 amountPerTick: 0.1f,
@@ -1408,11 +1410,25 @@ namespace Peak.AP
                 duration: 5.0f
                 ) },
 
+
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
         }
-        
+
+        [PunRPC]
+        private void StartBlackoutTrapRPC()
+        {
+            try
+            {
+                _log.LogInfo("[PeakPelago] RPC received: Start Blackout Trap");
+                BlackoutTrapEffect.ApplyBlackoutTrapLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartBlackoutTrapRPC: {ex.Message}");
+            }
+        }
 
         [PunRPC]
         private void StartPokemonTriviaRPC()
@@ -2540,12 +2556,12 @@ namespace Peak.AP
         // ===== Connection =====
 
         public void Connect()
-        {    
+        {
             if (_isConnecting) return;
 
             _isConnecting = true;
             _status = "Connecting...";
-           
+
             try
             {
                 // Check for port changes before connecting
@@ -2625,13 +2641,13 @@ namespace Peak.AP
                         string fromName = _session.Players.GetPlayerName(info.Player) ?? ("Player " + info.Player);
                         string toName = cfgSlot.Value;
                         ItemFlags classification = info.Flags;
-                        
+
                         if (helper.Index > _lastProcessedItemIndex)
                         {
                             _notifications.ShowItemNotification(fromName, toName, itemName, classification);
                             bool isTrap = IsTrapItem(itemName);
                             _itemQueue.AddLast((itemName, isTrap, helper.Index));
-                            
+
                             _log.LogInfo($"[PeakPelago] Queued NEW item #{helper.Index}: {itemName} (Queue size: {_itemQueue.Count})");
                         }
                         else
@@ -2691,7 +2707,7 @@ namespace Peak.AP
                             tags.Add("RingLink");
                         }
                     }
-                    
+
                     if (loginResult.SlotData.ContainsKey("hard_ring_link"))
                     {
                         var value = loginResult.SlotData["hard_ring_link"];
@@ -2709,7 +2725,7 @@ namespace Peak.AP
                         var value = loginResult.SlotData["trap_link"];
                         trapLinkEnabled = Convert.ToInt32(value) != 0;
                         _log.LogInfo($"[PeakPelago] Trap Link from slot data: {trapLinkEnabled}");
-                        
+
                         if (trapLinkEnabled)
                         {
                             tags.Add("TrapLink");
@@ -2729,7 +2745,7 @@ namespace Peak.AP
                             tags.Add("DeathLink");
                         }
                     }
-                    
+
                     if (tags.Count > 0)
                     {
                         var updatePacket = new ConnectUpdatePacket
@@ -2749,7 +2765,43 @@ namespace Peak.AP
                     }
                     if (trapLinkEnabled)
                     {
-                        var enabledTraps = TrapTypeExtensions.GetAllTrapNames();
+                        HashSet<string> enabledTraps = new HashSet<string>();
+                        if (loginResult.SlotData.ContainsKey("active_traps"))
+                        {
+                            try
+                            {
+                                var activeTrapsData = loginResult.SlotData["active_traps"];
+                                _log.LogInfo($"[PeakPelago] Active traps data type: {activeTrapsData?.GetType().Name}");
+                                _log.LogInfo($"[PeakPelago] Active traps raw value: {activeTrapsData}");
+
+                                if (activeTrapsData is JObject activeTrapsObj)
+                                {
+                                    foreach (var kvp in activeTrapsObj)
+                                    {
+                                        string trapKey = kvp.Key;
+                                        int weight = kvp.Value.ToObject<int>();
+                                        string trapName = MapSlotKeyToTrapName(trapKey);
+                                        if (weight > 0 && !string.IsNullOrEmpty(trapName))
+                                        {
+                                            enabledTraps.Add(trapName);
+                                            _log.LogInfo($"[PeakPelago] Enabled trap: {trapName} (weight: {weight})");
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _log.LogError($"[PeakPelago] Error parsing active_traps: {ex.Message}");
+                                enabledTraps = TrapTypeExtensions.GetAllTrapNames();
+                            }
+                        }
+                        else
+                        {
+                            _log.LogWarning("[PeakPelago] active_traps not found in slot data, enabling all traps");
+                            enabledTraps = TrapTypeExtensions.GetAllTrapNames();
+                        }
+
+                        _log.LogInfo($"[PeakPelago] Initializing Trap Link with {enabledTraps.Count} enabled traps");
                         _trapLinkService.Initialize(
                             _session,
                             trapLinkEnabled,
@@ -2855,6 +2907,41 @@ namespace Peak.AP
             {
                 _isConnecting = false;
             }
+        }
+        
+        private string MapSlotKeyToTrapName(string slotKey)
+        {
+            var mapping = new Dictionary<string, string>
+            {
+                { "instant_death_trap", "Instant Death Trap" },
+                { "items_to_bombs", "Items to Bombs" },
+                { "pokemon_trivia_trap", "Pokemon Trivia Trap" },
+                { "blackout_trap", "Blackout Trap" },
+                { "spawn_bee_swarm", "Spawn Bee Swarm" },
+                { "banana_peel_trap", "Banana Peel Trap" },
+                { "minor_poison_trap", "Minor Poison Trap" },
+                { "poison_trap", "Poison Trap" },
+                { "deadly_poison_trap", "Deadly Poison Trap" },
+                { "tornado_trap", "Tornado Trap" },
+                { "swap_trap", "Swap Trap" },
+                { "nap_time_trap", "Nap Time Trap" },
+                { "hungry_hungry_camper_trap", "Hungry Hungry Camper Trap" },
+                { "balloon_trap", "Balloon Trap" },
+                { "slip_trap", "Slip Trap" },
+                { "freeze_trap", "Freeze Trap" },
+                { "cold_trap", "Cold Trap" },
+                { "hot_trap", "Hot Trap" },
+                { "injury_trap", "Injury Trap" },
+                { "cactus_ball_trap", "Cactus Ball Trap" },
+                { "yeet_trap", "Yeet Trap" },
+                { "tumbleweed_trap", "Tumbleweed Trap" },
+                { "zombie_horde_trap", "Zombie Horde Trap" },
+                { "gust_trap", "Gust Trap" },
+                { "mandrake_trap", "Mandrake Trap" },
+                { "fungal_infection_trap", "Fungal Infection Trap" }
+            };
+            
+            return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;
         }
 
         private void TryCloseSession()

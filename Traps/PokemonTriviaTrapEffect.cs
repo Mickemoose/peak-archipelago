@@ -42,6 +42,10 @@ namespace Peak.AP
             dunsparce,
             qwilfish,
             crobat,
+            steelix,
+            suicune,
+            misdreavus,
+            hitmontop,
 
         }
 
@@ -49,8 +53,8 @@ namespace Peak.AP
         {
             { Pokemon.totodile, CharacterAfflictions.STATUSTYPE.Injury },
             { Pokemon.quilava, CharacterAfflictions.STATUSTYPE.Hot },
-            { Pokemon.unown, CharacterAfflictions.STATUSTYPE.Curse },
-            { Pokemon.pichu, CharacterAfflictions.STATUSTYPE.Injury },
+            { Pokemon.unown, CharacterAfflictions.STATUSTYPE.Hunger },
+            { Pokemon.pichu, CharacterAfflictions.STATUSTYPE.Hunger },
             { Pokemon.hooh, CharacterAfflictions.STATUSTYPE.Hot },
             { Pokemon.lugia, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.celebi, CharacterAfflictions.STATUSTYPE.Drowsy },
@@ -68,9 +72,13 @@ namespace Peak.AP
             { Pokemon.sudowoodo, CharacterAfflictions.STATUSTYPE.Injury },
             { Pokemon.scizor, CharacterAfflictions.STATUSTYPE.Poison },
             { Pokemon.porygon2, CharacterAfflictions.STATUSTYPE.Web },
-            { Pokemon.dunsparce, CharacterAfflictions.STATUSTYPE.Injury },
+            { Pokemon.dunsparce, CharacterAfflictions.STATUSTYPE.Hunger },
             { Pokemon.qwilfish, CharacterAfflictions.STATUSTYPE.Thorns },
             { Pokemon.crobat, CharacterAfflictions.STATUSTYPE.Poison },
+            { Pokemon.steelix, CharacterAfflictions.STATUSTYPE.Injury },
+            { Pokemon.suicune, CharacterAfflictions.STATUSTYPE.Cold },
+            { Pokemon.misdreavus, CharacterAfflictions.STATUSTYPE.Drowsy },
+            { Pokemon.hitmontop, CharacterAfflictions.STATUSTYPE.Injury },
         };
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)
@@ -490,13 +498,17 @@ namespace Peak.AP
             new PokemonTriviaQuestion("Which Pokemon resides in the Whirl Islands?", Pokemon.lugia),
             new PokemonTriviaQuestion("Which Pokemon is the time travel Pokemon?", Pokemon.celebi),
             new PokemonTriviaQuestion("Which Pokemon can only be found at night?", Pokemon.hoothoot),
-            new PokemonTriviaQuestion("Which Pokemon is evolved into while holding Metal Coat?", Pokemon.scizor),
+            new PokemonTriviaQuestion("Which Pokemon is evolved into while holding Metal Coat on Scyther?", Pokemon.scizor),
             new PokemonTriviaQuestion("Which Pokemon evolves from Eevee with high friendship at night?", Pokemon.umbreon),
             new PokemonTriviaQuestion("Which Pokemon evolves from Eevee with high friendship during day?", Pokemon.espeon),
             new PokemonTriviaQuestion("Which Pokemon evolves from Gloom with a Sun Stone?", Pokemon.bellossom),
             new PokemonTriviaQuestion("Which Pokemon delivers presents?", Pokemon.delibird),
             new PokemonTriviaQuestion("Which Pokemon is the main Pokemon of Pokemon 2000?", Pokemon.lugia),
             new PokemonTriviaQuestion("Which Pokemon does Ash see on his first day as a trainer?", Pokemon.hooh),
+            new PokemonTriviaQuestion("Which Pokemon does Eusine constantly chase after?", Pokemon.suicune),
+            new PokemonTriviaQuestion("Which Pokemon does Eusine constantly chase after?", Pokemon.suicune),
+            new PokemonTriviaQuestion("Which Pokemon is the regular form of Paradox Pokemon Flutter Mane?", Pokemon.misdreavus),
+
 
         };
     }

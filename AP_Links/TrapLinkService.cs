@@ -15,23 +15,13 @@ namespace Peak.AP
         private ArchipelagoSession _session;
         private bool _isEnabled;
         private string _playerName;
-        
-        // Queue of traps to activate
         private LinkedList<string> _trapQueue = new LinkedList<string>();
         private string _priorityTrap = null;
         private float _lastTrapActivation = 0f;
         private const float TRAP_ACTIVATION_COOLDOWN = 2f;
-
-        // Callback to activate traps through the main plugin
         private System.Action<string, bool> _applyTrapEffect;
-        
-        // Mapping of PEAK trap names to standardized cross-game names (for SENDING)
         private Dictionary<string, string> _peakToStandardMapping;
-        
-        // Mapping of standardized/external trap names to PEAK trap names (for RECEIVING)
         private Dictionary<string, string> _standardToPeakMapping;
-
-        // List of traps that can be sent/received
         private HashSet<string> _enabledTraps;
         private ArchipelagoNotificationManager _notifications;
 
@@ -77,6 +67,7 @@ namespace Peak.AP
                 { "Fungal Infection Trap", "Posession Trap"},
                 { "Items to Bombs", "Items to Bombs"},
                 { "Pokemon Trivia Trap", "Pokemon Trivia Trap"},
+                { "Blackout Trap", "Confuse Trap"}
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -128,6 +119,9 @@ namespace Peak.AP
                 { "OmoTrap", "Mandrake Trap"},
                 { "Posession Trap", "Fungal Infection Trap"},
                 { "Pokemon Trivia Trap", "Pokemon Trivia Trap"},
+                { "Confuse Trap", "Blackout Trap"},
+                { "Confusion Trap", "Blackout Trap"},
+                { "Confound Trap", "Blackout Trap"}
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");

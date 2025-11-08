@@ -1,6 +1,7 @@
 import logging
 import math
 from collections import Counter
+import typing
 
 from BaseClasses import ItemClassification, CollectionState
 from worlds.AutoWorld import World, WebWorld
@@ -110,15 +111,45 @@ class PeakWorld(World):
         # Calculate how many slots are left for traps and fillers
         remaining_slots = total_locations - len(item_pool)
         
-        # Calculate number of trap items based on TrapPercentage
-        trap_count = int(remaining_slots * (self.options.trap_percentage.value / 100))
+        # Build trap_weights list based on individual trap weights
+        trap_weights = []
+        trap_weights += (["Instant Death Trap"] * self.options.instant_death_trap_weight.value)
+        trap_weights += (["Items to Bombs"] * self.options.items_to_bombs_weight.value)
+        trap_weights += (["Pokemon Trivia Trap"] * self.options.pokemon_trivia_trap_weight.value)
+        trap_weights += (["Blackout Trap"] * self.options.blackout_trap_weight.value)
+        trap_weights += (["Spawn Bee Swarm"] * self.options.spawn_bee_swarm_weight.value)
+        trap_weights += (["Banana Peel Trap"] * self.options.banana_peel_trap_weight.value)
+        trap_weights += (["Minor Poison Trap"] * self.options.minor_poison_trap_weight.value)
+        trap_weights += (["Poison Trap"] * self.options.poison_trap_weight.value)
+        trap_weights += (["Deadly Poison Trap"] * self.options.deadly_poison_trap_weight.value)
+        trap_weights += (["Tornado Trap"] * self.options.tornado_trap_weight.value)
+        trap_weights += (["Swap Trap"] * self.options.swap_trap_weight.value)
+        trap_weights += (["Nap Time Trap"] * self.options.nap_time_trap_weight.value)
+        trap_weights += (["Hungry Hungry Camper Trap"] * self.options.hungry_hungry_camper_trap_weight.value)
+        trap_weights += (["Balloon Trap"] * self.options.balloon_trap_weight.value)
+        trap_weights += (["Slip Trap"] * self.options.slip_trap_weight.value)
+        trap_weights += (["Freeze Trap"] * self.options.freeze_trap_weight.value)
+        trap_weights += (["Cold Trap"] * self.options.cold_trap_weight.value)
+        trap_weights += (["Hot Trap"] * self.options.hot_trap_weight.value)
+        trap_weights += (["Injury Trap"] * self.options.injury_trap_weight.value)
+        trap_weights += (["Cactus Ball Trap"] * self.options.cactus_ball_trap_weight.value)
+        trap_weights += (["Yeet Trap"] * self.options.yeet_trap_weight.value)
+        trap_weights += (["Tumbleweed Trap"] * self.options.tumbleweed_trap_weight.value)
+        trap_weights += (["Zombie Horde Trap"] * self.options.zombie_horde_trap_weight.value)
+        trap_weights += (["Gust Trap"] * self.options.gust_trap_weight.value)
+        trap_weights += (["Mandrake Trap"] * self.options.mandrake_trap_weight.value)
+        trap_weights += (["Fungal Infection Trap"] * self.options.fungal_infection_trap_weight.value)
         
-        # Add trap items
-        if trap_count > 0:
-            trap_items = list(trap_table.keys())
-            for i in range(trap_count):
-                trap_name = trap_items[i % len(trap_items)]
-                item_pool.append(self.create_item(trap_name))
+        # Calculate number of trap items based on TrapPercentage
+        trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
+        
+        # Add trap items by randomly selecting from weighted list
+        trap_pool = []
+        for i in range(trap_count):
+            trap_item = self.multiworld.random.choice(trap_weights)
+            trap_pool.append(self.create_item(trap_item))
+        
+        item_pool += trap_pool
         
         # Fill remaining slots with filler items
         filler_items = list(filler_table.keys())
@@ -131,6 +162,38 @@ class PeakWorld(World):
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Trap items added: {trap_count}")
         
         self.multiworld.itempool.extend(item_pool)
+    
+    def output_active_traps(self) -> typing.Dict[str, int]:
+        trap_data = {}
+
+        trap_data["instant_death_trap"] = self.options.instant_death_trap_weight.value
+        trap_data["items_to_bombs"] = self.options.items_to_bombs_weight.value
+        trap_data["pokemon_trivia_trap"] = self.options.pokemon_trivia_trap_weight.value
+        trap_data["blackout_trap"] = self.options.blackout_trap_weight.value
+        trap_data["spawn_bee_swarm"] = self.options.spawn_bee_swarm_weight.value
+        trap_data["banana_peel_trap"] = self.options.banana_peel_trap_weight.value
+        trap_data["minor_poison_trap"] = self.options.minor_poison_trap_weight.value
+        trap_data["poison_trap"] = self.options.poison_trap_weight.value
+        trap_data["deadly_poison_trap"] = self.options.deadly_poison_trap_weight.value
+        trap_data["tornado_trap"] = self.options.tornado_trap_weight.value
+        trap_data["swap_trap"] = self.options.swap_trap_weight.value
+        trap_data["nap_time_trap"] = self.options.nap_time_trap_weight.value
+        trap_data["hungry_hungry_camper_trap"] = self.options.hungry_hungry_camper_trap_weight.value
+        trap_data["balloon_trap"] = self.options.balloon_trap_weight.value
+        trap_data["slip_trap"] = self.options.slip_trap_weight.value
+        trap_data["freeze_trap"] = self.options.freeze_trap_weight.value
+        trap_data["cold_trap"] = self.options.cold_trap_weight.value
+        trap_data["hot_trap"] = self.options.hot_trap_weight.value
+        trap_data["injury_trap"] = self.options.injury_trap_weight.value
+        trap_data["cactus_ball_trap"] = self.options.cactus_ball_trap_weight.value
+        trap_data["yeet_trap"] = self.options.yeet_trap_weight.value
+        trap_data["tumbleweed_trap"] = self.options.tumbleweed_trap_weight.value
+        trap_data["zombie_horde_trap"] = self.options.zombie_horde_trap_weight.value
+        trap_data["gust_trap"] = self.options.gust_trap_weight.value
+        trap_data["mandrake_trap"] = self.options.mandrake_trap_weight.value
+        trap_data["fungal_infection_trap"] = self.options.fungal_infection_trap_weight.value
+
+        return trap_data
 
     def set_rules(self):
         """Set progression rules and top-up the item pool based on final locations."""
@@ -193,6 +256,7 @@ class PeakWorld(World):
             "death_link": self.options.death_link.value,
             "death_link_behavior": self.options.death_link_behavior.value,
             "death_link_send_behavior": self.options.death_link_send_behavior.value,
+            "active_traps": self.output_active_traps(),
         }
         
         # Log what we're sending
