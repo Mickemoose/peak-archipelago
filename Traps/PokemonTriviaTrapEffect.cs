@@ -122,7 +122,7 @@ namespace Peak.AP
                 {
                     PeakArchipelagoPlugin._instance.PhotonView.RPC(
                         "StartPokemonTriviaRPC",
-                        RpcTarget.All  // ← All clients start trivia
+                        RpcTarget.All
                     );
                 }
                 else
@@ -143,18 +143,14 @@ namespace Peak.AP
             var question = GetRandomQuestion();
             log.LogInfo($"[PeakPelago] Pokemon Trivia Question: {question.Question}");
             log.LogInfo($"[PeakPelago] Correct Answer: {question.CorrectMon}");
-            
             var triviaUI = new GameObject("PokemonTriviaUI");
             var canvas = triviaUI.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 10000;
-            
             var canvasScaler = triviaUI.AddComponent<CanvasScaler>();
             canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             canvasScaler.referenceResolution = new Vector2(1920, 1080);
-            
             triviaUI.AddComponent<GraphicRaycaster>();
-
             var questionBanner = new GameObject("QuestionBanner");
             questionBanner.transform.SetParent(triviaUI.transform);
             var bannerRect = questionBanner.AddComponent<RectTransform>();
@@ -163,7 +159,6 @@ namespace Peak.AP
             bannerRect.offsetMin = Vector2.zero;
             bannerRect.offsetMax = Vector2.zero;
 
-            // Question text
             var questionTextObj = new GameObject("QuestionText");
             questionTextObj.transform.SetParent(questionBanner.transform);
             var questionRect = questionTextObj.AddComponent<RectTransform>();
@@ -171,7 +166,6 @@ namespace Peak.AP
             questionRect.anchorMax = new Vector2(0.95f, 0.95f);
             questionRect.offsetMin = Vector2.zero;
             questionRect.offsetMax = Vector2.zero;
-
             var questionText = questionTextObj.AddComponent<Text>();
             Font customFont = LoadCustomFont();
             questionText.font = customFont ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
@@ -180,31 +174,9 @@ namespace Peak.AP
             questionText.alignment = TextAnchor.MiddleCenter;
             questionText.horizontalOverflow = HorizontalWrapMode.Wrap;
             questionText.fontStyle = FontStyle.Bold;
-            
             var textOutline = questionTextObj.AddComponent<Outline>();
             textOutline.effectColor = Color.black;
             textOutline.effectDistance = new Vector2(3, 3);
-
-            // Timer display
-            var timerObj = new GameObject("Timer");
-            timerObj.transform.SetParent(questionBanner.transform);
-            var timerRect = timerObj.AddComponent<RectTransform>();
-            timerRect.anchorMin = new Vector2(0.85f, 0.05f);
-            timerRect.anchorMax = new Vector2(0.95f, 0.25f);
-            timerRect.offsetMin = Vector2.zero;
-            timerRect.offsetMax = Vector2.zero;
-
-            var timerText = timerObj.AddComponent<Text>();
-            timerText.font = customFont ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
-            timerText.fontSize = 60;
-            timerText.color = Color.white;
-            timerText.alignment = TextAnchor.MiddleCenter;
-            timerText.fontStyle = FontStyle.Bold;
-            
-            var timerOutline = timerObj.AddComponent<Outline>();
-            timerOutline.effectColor = Color.black;
-            timerOutline.effectDistance = new Vector2(3, 3);
-
             var answerPositions = new[]
             {
                 new Vector2(0.5f, 0.60f),
@@ -212,10 +184,8 @@ namespace Peak.AP
                 new Vector2(0.75f, 0.38f),
                 new Vector2(0.5f, 0.20f)
             };
-
             var answerObjects = new List<GameObject>();
             var pokemonImages = new List<Image>();
-
             for (int i = 0; i < 4; i++)
             {
                 var pokemonObj = new GameObject($"Pokemon{i}");
@@ -245,16 +215,10 @@ namespace Peak.AP
                 pokemonImages.Add(pokemonImage);
                 answerObjects.Add(pokemonObj);
             }
-
             questionText.text = "GET READY!";
             questionText.fontSize = 72;
-            timerText.text = "";
-
             for (int countdown = 3; countdown > 0; countdown--)
             {
-                timerText.text = countdown.ToString();
-                timerText.fontSize = 80;
-                timerText.color = Color.yellow;
                 yield return new WaitForSeconds(1f);
             }
 
@@ -264,34 +228,15 @@ namespace Peak.AP
             {
                 pokemonObj.SetActive(true);
             }
-
-            timerText.fontSize = 60;
-            timerText.color = Color.white;
-
             int selectedAnswer = -1;
             float timeoutDuration = 10f;
             float elapsed = 0f;
-
             var inputKeys = new[] { KeyCode.W, KeyCode.A, KeyCode.D, KeyCode.S };
             var altInputKeys = new[] { KeyCode.UpArrow, KeyCode.LeftArrow, KeyCode.RightArrow, KeyCode.DownArrow };
             var answerIndices = new[] { 0, 1, 2, 3 };
-
             while (selectedAnswer == -1 && elapsed < timeoutDuration)
             {
                 elapsed += Time.deltaTime;
-                float timeRemaining = timeoutDuration - elapsed;
-                timerText.text = Mathf.CeilToInt(timeRemaining).ToString();
-
-                // Change timer color when time is running out
-                if (timeRemaining <= 3f)
-                {
-                    timerText.color = Color.red;
-                }
-                else if (timeRemaining <= 5f)
-                {
-                    timerText.color = Color.yellow;
-                }
-
                 // Check keyboard input
                 for (int i = 0; i < 4; i++)
                 {
@@ -301,7 +246,6 @@ namespace Peak.AP
                         break;
                     }
                 }
-
                 // Check joystick input
                 if (selectedAnswer == -1)
                 {
@@ -325,8 +269,6 @@ namespace Peak.AP
 
                 yield return null;
             }
-
-            // Check answer
             bool correct = false;
             if (selectedAnswer == -1)
             {
@@ -338,8 +280,6 @@ namespace Peak.AP
                 correct = question.Options[selectedAnswer] == question.CorrectMon;
                 log.LogInfo($"[PeakPelago] Pokemon Trivia answer: {question.Options[selectedAnswer]} (Correct: {correct})");
             }
-
-            // Play sound and show result overlay
             if (correct)
             {
                 var connectionLog = UnityEngine.Object.FindFirstObjectByType<PlayerConnectionLog>();
@@ -367,7 +307,6 @@ namespace Peak.AP
                     );
                     overlayImage.preserveAspect = true;
                 }
-
                 questionText.text = "CORRECT!";
                 questionText.color = Color.green;
             }
@@ -378,7 +317,6 @@ namespace Peak.AP
                 {
                     connectionLog.sfxLeave.Play();
                 }
-
                 Texture2D wrongTex = LoadOverlayTexture("wrong.png");
                 if (wrongTex != null)
                 {
@@ -398,17 +336,13 @@ namespace Peak.AP
                     );
                     overlayImage.preserveAspect = true;
                 }
-
                 questionText.text = "TOO BAD!";
                 questionText.color = Color.red;
-
                 Pokemon selectedPokemon = question.Options[selectedAnswer];
                 if (_pokemonAfflictions.ContainsKey(selectedPokemon))
                 {
                     var statusType = _pokemonAfflictions[selectedPokemon];
-                    
                     log.LogInfo($"[PeakPelago] Applying {statusType} for selecting {selectedPokemon}");
-                    
                     StatusOverTimeTrapEffect.ApplyStatusOverTime(
                         log,
                         StatusOverTimeTrapEffect.TargetMode.LocalPlayer,
@@ -419,9 +353,7 @@ namespace Peak.AP
                     );
                 }
             }
-
             yield return new WaitForSeconds(3f);
-
             UnityEngine.Object.Destroy(triviaUI);
             _isActive = false;
             log.LogInfo("[PeakPelago] Pokemon Trivia trap completed");
@@ -430,9 +362,7 @@ namespace Peak.AP
         {
             try
             {
-                // Try to find the font PEAK already has loaded
                 Font[] loadedFonts = Resources.FindObjectsOfTypeAll<Font>();
-                
                 foreach (Font font in loadedFonts)
                 {
                     if (font.name.Contains("Daruma") || font.name.Contains("DarumaDropOne"))
@@ -441,14 +371,11 @@ namespace Peak.AP
                         return font;
                     }
                 }
-                
-                // Also check for the SDF version (TextMeshPro)
                 _log.LogInfo("[PeakPelago] Searching through all loaded fonts:");
                 foreach (Font font in loadedFonts)
                 {
                     _log.LogInfo($"[PeakPelago]   - {font.name}");
                 }
-                
                 foreach (Font font in loadedFonts)
                 {
                     if (!font.name.Contains("Arial") && !font.name.Contains("Legacy"))
@@ -502,20 +429,11 @@ namespace Peak.AP
                     if (stream == null)
                     {
                         _log.LogError($"[PeakPelago] Embedded resource not found: {resourceName}");
-                        
-                        // Debug: List all available resources
-                        _log.LogInfo("[PeakPelago] Available embedded resources:");
-                        foreach (var name in assembly.GetManifestResourceNames())
-                        {
-                            _log.LogInfo($"[PeakPelago]   - {name}");
-                        }
-                        
                         return null;
                     }
 
                     byte[] fileData = new byte[stream.Length];
                     stream.Read(fileData, 0, fileData.Length);
-                    
                     Texture2D tex = new Texture2D(2, 2);
                     tex.LoadImage(fileData);
                     return tex;
