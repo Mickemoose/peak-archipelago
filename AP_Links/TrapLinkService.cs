@@ -74,7 +74,9 @@ namespace Peak.AP
                 { "Zombie Horde Trap", "Spooky Time"},
                 { "Gust Trap", "Get Out Trap"},
                 { "Mandrake Trap", "OmoTrap"},
-                { "Fungal Infection Trap", "Posession Trap"}
+                { "Fungal Infection Trap", "Posession Trap"},
+                { "Items to Bombs", "Items to Bombs"},
+                { "Pokemon Trivia Trap", "Pokemon Trivia Trap"},
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -124,7 +126,8 @@ namespace Peak.AP
                 { "Get Out Trap", "Gust Trap"},
                 { "Resistance Trap", "Gust Trap"},
                 { "OmoTrap", "Mandrake Trap"},
-                { "Posession Trap", "Fungal Infection Trap"}
+                { "Posession Trap", "Fungal Infection Trap"},
+                { "Pokemon Trivia Trap", "Pokemon Trivia Trap"},
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");

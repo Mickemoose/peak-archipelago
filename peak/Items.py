@@ -110,6 +110,10 @@ filler_table = {
     "Big Egg":     ItemData(77073, ItemClassification.filler),
     "Cooked Bird": ItemData(77068, ItemClassification.filler),
     "Beehive":     ItemData(77070, ItemClassification.filler),
+    "Coconut Half":               ItemData(77058, ItemClassification.filler),
+    "Coconut":                    ItemData(77057, ItemClassification.filler),
+    "Cursed Skull":               ItemData(77031, ItemClassification.filler),
+    "Blue Berrynana":             ItemData(77060, ItemClassification.filler),
 }
 
 trap_table = {
@@ -117,10 +121,6 @@ trap_table = {
     "Minor Poison Trap":          ItemData(76032, ItemClassification.trap),
     "Slip Trap":                  ItemData(76041, ItemClassification.trap),
     "Cactus Ball Trap":           ItemData(76039, ItemClassification.trap),
-    "Coconut":                    ItemData(77057, ItemClassification.trap),
-    "Coconut Half":               ItemData(77058, ItemClassification.trap),
-    "Blue Berrynana":             ItemData(77060, ItemClassification.trap),
-    "Cursed Skull":               ItemData(77031, ItemClassification.trap),
     "Scorpion":                   ItemData(77074, ItemClassification.trap),
     "Mandrake":                   ItemData(77081, ItemClassification.trap),
     "Spawn Bee Swarm":            ItemData(76027, ItemClassification.trap),
@@ -130,6 +130,8 @@ trap_table = {
     "Balloon Trap":               ItemData(76037, ItemClassification.trap),
     "Hungry Hungry Camper Trap":  ItemData(76038, ItemClassification.trap),
     "Freeze Trap":                ItemData(76040, ItemClassification.trap),
+    "Cold Trap":                  ItemData(76048, ItemClassification.trap),
+    "Hot Trap":                   ItemData(76049, ItemClassification.trap),
     "Yeet Trap":                  ItemData(76042, ItemClassification.trap),
     "Gust Trap":                  ItemData(76045, ItemClassification.trap),
     "Mandrake Trap":              ItemData(76046, ItemClassification.trap),
@@ -141,6 +143,8 @@ trap_table = {
     "Tumbleweed Trap":            ItemData(76043, ItemClassification.trap),
     "Zombie Horde Trap":          ItemData(76044, ItemClassification.trap),
     "Pokemon Trivia Trap":        ItemData(77087, ItemClassification.trap),
+    "Items to Bombs":             ItemData(77088, ItemClassification.trap),
+    "Instant Death Trap":         ItemData(76028, ItemClassification.trap),
 }
 
 item_table = {

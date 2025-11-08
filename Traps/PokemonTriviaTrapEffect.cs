@@ -38,6 +38,10 @@ namespace Peak.AP
             shuckle,
             sudowoodo,
             scizor,
+            porygon2,
+            dunsparce,
+            qwilfish,
+            crobat,
 
         }
 
@@ -63,6 +67,10 @@ namespace Peak.AP
             { Pokemon.shuckle, CharacterAfflictions.STATUSTYPE.Poison },
             { Pokemon.sudowoodo, CharacterAfflictions.STATUSTYPE.Injury },
             { Pokemon.scizor, CharacterAfflictions.STATUSTYPE.Poison },
+            { Pokemon.porygon2, CharacterAfflictions.STATUSTYPE.Web },
+            { Pokemon.dunsparce, CharacterAfflictions.STATUSTYPE.Injury },
+            { Pokemon.qwilfish, CharacterAfflictions.STATUSTYPE.Thorns },
+            { Pokemon.crobat, CharacterAfflictions.STATUSTYPE.Poison },
         };
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)
