@@ -126,6 +126,11 @@ namespace Peak.AP
         {
             try
             {
+                string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+                if (!currentScene.StartsWith("Level_"))
+                {
+                    return;
+                }
                 // Don't process our own Ring Links
                 if (data.ContainsKey("source"))
                 {

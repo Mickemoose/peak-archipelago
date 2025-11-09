@@ -40,7 +40,7 @@ useful_table = {
     "Scout Cannon":      ItemData(77010, ItemClassification.useful),
     "Flying Disc":       ItemData(77020, ItemClassification.useful),
     "Rescue Claw":       ItemData(77084, ItemClassification.useful),
-    "Lantern":        ItemData(77013, ItemClassification.useful),
+    "Lantern":          ItemData(77013, ItemClassification.useful),
     "Flare":          ItemData(77014, ItemClassification.useful),
     "Torch":          ItemData(77015, ItemClassification.useful),
     "Faerie Lantern": ItemData(77026, ItemClassification.useful),

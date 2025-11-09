@@ -419,6 +419,12 @@ namespace Peak.AP
                 return;
             }
 
+            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (!currentScene.StartsWith("Level_"))
+            {
+                return;
+            }
+
             try
             {
                 // Prevent spam - only process one death link per 5 seconds
@@ -1173,12 +1179,12 @@ namespace Peak.AP
                 { "GUIDEBOOK", "Acquire Guidebook" },
                 
                 // Fire/light items
-                { "PORTABLE STOVE", "Acquire PortableStovetopItem" },
+                { "PORTABLE STOVE", "Acquire Portable Stove" },
                 { "FIREWOOD", "Acquire FireWood" },
                 { "LANTERN", "Acquire Lantern" },
                 { "FLARE", "Acquire Flare" },
                 { "TORCH", "Acquire Torch" },
-                { "FAERIE LANTERN", "Acquire Lantern_Faerie" },
+                { "FAERIE LANTERN", "Acquire Faerie Lantern" },
                 
                 // Navigation items
                 { "CACTUS BALL", "Acquire CactusBall" },
@@ -1188,7 +1194,7 @@ namespace Peak.AP
                 
                 // Medical items
                 { "BANDAGES", "Acquire Bandages" },
-                { "FIRST AID KIT", "Acquire FirstAidKit" },
+                { "FIRST AID KIT", "Acquire First-Aid Kit" },
                 { "ANTIDOTE", "Acquire Antidote" },
                 { "HEAT PACK", "Acquire Heat Pack" },
                 { "CURE-ALL", "Acquire Cure-All" },
@@ -1207,6 +1213,7 @@ namespace Peak.AP
                 { "ANCIENT IDOL", "Acquire Ancient Idol" },
                 { "STRANGE GEM", "Acquire Strange Gem" },
                 { "BOOK OF BONES", "Acquire Book of Bones" },
+                { "CHECKPOINT FLAG", "Acquire Checkpoint Flag" },
                 
                 // Musical items
                 { "BUGLE OF FRIENDSHIP", "Acquire Bugle of Friendship" },

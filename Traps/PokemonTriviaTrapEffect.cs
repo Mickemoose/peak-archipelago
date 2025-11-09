@@ -50,6 +50,7 @@ namespace Peak.AP
             chinchou,
             slugma,
             elekid,
+            marill,
         }
 
         private static Dictionary<Pokemon, CharacterAfflictions.STATUSTYPE> _pokemonAfflictions = new()
@@ -86,6 +87,7 @@ namespace Peak.AP
             { Pokemon.chinchou, CharacterAfflictions.STATUSTYPE.Hunger },
             { Pokemon.slugma, CharacterAfflictions.STATUSTYPE.Hot },
             { Pokemon.elekid, CharacterAfflictions.STATUSTYPE.Spores },
+            { Pokemon.marill, CharacterAfflictions.STATUSTYPE.Cold },
         };
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)
