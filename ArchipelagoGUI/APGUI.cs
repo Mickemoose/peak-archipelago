@@ -162,8 +162,10 @@ namespace Peak.AP
                 {
                     message = "Archipelago connected through host.";
                 }
-                
+
                 GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), message, labelStyle);
+                
+                
             }
         }
 

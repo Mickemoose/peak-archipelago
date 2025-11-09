@@ -46,7 +46,10 @@ namespace Peak.AP
             suicune,
             misdreavus,
             hitmontop,
-
+            spinarak,
+            chinchou,
+            slugma,
+            elekid,
         }
 
         private static Dictionary<Pokemon, CharacterAfflictions.STATUSTYPE> _pokemonAfflictions = new()
@@ -79,6 +82,10 @@ namespace Peak.AP
             { Pokemon.suicune, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.misdreavus, CharacterAfflictions.STATUSTYPE.Drowsy },
             { Pokemon.hitmontop, CharacterAfflictions.STATUSTYPE.Injury },
+            { Pokemon.spinarak, CharacterAfflictions.STATUSTYPE.Web },
+            { Pokemon.chinchou, CharacterAfflictions.STATUSTYPE.Hunger },
+            { Pokemon.slugma, CharacterAfflictions.STATUSTYPE.Hot },
+            { Pokemon.elekid, CharacterAfflictions.STATUSTYPE.Spores },
         };
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)
@@ -506,8 +513,12 @@ namespace Peak.AP
             new PokemonTriviaQuestion("Which Pokemon is the main Pokemon of Pokemon 2000?", Pokemon.lugia),
             new PokemonTriviaQuestion("Which Pokemon does Ash see on his first day as a trainer?", Pokemon.hooh),
             new PokemonTriviaQuestion("Which Pokemon does Eusine constantly chase after?", Pokemon.suicune),
-            new PokemonTriviaQuestion("Which Pokemon does Eusine constantly chase after?", Pokemon.suicune),
             new PokemonTriviaQuestion("Which Pokemon is the regular form of Paradox Pokemon Flutter Mane?", Pokemon.misdreavus),
+            new PokemonTriviaQuestion("Which Pokemon can learn the move Triple Kick?", Pokemon.hitmontop),
+            new PokemonTriviaQuestion("Which Pokemon is known for spinning webs to catch prey?", Pokemon.spinarak),
+            new PokemonTriviaQuestion("Which Pokemon is an Electric/Water type?", Pokemon.chinchou),
+            new PokemonTriviaQuestion("Which Pokemon is a Fire type that resembles molten lava?", Pokemon.slugma),
+            new PokemonTriviaQuestion("Which Pokemon eventually evolves into Electivire?", Pokemon.elekid),
 
 
         };

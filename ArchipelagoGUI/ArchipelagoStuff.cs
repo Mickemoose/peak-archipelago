@@ -442,6 +442,11 @@ namespace Peak.AP
             ShowColoredMessage(message, new Color(1f, 0.84f, 0f));
         }
 
+        public void ShowEnergyLinkNotification(string message)
+        {
+            ShowColoredMessage(message, new Color(0f, 1f, 0.25f));
+        }
+
         public void ShowConnected()
         {
             ShowSimpleMessage($"Connected to Archipelago as {_localSlotName}");

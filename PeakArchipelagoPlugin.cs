@@ -85,6 +85,7 @@ namespace Peak.AP
         private HardRingLinkService _hardRingLinkService;
         private TrapLinkService _trapLinkService;
         private DeathLinkService _deathLinkService;
+        private EnergyLinkService _energyLinkService;
         private int _deathLinkBehavior = 0;
         private bool _deathLinkReceivedThisSession = false;
         private int _deathLinkSendBehavior = 0;
@@ -127,6 +128,7 @@ namespace Peak.AP
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _hardRingLinkService = new HardRingLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
+                _energyLinkService = new EnergyLinkService(_log, _notifications);
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
                 PokemonTriviaTrapEffect.Initialize(_log, this);
@@ -201,6 +203,7 @@ namespace Peak.AP
             _ringLinkService?.Cleanup();
             _hardRingLinkService?.Cleanup();
             _trapLinkService?.Cleanup();
+            _energyLinkService?.Cleanup();
             // Remove Harmony patches
             _harmony?.UnpatchSelf();
 
@@ -2693,6 +2696,7 @@ namespace Peak.AP
                     bool trapLinkEnabled = false;
                     bool ringLinkEnabled = false;
                     bool hardRingLinkEnabled = false;
+                    bool energyLinkEnabled = false;
 
                     List<string> tags = new List<string>();
 
@@ -2705,6 +2709,18 @@ namespace Peak.AP
                         if (ringLinkEnabled)
                         {
                             tags.Add("RingLink");
+                        }
+                    }
+
+                    if (loginResult.SlotData.ContainsKey("energy_link"))
+                    {
+                        var value = loginResult.SlotData["energy_link"];
+                        energyLinkEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Energy Link from slot data: {energyLinkEnabled}");
+
+                        if (energyLinkEnabled)
+                        {
+                            tags.Add("EnergyLink");
                         }
                     }
 
@@ -2763,6 +2779,18 @@ namespace Peak.AP
                     {
                         _hardRingLinkService.Initialize(_session, hardRingLinkEnabled);
                     }
+                    if (energyLinkEnabled)
+                    {
+                        int teamNumber = 0;
+                        if (loginResult.SlotData.ContainsKey("team"))
+                        {
+                            teamNumber = Convert.ToInt32(loginResult.SlotData["team"]);
+                        }
+                        
+                        string teamName = teamNumber.ToString();
+                        _energyLinkService.Initialize(_session, energyLinkEnabled, teamName);
+                    }
+
                     if (trapLinkEnabled)
                     {
                         HashSet<string> enabledTraps = new HashSet<string>();
