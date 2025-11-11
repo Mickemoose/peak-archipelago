@@ -101,7 +101,6 @@ namespace Peak.AP
         {
             _log = log;
             _plugin = plugin;
-            _log.LogInfo($"[PeakPelago] Pokemon Trivia initialized with embedded resources");
         }
 
         public static void ApplyPokemonTriviaTrapLocal(ManualLogSource log)
@@ -119,8 +118,6 @@ namespace Peak.AP
                     log.LogWarning("[PeakPelago] Cannot apply Pokemon Trivia - no local character");
                     return;
                 }
-
-                log.LogInfo("[PeakPelago] Starting Pokemon Trivia trap locally");
                 _plugin.StartCoroutine(PokemonTriviaCoroutine(log));
             }
             catch (Exception ex)
@@ -138,10 +135,6 @@ namespace Peak.AP
                     log.LogWarning("[PeakPelago] Cannot apply Pokemon Trivia - no local character");
                     return;
                 }
-
-                log.LogInfo("[PeakPelago] Triggering Pokemon Trivia for all players via RPC");
-
-                // Send RPC to ALL clients to start their trivia
                 if (PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
                 {
                     PeakArchipelagoPlugin._instance.PhotonView.RPC(
@@ -151,7 +144,6 @@ namespace Peak.AP
                 }
                 else
                 {
-                    log.LogWarning("[PeakPelago] PhotonView not available, starting locally only");
                     _plugin.StartCoroutine(PokemonTriviaCoroutine(log));
                 }
             }
@@ -165,8 +157,6 @@ namespace Peak.AP
         {
             _isActive = true;
             var question = GetRandomQuestion();
-            log.LogInfo($"[PeakPelago] Pokemon Trivia Question: {question.Question}");
-            log.LogInfo($"[PeakPelago] Correct Answer: {question.CorrectMon}");
             var triviaUI = new GameObject("PokemonTriviaUI");
             var canvas = triviaUI.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -296,13 +286,11 @@ namespace Peak.AP
             bool correct = false;
             if (selectedAnswer == -1)
             {
-                log.LogInfo("[PeakPelago] Pokemon Trivia timed out - treating as incorrect");
                 selectedAnswer = 0;
             }
             else
             {
                 correct = question.Options[selectedAnswer] == question.CorrectMon;
-                log.LogInfo($"[PeakPelago] Pokemon Trivia answer: {question.Options[selectedAnswer]} (Correct: {correct})");
             }
             if (correct)
             {
@@ -366,7 +354,6 @@ namespace Peak.AP
                 if (_pokemonAfflictions.ContainsKey(selectedPokemon))
                 {
                     var statusType = _pokemonAfflictions[selectedPokemon];
-                    log.LogInfo($"[PeakPelago] Applying {statusType} for selecting {selectedPokemon}");
                     StatusOverTimeTrapEffect.ApplyStatusOverTime(
                         log,
                         StatusOverTimeTrapEffect.TargetMode.LocalPlayer,
@@ -391,20 +378,13 @@ namespace Peak.AP
                 {
                     if (font.name.Contains("Daruma") || font.name.Contains("DarumaDropOne"))
                     {
-                        _log.LogInfo($"[PeakPelago] Found PEAK's font: {font.name}");
                         return font;
                     }
-                }
-                _log.LogInfo("[PeakPelago] Searching through all loaded fonts:");
-                foreach (Font font in loadedFonts)
-                {
-                    _log.LogInfo($"[PeakPelago]   - {font.name}");
                 }
                 foreach (Font font in loadedFonts)
                 {
                     if (!font.name.Contains("Arial") && !font.name.Contains("Legacy"))
                     {
-                        _log.LogInfo($"[PeakPelago] Using font: {font.name}");
                         return font;
                     }
                 }

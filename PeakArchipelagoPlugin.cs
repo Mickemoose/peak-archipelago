@@ -74,6 +74,8 @@ namespace Peak.AP
         private bool _hasHiddenBadges = false;
         private bool _hasRebuiltBadges = false;
         private int _totalItemsCooked = 0;
+        private int _pitonsPlaced = 0;
+        private int _glizzysGobbled = 0;
 
         // ===== Ascent Management =====
         private int _originalMaxAscent = 0;
@@ -138,6 +140,7 @@ namespace Peak.AP
                 PokemonTriviaTrapEffect.Initialize(_log, this);
                 BlackoutTrapEffect.Initialize(_log, this);
                 CampfireModelSpawner.Initialize(_log);
+                FearTrapEffect.Initialize(_log, this);
                 CheckAndHandlePortChange();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
@@ -172,7 +175,6 @@ namespace Peak.AP
         {
             if (_photonView != null && PhotonNetwork.IsConnected)
             {
-                // Find the target player
                 var targetPlayer = PhotonNetwork.PlayerList.FirstOrDefault(p => p.ActorNumber == actorNumber);
 
                 if (targetPlayer != null)
@@ -201,17 +203,13 @@ namespace Peak.AP
 
         private void OnDestroy()
         {
-            // Unsubscribe from achievement events
             GlobalEvents.OnAchievementThrown -= OnAchievementThrown;
-            // Unsubscribe from item acquisition events
             GlobalEvents.OnItemRequested -= OnItemRequested;
             _ringLinkService?.Cleanup();
             _hardRingLinkService?.Cleanup();
             _trapLinkService?.Cleanup();
             _energyLinkService?.Cleanup();
-            // Remove Harmony patches
             _harmony?.UnpatchSelf();
-
             TryCloseSession();
             SaveState();
         }
@@ -262,6 +260,19 @@ namespace Peak.AP
             }
         }
         [PunRPC]
+        private void StartFearTrapRPC()
+        {
+            try
+            {
+                _log.LogInfo("[PeakPelago] RPC received: Start Fear Trap");
+                FearTrapEffect.ApplyFearTrapLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartFearTrapRPC: {ex.Message}");
+            }
+        }
+        [PunRPC]
         private void SyncStaminaUpgrade(int totalUpgrades)
         {
             try
@@ -281,7 +292,6 @@ namespace Peak.AP
                     _log.LogInfo($"[PeakPelago] Applied stamina upgrade {currentUpgrades}/{totalUpgrades}");
                 }
 
-                // Force UI update
                 StartCoroutine(ForceStaminaUIUpdate());
                 
                 _log.LogInfo($"[PeakPelago] Stamina sync complete - now at {currentUpgrades} upgrades");
@@ -1214,9 +1224,9 @@ namespace Peak.AP
                 { "FAERIE LANTERN", "Acquire Faerie Lantern" },
                 
                 // Navigation items
-                { "CACTUS BALL", "Acquire CactusBall" },
+                { "CACTUS", "Acquire Cactus" },
                 { "COMPASS", "Acquire Compass" },
-                { "PIRATE COMPASS", "Acquire Pirate Compass" },
+                { "PIRATE'S COMPASS", "Acquire Pirate Compass" },
                 { "BINOCULARS", "Acquire Binoculars" },
                 
                 // Medical items
@@ -1230,7 +1240,7 @@ namespace Peak.AP
                 { "ALOE VERA", "Acquire Aloe Vera" },
                 { "SUNSCREEN", "Acquire Sunscreen" },
                 { "MARSHMALLOW", "Acquire Marshmallow" },
-                { "GLIZZY", "Acquire Glizzy" },
+                { "HOT DOG", "Acquire Glizzy" },
                 { "FORTIFIED MILK", "Acquire Fortified Milk" },
                 
                 // Special objects
@@ -1239,7 +1249,7 @@ namespace Peak.AP
                 { "PANDORA'S LUNCHBOX", "Acquire Pandora's Lunchbox" },
                 { "ANCIENT IDOL", "Acquire Ancient Idol" },
                 { "STRANGE GEM", "Acquire Strange Gem" },
-                { "BOOK OF BONES", "Acquire Book of Bones" },
+                { "THE BOOK OF BONES", "Acquire Book of Bones" },
                 { "CHECKPOINT FLAG", "Acquire Checkpoint Flag" },
                 
                 // Musical items
@@ -1247,7 +1257,7 @@ namespace Peak.AP
                 { "BUGLE", "Acquire Bugle" },
                 
                 // Mushrooms
-                { "SHELF SHROOM", "Acquire Shelf Shroom" },
+                { "SHELF FUNGUS", "Acquire Shelf Shroom" },
                 { "BOUNCE SHROOM", "Acquire Bounce Shroom" },
                 { "BUTTON SHROOM", "Acquire Button Shroom" },
                 { "BUGLE SHROOM", "Acquire Bugle Shroom" },
@@ -1255,7 +1265,7 @@ namespace Peak.AP
                 { "CHUBBY SHROOM", "Acquire Chubby Shroom" },
                 
                 // Food items
-                { "TRAIL MIX", "Acquire TrailMix" },
+                { "TRAIL MIX", "Acquire Trail Mix" },
                 { "GRANOLA BAR", "Acquire Granola Bar" },
                 { "SCOUT COOKIES", "Acquire Scout Cookies" },
                 { "AIRLINE FOOD", "Acquire Airline Food" },
@@ -1264,16 +1274,17 @@ namespace Peak.AP
                 { "BIG LOLLIPOP", "Acquire Big Lollipop" },
                 { "BIG EGG", "Acquire Big Egg" },
                 { "EGG", "Acquire Egg" },
-                { "COOKED BIRD", "Acquire Cooked Bird" },
+                { "BIRD", "Acquire Cooked Bird" },
                 { "HONEYCOMB", "Acquire Honeycomb" },
                 { "BEEHIVE", "Acquire Beehive" },
                 { "SCORPION", "Acquire Scorpion" },
                 
                 // Miscellaneous items
                 { "CONCH", "Acquire Conch" },
-                { "BANANA PEEL", "Acquire Banana Peel" },
+                { "BERRYNANA PEEL", "Acquire Berrynana Peel" },
                 { "DYNAMITE", "Acquire Dynamite" },
                 { "BING BONG", "Acquire Bing Bong" },
+                { "MANDRAKE", "Acquire Mandrake" },
                 
                 // Berries
                 { "RED CRISPBERRY", "Acquire Red Crispberry" },
@@ -1289,6 +1300,12 @@ namespace Peak.AP
                 { "YELLOW WINTERBERRY", "Acquire Yellow Winterberry" },
                 { "RED PRICKLEBERRY", "Acquire Red Prickleberry" },
                 { "GOLD PRICKLEBERRY", "Acquire Gold Prickleberry" },
+
+                { "RED SHROOMBERRY", "Acquire Red Shroomberry" },
+                { "BLUE SHROOMBERRY", "Acquire Blue Shroomberry" },
+                { "GREEN SHROOMBERRY", "Acquire Green Shroomberry" },
+                { "YELLOW SHROOMBERRY", "Acquire Yellow Shroomberry" },
+                { "PURPLE SHROOMBERRY", "Acquire Purple Shroomberry" },
             };
 
             _log.LogInfo("[PeakPelago] Initialized item mapping with " + _itemToLocationMapping.Count + " items");
@@ -1317,7 +1334,7 @@ namespace Peak.AP
                 { "Cactus", () => SpawnPhysicalItem("CactusBall") },
                 { "Compass", () => SpawnPhysicalItem("Compass") },
                 { "Mandrake", () => SpawnPhysicalItem("Mandrake") },
-                { "Pirate Compass", () => SpawnPhysicalItem("Pirate Compass") },
+                { "Pirate's Compass", () => SpawnPhysicalItem("Pirate Compass") },
                 { "Binoculars", () => SpawnPhysicalItem("Binoculars") },
                 { "Flying Disc", () => SpawnPhysicalItem("Frisbee") },
                 { "Bandages", () => SpawnPhysicalItem("Bandages") },
@@ -1446,7 +1463,7 @@ namespace Peak.AP
                 tickInterval: 1.0f,
                 duration: 5.0f
                 ) },
-
+                { "Fear Trap", () => FearTrapEffect.ApplyFearTrap(_log) },
 
             };
 
@@ -2182,6 +2199,69 @@ namespace Peak.AP
         }
 
         // ===== Harmony Patches =====
+        [HarmonyPatch(typeof(Item), "OnConsume")]
+        public static class ItemOnConsumePatch
+        {
+            static void Postfix(Item __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    
+                    // Only track for master client to avoid duplicates
+                    if (!PhotonNetwork.IsMasterClient) return;
+                    
+                    // Check if the consumed item is a hot dog (glizzy)
+                    string itemName = __instance.UIData.itemName;
+                    if (itemName != null && itemName.ToUpper().Contains("HOT DOG"))
+                    {
+                        _instance._glizzysGobbled++;
+                        _instance._log.LogInfo($"[PeakPelago] Glizzys gobbled: {_instance._glizzysGobbled}");
+                        
+                        _instance.SaveState();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] OnConsume patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
+        [HarmonyPatch(typeof(CharacterItems), "HammerClimbingSpike")]
+        public static class CharacterItemsHammerClimbingSpikePatch
+        {
+            static void Postfix(CharacterItems __instance, RaycastHit hit)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    
+                    // Only track for master client to avoid duplicates
+                    if (!PhotonNetwork.IsMasterClient) return;
+                    
+                    _instance._pitonsPlaced++;
+                    _instance._log.LogInfo($"[PeakPelago] Pitons placed: {_instance._pitonsPlaced}");
+                    
+                    // Report Bouldering Badge at 10 pitons
+                    if (_instance._pitonsPlaced >= 10)
+                    {
+                        _instance.ReportCheckByName("Bouldering Badge");
+                    }
+                    
+                    _instance.SaveState();
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] HammerClimbingSpike patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
         [HarmonyPatch(typeof(ItemCooking), "FinishCookingRPC")]
         public static class ItemCookingFinishCookingRPCPatch
         {
@@ -3145,7 +3225,8 @@ namespace Peak.AP
                 { "zombie_horde_trap", "Zombie Horde Trap" },
                 { "gust_trap", "Gust Trap" },
                 { "mandrake_trap", "Mandrake Trap" },
-                { "fungal_infection_trap", "Fungal Infection Trap" }
+                { "fungal_infection_trap", "Fungal Infection Trap" },
+                { "fear_trap", "Fear Trap" }
             };
             
             return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;
@@ -3211,7 +3292,6 @@ namespace Peak.AP
                 ProcessItemQueue();
                 CampfireModelSpawner.CleanupDestroyedCampfires();
 
-                // Add this debug logging block
                 if (!_hasRebuiltBadges && _session != null)
                 {
                     string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
@@ -3231,7 +3311,6 @@ namespace Peak.AP
         {
             _log.LogInfo("[PeakPelago] Waiting for local character to spawn...");
             
-            // Wait until local character exists
             while (Character.localCharacter == null)
             {
                 yield return new WaitForSeconds(0.5f);
@@ -3324,7 +3403,6 @@ namespace Peak.AP
         {
             try
             {
-                // Clear all cached data
                 _lastProcessedItemIndex = 0;
                 _reportedChecks.Clear();
                 _totalLuggageOpened = 0;
@@ -3471,6 +3549,22 @@ namespace Peak.AP
                         _log.LogDebug($"[PeakPelago] Loaded cooked items: {cooked}");
                     }
                 }
+                if (lines.Length >= 7)
+                {
+                    if (int.TryParse(lines[6].Trim(), out int pitons))
+                    {
+                        _pitonsPlaced = pitons;
+                        _log.LogDebug($"[PeakPelago] Loaded pitons placed: {pitons}");
+                    }
+                }
+                if (lines.Length >= 8)
+                {
+                    if (int.TryParse(lines[7].Trim(), out int glizzys))
+                    {
+                        _glizzysGobbled = glizzys;
+                        _log.LogDebug($"[PeakPelago] Loaded glizzys gobbled: {glizzys}");
+                    }
+                }
                 
                 _log.LogInfo($"[PeakPelago] State loaded successfully: {_reportedChecks.Count} checks, {_totalLuggageOpened} luggage, {_unlockedAscents.Count} ascents");
             }
@@ -3496,10 +3590,12 @@ namespace Peak.AP
                 string line4 = string.Join(",", _unlockedAscents.Select(x => x.ToString()).ToArray()); // Save ascent unlocks
                 string line5 = _staminaManager?.SaveState() ?? "0,1.00";
                 string line6 = _totalItemsCooked.ToString();
+                string line7 = _pitonsPlaced.ToString();
+                string line8 = _glizzysGobbled.ToString();
                 
                 // Write to temp file first, then rename to try and stop corruption
                 string tempPath = StateFilePath + ".tmp";
-                File.WriteAllLines(tempPath, new[] { line1, line2, line3, line4, line5, line6 });
+                File.WriteAllLines(tempPath, new[] { line1, line2, line3, line4, line5, line6, line7, line8 });
                 
                 if (File.Exists(StateFilePath))
                 {

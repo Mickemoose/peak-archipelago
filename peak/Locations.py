@@ -163,7 +163,7 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Cluster Shroom": 76247,
     "Acquire Chubby Shroom": 76248,
     "Acquire Conch": 76249,
-    "Acquire Banana Peel": 76250,
+    "Acquire Berrynana Peel": 76250,
     "Acquire Dynamite": 76251,
     "Acquire Bing Bong": 76252,
     "Acquire Red Crispberry": 76253,

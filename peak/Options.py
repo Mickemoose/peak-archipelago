@@ -264,6 +264,11 @@ class FungalInfectionTrapWeight(BaseTrapWeight):
     Likelihood of receiving a trap which applies a Possession Affliction over time to a player
     """
     display_name = "FungalInfectionTrap Weight"
+class FearTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a spooky trap
+    """
+    display_name = "FearTrap Weight"
 
 class TrapPercentage(Range):
     """
@@ -323,6 +328,7 @@ peak_option_groups = [
         GustTrapWeight,
         MandrakeTrapWeight,
         FungalInfectionTrapWeight,
+        FearTrapWeight,
     ]),
 ]
 
@@ -370,3 +376,4 @@ class PeakOptions(PerGameCommonOptions):
     gust_trap_weight: GustTrapWeight
     mandrake_trap_weight: MandrakeTrapWeight
     fungal_infection_trap_weight: FungalInfectionTrapWeight
+    fear_trap_weight: FearTrapWeight

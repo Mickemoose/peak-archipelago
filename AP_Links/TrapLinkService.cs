@@ -18,7 +18,7 @@ namespace Peak.AP
         private LinkedList<string> _trapQueue = new LinkedList<string>();
         private string _priorityTrap = null;
         private float _lastTrapActivation = 0f;
-        private const float TRAP_ACTIVATION_COOLDOWN = 2f;
+        private const float TRAP_ACTIVATION_COOLDOWN = 5f;
         private System.Action<string, bool> _applyTrapEffect;
         private Dictionary<string, string> _peakToStandardMapping;
         private Dictionary<string, string> _standardToPeakMapping;
@@ -67,7 +67,8 @@ namespace Peak.AP
                 { "Fungal Infection Trap", "Posession Trap"},
                 { "Items to Bombs", "Items to Bombs"},
                 { "Pokemon Trivia Trap", "Pokemon Trivia Trap"},
-                { "Blackout Trap", "Confuse Trap"}
+                { "Blackout Trap", "Confuse Trap"},
+                { "Fear Trap", "Fear Trap"}
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -121,7 +122,8 @@ namespace Peak.AP
                 { "Pokemon Trivia Trap", "Pokemon Trivia Trap"},
                 { "Confuse Trap", "Blackout Trap"},
                 { "Confusion Trap", "Blackout Trap"},
-                { "Confound Trap", "Blackout Trap"}
+                { "Confound Trap", "Blackout Trap"},
+                { "Fear Trap", "Fear Trap"}
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
