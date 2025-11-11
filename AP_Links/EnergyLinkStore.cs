@@ -14,6 +14,7 @@ namespace Peak.AP
     public class CampfireModelSpawner
     {
         private static GameObject modelPrefab;
+        private static AnimationClip openAnimationClip;
         private static ManualLogSource _log;
         private static readonly Dictionary<Campfire, GameObject> spawnedModels = new Dictionary<Campfire, GameObject>();
         private static EnergyLinkService _energyLinkService;
@@ -41,11 +42,26 @@ namespace Peak.AP
                     AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
                     if (bundle != null)
                     {
+                        _log?.LogInfo("[CampfireSpawner] All assets in bundle:");
+                        foreach (var name in bundle.GetAllAssetNames())
+                        {
+                            _log?.LogInfo($"[CampfireSpawner]   - {name}");
+                        }
                         modelPrefab = bundle.LoadAsset<GameObject>("energy_link_store");
+                        openAnimationClip = bundle.LoadAsset<AnimationClip>("armature_anim_open");
                         
                         if (modelPrefab != null)
                         {
                             UnityEngine.Object.DontDestroyOnLoad(modelPrefab);
+                            if (openAnimationClip != null)
+                            {
+                                UnityEngine.Object.DontDestroyOnLoad(openAnimationClip);
+                                _log?.LogInfo($"[CampfireSpawner] Loaded model and animation from AssetBundle");
+                            }
+                            else
+                            {
+                                _log?.LogWarning("[CampfireSpawner] Animation clip not found in bundle");
+                            }
                             _log?.LogInfo($"[CampfireSpawner] Loaded model '{modelPrefab.name}' from AssetBundle");
                             return;
                         }
@@ -63,7 +79,7 @@ namespace Peak.AP
                         _log?.LogError("[CampfireSpawner] Failed to load AssetBundle");
                     }
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     _log?.LogError($"[CampfireSpawner] Error loading AssetBundle: {ex.Message}");
                 }
@@ -100,7 +116,7 @@ namespace Peak.AP
             model.transform.localScale = Vector3.one * 2f;
             model.transform.SetParent(__instance.transform, worldPositionStays: true);
             var interactable = model.AddComponent<EnergyLinkStoreInteractable>();
-            interactable.Initialize(_log, _energyLinkService);
+            interactable.Initialize(_log, _energyLinkService, openAnimationClip);
             
             spawnedModels[__instance] = model;
 
@@ -217,6 +233,7 @@ namespace Peak.AP
         private ManualLogSource _log;
         private EnergyLinkService _energyLinkService;
         private BoxCollider _collider;
+        private Animation _animation;
         private int _cachedEnergy = 0;
         private int _cachedMaxEnergy = 0;
         private string _selectedBundleName;
@@ -250,22 +267,28 @@ namespace Peak.AP
             }
         }
 
-        public void Initialize(ManualLogSource log, EnergyLinkService energyLinkService)
+        public void Initialize(ManualLogSource log, EnergyLinkService energyLinkService, AnimationClip openClip)
         {
             _log = log;
             _energyLinkService = energyLinkService;
-            //gameObject.layer = LayerMask.NameToLayer("Interactable");
             
-            _collider = GetComponent<BoxCollider>();
-            if (_collider == null)
-            {
-                _collider = gameObject.AddComponent<BoxCollider>();
-            }
+            var physicsCollider = gameObject.AddComponent<BoxCollider>();
+            physicsCollider.center = new Vector3(-0.16f, 0f, 0.1f);
+            physicsCollider.size = new Vector3(1.5f, 2.7f, 1.05f);
+            physicsCollider.isTrigger = false;
             
+            _collider = gameObject.AddComponent<BoxCollider>();
             _collider.center = new Vector3(-0.16f, 0f, 0.1f);
             _collider.size = new Vector3(1.5f, 2.7f, 1.05f);
             _collider.isTrigger = true;
-            
+
+            if (openClip != null)
+            {
+                _animation = gameObject.AddComponent<Animation>();
+                _animation.AddClip(openClip, "open_animation");
+                _log?.LogInfo("[EnergyLinkStore] Added animation component");
+            }
+                    
             if (_energyLinkService?.IsEnabled() == true)
             {
                 _cachedEnergy = _energyLinkService.GetCurrentEnergy();
@@ -291,13 +314,13 @@ namespace Peak.AP
 
         private void DispenseBundle(BundleDefinition bundle)
         {
-            var animator = GetComponent<Animator>();
-            if (animator != null)
+            if (_animation != null)
             {
-                animator.Play("energy_link_store_open"); 
+                _log?.LogInfo("[EnergyLinkStore] Playing open animation");
+                _animation.Play("open_animation");
             }
 
-            StartCoroutine(DispenseAfterDelay(bundle, 1.0f));
+            StartCoroutine(DispenseAfterDelay(bundle, 1.2f));
         }
         
         private IEnumerator DispenseAfterDelay(BundleDefinition bundle, float delay)
@@ -362,7 +385,7 @@ namespace Peak.AP
                     var rb = spawnedItem.GetComponent<Rigidbody>();
                     if (rb != null)
                     {
-                        Vector3 force = dispenserForward * UnityEngine.Random.Range(2f, 4f) + Vector3.up * 2f;
+                        Vector3 force = dispenserForward * UnityEngine.Random.Range(2f, 3f) + Vector3.up * 2f;
                         rb.AddForce(force, ForceMode.Impulse);
                     }
                     
