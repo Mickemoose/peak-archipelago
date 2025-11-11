@@ -528,6 +528,9 @@ namespace Peak.AP
             new PokemonTriviaQuestion("Which Pokemon is an Electric/Water type?", Pokemon.chinchou),
             new PokemonTriviaQuestion("Which Pokemon is a Fire type that resembles molten lava?", Pokemon.slugma),
             new PokemonTriviaQuestion("Which Pokemon eventually evolves into Electivire?", Pokemon.elekid),
+            new PokemonTriviaQuestion("Which Pokemon is known for its round, blue body and tail?", Pokemon.marill),
+            new PokemonTriviaQuestion("Which Psychic/Flying type Pokemon is known for its small size and big eyes?", Pokemon.natu),
+            new PokemonTriviaQuestion("Which of these Pokemon has a regional form that evolves into Clodsire?", Pokemon.wooper),
 
 
         };

@@ -94,6 +94,11 @@ namespace Peak.AP
         [HarmonyPatch(typeof(Campfire), nameof(Campfire.Awake))]
         static void OnCampfireAwake(Campfire __instance)
         {
+            if (_energyLinkService?.IsEnabled() != true)
+            {
+                _log?.LogDebug("[CampfireSpawner] EnergyLink not enabled, skipping store spawn");
+                return;
+            }
             if (modelPrefab == null)
             {
                 _log?.LogWarning("[CampfireSpawner] Model prefab not loaded!");
@@ -240,6 +245,8 @@ namespace Peak.AP
         private Action _selectedBundleAction;
         private const int BUNDLE_COST = 300;
         private const float PURCHASE_TIME = 3f;
+        private const float ENERGY_UPDATE_INTERVAL = 0.5f;
+        private float _lastEnergyUpdateTime = 0f;
         private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new Dictionary<string, BundleDefinition>
         {
             { "Bundle: Glizzy Gobbler", new BundleDefinition("Glizzy", 3) },
@@ -284,9 +291,31 @@ namespace Peak.AP
 
             if (openClip != null)
             {
+                
+                openClip.legacy = true;
                 _animation = gameObject.AddComponent<Animation>();
                 _animation.AddClip(openClip, "open_animation");
+                _animation.playAutomatically = false;
+                
+                AnimationState state = _animation["open_animation"];
+                if (state != null)
+                {
+                    state.wrapMode = WrapMode.Once;
+                    state.speed = 1f;
+                    state.layer = 0;
+                    state.enabled = true;
+                    _log?.LogInfo($"[EnergyLinkStore] Animation clip length: {openClip.length}s");
+                }
+                else
+                {
+                    _log?.LogWarning("[EnergyLinkStore] Failed to get animation state!");
+                }
+                
                 _log?.LogInfo("[EnergyLinkStore] Added animation component");
+            }
+            else
+            {
+                _log?.LogWarning("[EnergyLinkStore] No animation clip provided!");
             }
                     
             if (_energyLinkService?.IsEnabled() == true)
@@ -295,7 +324,7 @@ namespace Peak.AP
                 _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
                 _log?.LogInfo($"[EnergyLinkStore] Initial energy: {_cachedEnergy}/{_cachedMaxEnergy}");
             }
-            
+            UpdateCachedEnergy();
             SelectRandomBundle();
         }
 
@@ -314,19 +343,27 @@ namespace Peak.AP
 
         private void DispenseBundle(BundleDefinition bundle)
         {
-            if (_animation != null)
+            if (_animation != null && _animation["open_animation"] != null)
             {
                 _log?.LogInfo("[EnergyLinkStore] Playing open animation");
                 _animation.Play("open_animation");
+                
+                float animLength = _animation["open_animation"].length;
+                float dispenseDelay = Mathf.Max(animLength * 0.7f, 0.5f);
+                
+                StartCoroutine(DispenseAfterDelay(bundle, dispenseDelay));
             }
-
-            StartCoroutine(DispenseAfterDelay(bundle, 1.2f));
+            else
+            {
+                _log?.LogWarning("[EnergyLinkStore] Animation not available, dispensing immediately");
+                StartCoroutine(DispenseAfterDelay(bundle, 0.1f));
+            }
         }
-        
+
         private IEnumerator DispenseAfterDelay(BundleDefinition bundle, float delay)
         {
             yield return new WaitForSeconds(delay);
-            
+
             Vector3 dispenserOffset = new Vector3(0f, 1.5f, 1f);
             Vector3 dispenserPosition = transform.position + transform.TransformDirection(dispenserOffset);
 
@@ -334,6 +371,24 @@ namespace Peak.AP
             foreach (var (itemName, count) in bundle.Items)
             {
                 SpawnPhysicalItems(itemName, count, dispenserPosition);
+            }
+        }
+        private void Update()
+        {
+            // Periodically update cached energy
+            if (Time.time - _lastEnergyUpdateTime >= ENERGY_UPDATE_INTERVAL)
+            {
+                UpdateCachedEnergy();
+                _lastEnergyUpdateTime = Time.time;
+            }
+        }
+
+        private void UpdateCachedEnergy()
+        {
+            if (_energyLinkService?.IsEnabled() == true)
+            {
+                _cachedEnergy = _energyLinkService.GetCurrentEnergy();
+                _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
             }
         }
         
@@ -410,7 +465,16 @@ namespace Peak.AP
 
         public string GetInteractionText()
         {
-            return $"{_selectedBundleName}\n{BUNDLE_COST}J";
+            UpdateCachedEnergy();
+            
+            if (_cachedEnergy >= BUNDLE_COST)
+            {
+                return $"{_selectedBundleName}\n{BUNDLE_COST}J";
+            }
+            else
+            {
+                return $"NOT ENOUGH ENERGY\n({_cachedEnergy}/{BUNDLE_COST}J)";
+            }
         }
 
         public string GetName()
@@ -425,12 +489,8 @@ namespace Peak.AP
 
         public void HoverEnter()
         {
-            if (_energyLinkService?.IsEnabled() == true)
-            {
-                _cachedEnergy = _energyLinkService.GetCurrentEnergy();
-                _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
-                _log?.LogDebug($"[EnergyLinkStore] Refreshed energy on hover: {_cachedEnergy}/{_cachedMaxEnergy}");
-            }
+            // Force immediate update when hovering
+            UpdateCachedEnergy();
         }
 
         public void HoverExit()
@@ -445,12 +505,13 @@ namespace Peak.AP
         public void Interact_CastFinished(Character interactor)
         {
             _log?.LogInfo($"[EnergyLinkStore] Interact_CastFinished called!");
-            
+
             if (_energyLinkService?.IsEnabled() != true)
             {
                 _log?.LogWarning("[EnergyLinkStore] EnergyLink not enabled");
                 return;
             }
+            UpdateCachedEnergy();
             if (_cachedEnergy < BUNDLE_COST)
             {
                 _log?.LogInfo($"[EnergyLinkStore] Not enough energy! Need {BUNDLE_COST}J, have {_cachedEnergy}J");
@@ -476,17 +537,13 @@ namespace Peak.AP
 
         public void ReleaseInteract(Character interactor)
         {
-            // Called when interaction is released
         }
 
         public bool IsInteractible(Character interactor)
         {
-            // Only allow interaction if EnergyLink is enabled and we have enough energy
-            if (_energyLinkService?.IsEnabled() != true)
-                return false;
-                
-            return _cachedEnergy >= BUNDLE_COST;
+            return _energyLinkService?.IsEnabled() == true;
         }
+
 
         public bool IsConstantlyInteractable(Character interactor)
         {
