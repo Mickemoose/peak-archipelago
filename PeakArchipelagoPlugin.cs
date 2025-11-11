@@ -129,10 +129,12 @@ namespace Peak.AP
                 _hardRingLinkService = new HardRingLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
                 _energyLinkService = new EnergyLinkService(_log, _notifications);
+                CampfireModelSpawner.SetEnergyLinkService(_energyLinkService);
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
                 PokemonTriviaTrapEffect.Initialize(_log, this);
                 BlackoutTrapEffect.Initialize(_log, this);
+                CampfireModelSpawner.Initialize(_log);
                 CheckAndHandlePortChange();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
@@ -156,7 +158,7 @@ namespace Peak.AP
                 Invoke(nameof(CountExistingBadges), 1.5f);
 
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] CRITICAL ERROR during plugin initialization: " + ex.Message);
                 _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
@@ -1747,7 +1749,7 @@ namespace Peak.AP
                 _unlockedAscents.Add(ascentLevel);
 
                 // Use reflection to access the Ascents class and unlock the ascent
-                var ascentsType = System.Type.GetType("Ascents");
+                var ascentsType = Type.GetType("Ascents");
                 if (ascentsType != null)
                 {
                     var unlockMethod = ascentsType.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
@@ -1818,7 +1820,7 @@ namespace Peak.AP
                     _log.LogWarning("[PeakPelago] Could not find ClearAll method for afflictions");
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error clearing all effects: " + ex.Message);
             }
@@ -1845,7 +1847,7 @@ namespace Peak.AP
                 // Start coroutine to restore original speed after 30 seconds
                 StartCoroutine(RestoreSpeedAfterDelay(character, originalModifier, 30f));
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error applying speed upgrade: " + ex.Message);
             }
@@ -2796,6 +2798,7 @@ namespace Peak.AP
                         
                         string teamName = teamNumber.ToString();
                         _energyLinkService.Initialize(_session, energyLinkEnabled, teamName);
+                        CampfireModelSpawner.SetEnergyLinkService(_energyLinkService);
                     }
 
                     if (trapLinkEnabled)
@@ -3036,6 +3039,7 @@ namespace Peak.AP
             {
                 _trapLinkService?.Update();
                 ProcessItemQueue();
+                CampfireModelSpawner.CleanupDestroyedCampfires();
             }
             catch (Exception ex)
             {

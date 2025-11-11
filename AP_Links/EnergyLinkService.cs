@@ -94,7 +94,7 @@ namespace Peak.AP
         /// <summary>
         /// Refresh the current energy state from DataStorage
         /// </summary>
-        private void RefreshEnergyState()
+        public void RefreshEnergyState()
         {
             if (_session == null || !_isEnabled) return;
 
@@ -118,7 +118,6 @@ namespace Peak.AP
                 _log.LogError($"[PeakPelago] Failed to refresh EnergyLink state: {ex.Message}");
             }
         }
-
         /// <summary>
         /// Contribute energy to the EnergyLink pool
         /// </summary>
@@ -126,11 +125,24 @@ namespace Peak.AP
         {
             if (_session == null || !_isEnabled || amount <= 0) return;
 
+            _currentEnergy += amount;
+            if (_maxEnergy > 0)
+            {
+                _currentEnergy = Math.Min(_currentEnergy, _maxEnergy);
+            }
+
+            System.Threading.Tasks.Task.Run(() => ContributeEnergyAsync(amount));
+
+            _log.LogInfo($"[PeakPelago] Contributed {amount} energy to EnergyLink (new total: {_currentEnergy}/{_maxEnergy})");
+            _notifications.ShowEnergyLinkNotification($"EnergyLink: Contributed +{amount} energy");
+        }
+        
+        private void ContributeEnergyAsync(int amount)
+        {
             try
             {
                 var energyScope = _dataStorageHelper[Scope.Global, _energyKey];
                 
-                // Read current value
                 var currentData = energyScope.To<JObject>();
                 if (currentData == null)
                 {
@@ -153,14 +165,10 @@ namespace Peak.AP
                 };
                 
                 _dataStorageHelper[Scope.Global, _energyKey] = newData;
-                
-                _currentEnergy = newEnergy;
-                _log.LogInfo($"[PeakPelago] Contributed {amount} energy to EnergyLink (new total: {newEnergy}/{maxEnergy})");
-                _notifications.ShowEnergyLinkNotification($"EnergyLink: Contributed +{amount} energy");
             }
             catch (Exception ex)
             {
-                _log.LogError($"[PeakPelago] Failed to contribute energy: {ex.Message}");
+                _log.LogError($"[PeakPelago] Failed to contribute energy async: {ex.Message}");
             }
         }
 
@@ -215,34 +223,18 @@ namespace Peak.AP
                 return false;
             }
         }
-
-        /// <summary>
-        /// Get the current energy amount
-        /// </summary>
         public int GetCurrentEnergy()
         {
-            RefreshEnergyState();
             return _currentEnergy;
         }
-
-        /// <summary>
-        /// Get the maximum energy capacity
-        /// </summary>
         public int GetMaxEnergy()
         {
-            RefreshEnergyState();
             return _maxEnergy;
         }
-
-        /// <summary>
-        /// Check if there's enough energy available
-        /// </summary>
         public bool HasEnergy(int amount)
         {
-            RefreshEnergyState();
             return _currentEnergy >= amount;
         }
-
         /// <summary>
         /// Check if an item can be converted to energy
         /// </summary>

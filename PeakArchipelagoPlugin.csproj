@@ -13,7 +13,7 @@
   </PropertyGroup>
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="PeakArchipelagoPluginDLL\" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="peakpelago\plugins\PeakArchipelagoPluginDLL\" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="peakpelago\plugins\peakpelago\" />
   </Target>
 
   <ItemGroup>
@@ -53,6 +53,12 @@
     </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>F:\SteamLibrary\steamapps\common\PEAK\PEAK_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>F:\SteamLibrary\steamapps\common\PEAK\PEAK_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>F:\SteamLibrary\steamapps\common\PEAK\PEAK_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.UIModule">
       <HintPath>F:\SteamLibrary\steamapps\common\PEAK\PEAK_Data\Managed\UnityEngine.UIModule.dll</HintPath>
