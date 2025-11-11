@@ -72,6 +72,8 @@ namespace Peak.AP
         private HashSet<ACHIEVEMENTTYPE> _originalUnlockedBadges = new HashSet<ACHIEVEMENTTYPE>();
         private bool _badgesHidden = false;
         private bool _hasHiddenBadges = false;
+        private bool _hasRebuiltBadges = false;
+        private int _totalItemsCooked = 0;
 
         // ===== Ascent Management =====
         private int _originalMaxAscent = 0;
@@ -100,6 +102,7 @@ namespace Peak.AP
         private LinkedList<(string itemName, bool isTrap, int itemIndex)> _itemQueue = new LinkedList<(string, bool, int)>();
         private float _lastItemProcessed = 0f;
         private const float ITEM_PROCESSING_COOLDOWN = 1f;
+
         private void Awake()
         {
             try
@@ -787,25 +790,41 @@ namespace Peak.AP
         {
             try
             {
-                // Use reflection to get the AchievementManager singleton
-                var singletonType = typeof(UnityEngine.Object).Assembly.GetType("Zorro.Core.Singleton`1");
+                _log.LogInfo("[PeakPelago] Trying to get AchievementManager...");
+                
+                var assembly = typeof(Character).Assembly;
+                _log.LogInfo($"[PeakPelago] Using assembly: {assembly.FullName}");
+                var singletonType = assembly.GetType("Zorro.Core.Singleton`1");
+                _log.LogInfo($"[PeakPelago] Singleton type: {singletonType?.FullName ?? "NULL"}");
+                
                 if (singletonType != null)
                 {
-                    var achievementManagerType = typeof(UnityEngine.Object).Assembly.GetType("AchievementManager");
+                    var achievementManagerType = assembly.GetType("AchievementManager");
+                    _log.LogInfo($"[PeakPelago] AchievementManager type: {achievementManagerType?.FullName ?? "NULL"}");
+                    
                     if (achievementManagerType != null)
                     {
                         var genericType = singletonType.MakeGenericType(achievementManagerType);
+                        _log.LogInfo($"[PeakPelago] Generic singleton type: {genericType?.FullName ?? "NULL"}");
+                        
                         var instanceProperty = genericType.GetProperty("Instance");
+                        _log.LogInfo($"[PeakPelago] Instance property: {instanceProperty?.Name ?? "NULL"}");
+                        
                         if (instanceProperty != null)
                         {
-                            return instanceProperty.GetValue(null);
+                            var instance = instanceProperty.GetValue(null);
+                            _log.LogInfo($"[PeakPelago] AchievementManager instance: {instance?.GetType().Name ?? "NULL"}");
+                            return instance;
                         }
                     }
                 }
+                
+                _log.LogWarning("[PeakPelago] Failed to get AchievementManager - one of the reflection steps failed");
             }
             catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Failed to get AchievementManager: " + ex.Message);
+                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
             }
             return null;
         }
@@ -2163,7 +2182,41 @@ namespace Peak.AP
         }
 
         // ===== Harmony Patches =====
-        
+        [HarmonyPatch(typeof(ItemCooking), "FinishCookingRPC")]
+        public static class ItemCookingFinishCookingRPCPatch
+        {
+            static void Postfix(ItemCooking __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    
+                    // Only track for master client to avoid duplicates
+                    if (!PhotonNetwork.IsMasterClient) return;
+                    
+                    // Increment the cooked items counter
+                    _instance._totalItemsCooked++;
+                    
+                    _instance._log.LogInfo($"[PeakPelago] Item cooked - Total: {_instance._totalItemsCooked}");
+                    
+                    // Report Cooking Badge at 20 items
+                    if (_instance._totalItemsCooked >= 20)
+                    {
+                        _instance.ReportCheckByName("Cooking Badge");
+                    }
+                    
+                    _instance.SaveState();
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] FinishCookingRPC patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
+                
         ///This updates the DeathLink checkpoint spawn when we initialize a new map segment (like when we activate a campfire at the top of one of the biomes)
         [HarmonyPatch(typeof(MapHandler), "GoToSegment")]
         public static class MapHandlerGoToSegmentPatch
@@ -2436,39 +2489,27 @@ namespace Peak.AP
             {
                 try
                 {
-                    if (_instance == null || !_instance._badgesHidden) return true;
+                    if (_instance == null || !_instance._badgesHidden || _instance._session == null) return true;
 
-                    // Get the location name for this badge
                     var badgeMapping = _instance.GetBadgeToLocationMapping();
                     if (badgeMapping.ContainsKey(achievementType))
                     {
-                        // Check if this badge has been reported to Archipelago
                         string locationName = badgeMapping[achievementType];
-                        long locationId = _instance._session?.Locations.GetLocationIdFromName(_instance.cfgGameId.Value, locationName) ?? -1;
+                        long locationId = _instance._session.Locations.GetLocationIdFromName(_instance.cfgGameId.Value, locationName);
 
-                        if (locationId > 0 && _instance._reportedChecks.Contains(locationId))
-                        {
-                            // This badge has been reported to AP, so show it as unlocked
-                            __result = true;
-                            return false; // Skip original method
-                        }
-                        else
-                        {
-                            // This badge hasn't been reported to AP yet, so hide it
-                            __result = false;
-                            return false; // Skip original method
-                        }
+                        // Check if this location is checked in Archipelago
+                        bool isCheckedInAP = _instance._session.Locations.AllLocationsChecked.Contains(locationId);
+                        
+                        __result = isCheckedInAP;
+                        return false;
                     }
                 }
                 catch (Exception ex)
                 {
-                    if (_instance != null)
-                    {
-                        _instance._log.LogError("[PeakPelago] IsAchievementUnlocked patch error: " + ex.Message);
-                    }
+                    _instance?._log.LogError($"[Patch] IsAchievementUnlocked error: {ex.Message}");
                 }
 
-                return true; // Allow normal processing for non-badge achievements
+                return true;
             }
         }
 
@@ -2952,6 +2993,86 @@ namespace Peak.AP
                 _isConnecting = false;
             }
         }
+
+        private void RebuildCollectedBadgesFromChecks()
+        {
+            try
+            {
+                if (_session == null)
+                {
+                    _log.LogWarning("[PeakPelago] Cannot rebuild badges - no session");
+                    return;
+                }
+                
+                if (Character.localCharacter == null)
+                {
+                    _log.LogWarning("[PeakPelago] Cannot rebuild badges - no local character");
+                    return;
+                }
+                
+                _collectedBadges.Clear();
+                
+                var badgeMapping = GetBadgeToLocationMapping();
+                var reverseBadgeMapping = badgeMapping.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
+                
+                // Get all checked locations from the AP session
+                var checkedLocations = _session.Locations.AllLocationsChecked;
+                
+                _log.LogInfo($"[PeakPelago] === REBUILDING BADGES FROM {checkedLocations.Count} CHECKED LOCATIONS ===");
+                
+                // Check all checked locations for badge locations
+                foreach (long checkId in checkedLocations)
+                {
+                    try
+                    {
+                        string locationName = null;
+                        
+                        try
+                        {
+                            locationName = _session.Locations.GetLocationNameFromId(checkId, cfgGameId.Value);
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogDebug($"[PeakPelago] Failed to get location name for check {checkId}: {ex.Message}");
+                        }
+                        
+                        if (!string.IsNullOrEmpty(locationName) && reverseBadgeMapping.ContainsKey(locationName))
+                        {
+                            ACHIEVEMENTTYPE badgeType = reverseBadgeMapping[locationName];
+                            _collectedBadges.Add(badgeType);
+                            
+                            // Set the badge in the character's badge status array
+                            int badgeIndex = (int)badgeType;
+                            if (badgeIndex >= 0 && badgeIndex < Character.localCharacter.data.badgeStatus.Length)
+                            {
+                                Character.localCharacter.data.badgeStatus[badgeIndex] = true;
+                                _log.LogInfo($"[PeakPelago] ✓ Rebuilt badge: {locationName} ({badgeType})");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError($"[PeakPelago] Error rebuilding badge for check {checkId}: {ex.Message}");
+                    }
+                }
+                
+                // Update the badge visuals
+                if (Character.localCharacter != null)
+                {
+                    var badgeUnlocker = Character.localCharacter.GetComponent<BadgeUnlocker>();
+                    if (badgeUnlocker != null)
+                    {
+                        badgeUnlocker.BadgeUnlockVisual();
+                    }
+                }
+                
+                _log.LogInfo($"[PeakPelago] === REBUILD COMPLETE: {_collectedBadges.Count} badges ===");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error rebuilding collected badges: {ex.Message}");
+            }
+        }
         private void RecoverAscentUnlocks()
         {
             try
@@ -3065,6 +3186,7 @@ namespace Peak.AP
             finally
             {
                 _session = null;
+                _hasRebuiltBadges = false;
                 _status = "Disconnected";
             }
         }
@@ -3088,11 +3210,35 @@ namespace Peak.AP
                 _trapLinkService?.Update();
                 ProcessItemQueue();
                 CampfireModelSpawner.CleanupDestroyedCampfires();
+
+                // Add this debug logging block
+                if (!_hasRebuiltBadges && _session != null)
+                {
+                    string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+                    if (currentScene.Contains("Airport"))
+                    {
+                        StartCoroutine(WaitForCharacterAndRebuild());
+                        _hasRebuiltBadges = true;
+                    }
+                }
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in Update: {ex.Message}");
             }
+        }
+        private System.Collections.IEnumerator WaitForCharacterAndRebuild()
+        {
+            _log.LogInfo("[PeakPelago] Waiting for local character to spawn...");
+            
+            // Wait until local character exists
+            while (Character.localCharacter == null)
+            {
+                yield return new WaitForSeconds(0.5f);
+            }
+            
+            _log.LogInfo("[PeakPelago] Character ready! Rebuilding badges...");
+            RebuildCollectedBadgesFromChecks();
         }
 
         /// <summary>
@@ -3317,6 +3463,14 @@ namespace Peak.AP
                         _log.LogWarning($"[PeakPelago] Failed to load stamina state: {ex.Message}");
                     }
                 }
+                if (lines.Length >= 6)
+                {
+                    if (int.TryParse(lines[5].Trim(), out int cooked))
+                    {
+                        _totalItemsCooked = cooked;
+                        _log.LogDebug($"[PeakPelago] Loaded cooked items: {cooked}");
+                    }
+                }
                 
                 _log.LogInfo($"[PeakPelago] State loaded successfully: {_reportedChecks.Count} checks, {_totalLuggageOpened} luggage, {_unlockedAscents.Count} ascents");
             }
@@ -3341,10 +3495,11 @@ namespace Peak.AP
                 string line3 = _totalLuggageOpened.ToString();
                 string line4 = string.Join(",", _unlockedAscents.Select(x => x.ToString()).ToArray()); // Save ascent unlocks
                 string line5 = _staminaManager?.SaveState() ?? "0,1.00";
+                string line6 = _totalItemsCooked.ToString();
                 
                 // Write to temp file first, then rename to try and stop corruption
                 string tempPath = StateFilePath + ".tmp";
-                File.WriteAllLines(tempPath, new[] { line1, line2, line3, line4, line5 });
+                File.WriteAllLines(tempPath, new[] { line1, line2, line3, line4, line5, line6 });
                 
                 if (File.Exists(StateFilePath))
                 {
