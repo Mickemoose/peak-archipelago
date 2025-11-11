@@ -844,12 +844,14 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.AlpinistBadge, "Alpinist Badge" },
                 { ACHIEVEMENTTYPE.VolcanologyBadge, "Volcanology Badge" },
                 { ACHIEVEMENTTYPE.CookingBadge, "Cooking Badge" },
+                { ACHIEVEMENTTYPE.HappyCamperBadge, "Happy Camper Badge" },
                 { ACHIEVEMENTTYPE.BoulderingBadge, "Bouldering Badge" },
                 { ACHIEVEMENTTYPE.ToxicologyBadge, "Toxicology Badge" },
                 { ACHIEVEMENTTYPE.ForagingBadge, "Foraging Badge" },
                 { ACHIEVEMENTTYPE.EsotericaBadge, "Esoterica Badge" },
                 { ACHIEVEMENTTYPE.PeakBadge, "Peak Badge" },
                 { ACHIEVEMENTTYPE.LoneWolfBadge, "Lone Wolf Badge" },
+                { ACHIEVEMENTTYPE.ClutchBadge, "Clutch Badge" },
                 { ACHIEVEMENTTYPE.BalloonBadge, "Balloon Badge" },
                 { ACHIEVEMENTTYPE.LeaveNoTraceBadge, "Leave No Trace Badge" },
                 { ACHIEVEMENTTYPE.SpeedClimberBadge, "Speed Climber Badge" },
@@ -857,14 +859,20 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.NaturalistBadge, "Naturalist Badge" },
                 { ACHIEVEMENTTYPE.GourmandBadge, "Gourmand Badge" },
                 { ACHIEVEMENTTYPE.MycologyBadge, "Mycology Badge" },
+                { ACHIEVEMENTTYPE.FirstAidBadge, "First Aid Badge" },
                 { ACHIEVEMENTTYPE.SurvivalistBadge, "Survivalist Badge" },
                 { ACHIEVEMENTTYPE.AnimalSerenadingBadge, "Animal Serenading Badge" },
                 { ACHIEVEMENTTYPE.ArboristBadge, "Arborist Badge" },
                 { ACHIEVEMENTTYPE.MentorshipBadge, "Mentorship Badge" },
                 { ACHIEVEMENTTYPE.KnotTyingBadge, "Knot Tying Badge" },
+                { ACHIEVEMENTTYPE.EmergencyPreparednessBadge, "Emergency Preparedness Badge" },
+                { ACHIEVEMENTTYPE.AscenderBadge, "Ascender Badge" },
                 { ACHIEVEMENTTYPE.PlundererBadge, "Plunderer Badge" },
+                { ACHIEVEMENTTYPE.BookwormBadge, "Bookworm Badge" },
                 { ACHIEVEMENTTYPE.EnduranceBadge, "Endurance Badge" },
+                { ACHIEVEMENTTYPE.ResourcefulnessBadge, "Resourcefulness Badge" },
                 { ACHIEVEMENTTYPE.NomadBadge, "Nomad Badge" },
+                { ACHIEVEMENTTYPE.UltimateBadge, "Ultimate Badge" },
                 { ACHIEVEMENTTYPE.CoolCucumberBadge, "Cool Cucumber Badge" },
                 { ACHIEVEMENTTYPE.NeedlepointBadge, "Needlepoint Badge" },
                 { ACHIEVEMENTTYPE.AeronauticsBadge, "Aeronautics Badge" },
@@ -873,19 +881,17 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.MegaentomologyBadge, "Megaentomology Badge" },
                 { ACHIEVEMENTTYPE.AstronomyBadge, "Astronomy Badge" },
                 { ACHIEVEMENTTYPE.BundledUpBadge, "Bundled Up Badge" },
-                //ROOTS UPDATE BADGES
                 { ACHIEVEMENTTYPE.ForestryBadge, "Forestry Badge" },
+                { ACHIEVEMENTTYPE.TreadLightlyBadge, "Tread Lightly Badge" },
+                { ACHIEVEMENTTYPE.WebSecurityBadge, "Web Security Badge" },
+                { ACHIEVEMENTTYPE.UndeadEncounterBadge, "Undead Encounter Badge" },
+                { ACHIEVEMENTTYPE.AdvancedMycologyBadge, "Advanced Mycology Badge" },
                 { ACHIEVEMENTTYPE.DisasterResponseBadge, "Disaster Response Badge" },
-                { ACHIEVEMENTTYPE.UndeadEncounterBadge, "Undead Encounter Badge"},
-                { ACHIEVEMENTTYPE.WebSecurityBadge, "Web Security Badge"},
-                { ACHIEVEMENTTYPE.AdvancedMycologyBadge, "Advanced Mycology Badge"},
-                { ACHIEVEMENTTYPE.AppliedEsotericaBadge, "Applied Esoterica Badge"},
-                { ACHIEVEMENTTYPE.CalciumIntakeBadge, "Calcium Intake Badge"},
-                { ACHIEVEMENTTYPE.CompetitiveEatingBadge, "Competitive Eating Badge"},
-                { ACHIEVEMENTTYPE.CryptogastronomyBadge, "Cryptogastronomy Badge"},
-                { ACHIEVEMENTTYPE.MycoacrobaticsBadge, "Mycoacrobatics Badge"},
-                { ACHIEVEMENTTYPE.TreadLightlyBadge, "Tread Lightly Badge"},
-
+                { ACHIEVEMENTTYPE.CalciumIntakeBadge, "Calcium Intake Badge" },
+                { ACHIEVEMENTTYPE.CompetitiveEatingBadge, "Competitive Eating Badge" },
+                { ACHIEVEMENTTYPE.AppliedEsotericaBadge, "Applied Esoterica Badge" },
+                { ACHIEVEMENTTYPE.MycoacrobaticsBadge, "Mycoacrobatics Badge" },
+                { ACHIEVEMENTTYPE.CryptogastronomyBadge, "Cryptogastronomy Badge" },
             };
         }
 
@@ -2795,7 +2801,7 @@ namespace Peak.AP
                         {
                             teamNumber = Convert.ToInt32(loginResult.SlotData["team"]);
                         }
-                        
+
                         string teamName = teamNumber.ToString();
                         _energyLinkService.Initialize(_session, energyLinkEnabled, teamName);
                         CampfireModelSpawner.SetEnergyLinkService(_energyLinkService);
@@ -2920,7 +2926,7 @@ namespace Peak.AP
                     {
                         _log.LogWarning("[PeakPelago] additional_stamina_bars not found in slot data");
                     }
-
+                    RecoverAscentUnlocks();
                     _log.LogInfo($"[PeakPelago] Initializing stamina manager with progressive={progressiveEnabled}, additional={additionalEnabled}");
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
                 }
@@ -2944,6 +2950,48 @@ namespace Peak.AP
             finally
             {
                 _isConnecting = false;
+            }
+        }
+        private void RecoverAscentUnlocks()
+        {
+            try
+            {
+                if (_session == null) return;
+                
+                // Check received items for ascent unlocks
+                var receivedItems = _session.Items.AllItemsReceived;
+                
+                foreach (var item in receivedItems)
+                {
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    
+                    // Check if it's an ascent unlock
+                    if (itemName != null && itemName.Contains("Ascent") && itemName.Contains("Unlock"))
+                    {
+                        // Extract the ascent number (e.g., "Ascent 3 Unlock" -> 3)
+                        for (int i = 1; i <= 7; i++)
+                        {
+                            if (itemName.Contains($"Ascent {i} Unlock"))
+                            {
+                                if (!_unlockedAscents.Contains(i))
+                                {
+                                    _unlockedAscents.Add(i);
+                                    _log.LogInfo($"[PeakPelago] Recovered ascent unlock: {i}");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (_unlockedAscents.Count > 0)
+                {
+                    _log.LogInfo($"[PeakPelago] Recovered {_unlockedAscents.Count} ascent unlocks: {string.Join(", ", _unlockedAscents.OrderBy(x => x))}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error recovering ascent unlocks: {ex.Message}");
             }
         }
         
@@ -3052,23 +3100,34 @@ namespace Peak.AP
         /// </summary>
         private void ProcessItemQueue()
         {
-            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-            if (!currentScene.StartsWith("Level_"))
-            {
-                return;
-            }
-            
             if (_itemQueue.Count == 0 || Time.time - _lastItemProcessed < ITEM_PROCESSING_COOLDOWN)
             {
                 return;
             }
             
             var (itemName, isTrap, itemIndex) = _itemQueue.First.Value;
+            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
+            bool isInLevel = currentScene.StartsWith("Level_");
+            bool isInAirport = currentScene.Contains("Airport");
+            bool isProgressionItem = itemName.Contains("Progressive Stamina") || itemName.Contains("Unlock") || itemName.Contains("Badge");
+
+            // Progression items (stamina/ascent unlocks) can only be processed in Airport
+            if (isProgressionItem && !isInAirport)
+            {
+                return;
+            }
+
+            // Regular items can only be processed in levels (not in airport/menus)
+            if (!isProgressionItem && !isInLevel)
+            {
+                return;
+            }
             _itemQueue.RemoveFirst();
             
             try
             {
-                _log.LogInfo($"[PeakPelago] Processing queued item #{itemIndex}: {itemName} (Remaining: {_itemQueue.Count})");
+                _log.LogInfo($"[PeakPelago] Processing queued item #{itemIndex}: {itemName} in scene {currentScene} (Remaining: {_itemQueue.Count})");
                 
                 if (isTrap)
                 {
@@ -3216,7 +3275,34 @@ namespace Peak.AP
                     }
                 }
 
-                // Skip line 4 (was item acquisition counts, but not needed atm)
+                // Load unlocked ascents (Line 4)
+                if (lines.Length >= 4 && !string.IsNullOrEmpty(lines[3]))
+                {
+                    try
+                    {
+                        var parts = lines[3].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        int successCount = 0;
+                        
+                        foreach (var p in parts)
+                        {
+                            if (int.TryParse(p.Trim(), out int ascentLevel))
+                            {
+                                _unlockedAscents.Add(ascentLevel);
+                                successCount++;
+                            }
+                            else
+                            {
+                                _log.LogWarning($"[PeakPelago] Failed to parse ascent level: '{p}'");
+                            }
+                        }
+                        
+                        _log.LogInfo($"[PeakPelago] Loaded {successCount} unlocked ascents: {string.Join(", ", _unlockedAscents.OrderBy(x => x))}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError($"[PeakPelago] Error parsing unlocked ascents: {ex.Message}");
+                    }
+                }
 
                 // Load stamina state (Line 5)
                 if (lines.Length >= 5 && !string.IsNullOrEmpty(lines[4]))
@@ -3232,7 +3318,7 @@ namespace Peak.AP
                     }
                 }
                 
-                _log.LogInfo($"[PeakPelago] State loaded successfully: {_reportedChecks.Count} checks, {_totalLuggageOpened} luggage");
+                _log.LogInfo($"[PeakPelago] State loaded successfully: {_reportedChecks.Count} checks, {_totalLuggageOpened} luggage, {_unlockedAscents.Count} ascents");
             }
             catch (Exception ex)
             {
@@ -3243,6 +3329,7 @@ namespace Peak.AP
                 _reportedChecks.Clear();
                 _totalLuggageOpened = 0;
                 _lastProcessedItemIndex = 0;
+                _unlockedAscents.Clear();
             }
         }
         private void SaveState()
@@ -3252,7 +3339,7 @@ namespace Peak.AP
                 string line1 = _lastProcessedItemIndex.ToString();
                 string line2 = string.Join(",", _reportedChecks.Select(x => x.ToString()).ToArray());
                 string line3 = _totalLuggageOpened.ToString();
-                string line4 = ""; // Reserved for future use (was item acquisition counts but we decided we dont need that atm so no point in saving it)
+                string line4 = string.Join(",", _unlockedAscents.Select(x => x.ToString()).ToArray()); // Save ascent unlocks
                 string line5 = _staminaManager?.SaveState() ?? "0,1.00";
                 
                 // Write to temp file first, then rename to try and stop corruption
@@ -3287,9 +3374,20 @@ namespace Peak.AP
                 if (badgeMapping.TryGetValue(achievementType, out string locationName))
                 {
                     ReportCheckByName(locationName);
-                    
+
                     // Track this badge as collected
                     _collectedBadges.Add(achievementType);
+                    //if enough badges collected, report "All Badges Collected" location
+                    if (_collectedBadges.Count >= _slotRequiredBadges)
+                    {
+                        _log.LogInfo("[PeakPelago] All required badges collected - reporting All Badges Collected location");
+                        ReportCheckByName("All Badges Collected");
+                    }
+                    if (achievementType == ACHIEVEMENTTYPE.TwentyFourKaratBadge)
+                    {
+                        _log.LogInfo("[PeakPelago] 24 Karat Badge earned - reporting Idol Dunked location");
+                        ReportCheckByName("Idol Dunked");
+                    }
                 }
                 else
                 {

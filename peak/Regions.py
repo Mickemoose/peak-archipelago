@@ -39,13 +39,11 @@ def create_peak_regions(world: "PeakWorld"):
         ("Ascent 5 Completed", "Ascent 5 Completed"),
         ("Ascent 6 Completed", "Ascent 6 Completed"),
         ("Ascent 7 Completed", "Ascent 7 Completed"),
-        ("Lone Wolf Badge", "Lone Wolf Badge"),
-        ("Peak Badge", "Peak Badge"),
-        ("Survivalist Badge", "Survivalist Badge"),
+        ("Idol Dunked", "Idol Dunked"),
+        ("All Badges Collected", "All Badges Collected"),
         ("Mesa Access", "Mesa Access"),
         ("Roots Access", "Roots Access"),
         ("Alpine Access", "Alpine Access"),
-        ("24 Karat Badge", "24 Karat Badge")
     ]
     
     for loc_name, item_name in event_locations:

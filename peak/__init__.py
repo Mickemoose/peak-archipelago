@@ -36,13 +36,12 @@ class PeakWorld(World):
         "Ascent 5 Completed",
         "Ascent 6 Completed",
         "Ascent 7 Completed",
-        "Lone Wolf Badge", 
-        "Peak Badge",
-        "Survivalist Badge",
         "Mesa Access",
         "Alpine Access",
         "Roots Access",
-        "24 Karat Badge"
+        "Idol Dunked",
+        "All Badges Collected"
+
     ]
     for event_loc in event_locations:
         location_name_to_id[event_loc] = None
@@ -215,12 +214,12 @@ class PeakWorld(World):
 
         elif goal == 1:  # Complete All Badges
             self.multiworld.completion_condition[self.player] = (
-                lambda state: state.has("Peak Badge", self.player)
+                lambda state: state.has("All Badges Collected", self.player)
             )
 
         elif goal == 2:  # 24 Karat Badge
             self.multiworld.completion_condition[self.player] = (
-                lambda state: state.has("24 Karat Badge", self.player)
+                lambda state: state.has("Idol Dunked", self.player)
             )
 
         else:

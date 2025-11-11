@@ -375,7 +375,6 @@ namespace Peak.AP
         }
         private void Update()
         {
-            // Periodically update cached energy
             if (Time.time - _lastEnergyUpdateTime >= ENERGY_UPDATE_INTERVAL)
             {
                 UpdateCachedEnergy();

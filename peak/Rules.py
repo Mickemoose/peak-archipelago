@@ -30,14 +30,16 @@ def apply_rules(world: "PeakWorld"):
         "Mycology Badge", "Megaentomology Badge", "Speed Climber Badge", "Bookwork Badge",
         "Balloon Badge", "Nomad Badge", "Animal Serenading Badge", "Arborist Badge",
         "Endurance Badge", "Toxicology Badge", "Foraging Badge", "Bouldering Badge",
-        "Bing Bong Badge", "Cooking Badge", "Plunderer Badge", "High Altitude Badge",
+        "Bing Bong Badge", "Cooking Badge", "Plunderer Badge", "Lone Wolf Badge",
         "Volcanology Badge", "Alpinist Badge", "Esoterica Badge", "Trailblazer Badge",
         "Beachcomber Badge", "Mentorship Badge", "Cool Cucumber Badge", "Naturalist Badge",
         "Aeronautics Badge", "Leave No Trace Badge", "Needlepoint Badge", "Knot Tying Badge",
         "Bundled Up Badge", "Forestry Badge", "Disaster Response Badge", "Competitive Eating Badge",
         "Tread Lightly Badge", "Cryptogastronomy Badge", "Calcium Intake Badge", "Advanced Mycology Badge",
         "Applied Esoterica Badge", "Undead Encounter Badge", "Web Security Badge", "Mycoacrobatics Badge",
-        
+        "Survivalist Badge", "Happy Camper Badge", "First Aid Badge", "Clutch Badge",
+        "Emergency Preparedness Badge", "Ascender Badge", "Bookworm Badge", "Resourcefulness Badge",
+        "Ultimate Badge", "Peak Badge", "High Altitude Badge"
     ]
     
     for badge_name in regular_badges:
@@ -115,12 +117,6 @@ def apply_rules(world: "PeakWorld"):
             set_rule(world.get_location(acquire_name), lambda state: True)
         except KeyError:
             pass
-    
-    # Peak Badge is always accessible
-    try:
-        set_rule(world.get_location("Peak Badge"), lambda state: True)
-    except KeyError:
-        pass
     
     # Mesa-locked items require Mesa Access
     mesa_locked_items = [

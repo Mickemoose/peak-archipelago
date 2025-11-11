@@ -101,7 +101,17 @@ LOCATION_TABLE: Dict[str, int] = {
     "Disaster Response Badge": 76193,
     "Mycoacrobatics Badge": 76194,
     "Tread Lightly Badge": 76195,
-    
+    "Lone Wolf Badge": 76196,
+    "Survivalist Badge": 76197,
+    "Happy Camper Badge": 76198,
+    "First Aid Badge": 76199,
+    "Clutch Badge": 76400,
+    "Emergency Preparedness Badge": 76401,
+    "Ascender Badge": 76402,
+    "Bookworm Badge": 76403,
+    "Resourcefulness Badge": 76404,
+    "Ultimate Badge": 76405,
+        
     # Acquire Item Locations
     "Acquire Rope Spool": 76200,
     "Acquire Rope Cannon": 76201,
