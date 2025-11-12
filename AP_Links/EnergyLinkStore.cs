@@ -247,18 +247,20 @@ namespace Peak.AP
         private const float PURCHASE_TIME = 3f;
         private const float ENERGY_UPDATE_INTERVAL = 0.5f;
         private float _lastEnergyUpdateTime = 0f;
-        private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new Dictionary<string, BundleDefinition>
+        private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new()
         {
-            { "Bundle: Glizzy Gobbler", new BundleDefinition("Glizzy", 3) },
-            { "Bundle: Marshmallow Muncher", new BundleDefinition("Marshmallow", 3) },
-            { "Bundle: Trailblazer Snacks", new BundleDefinition(new[] {
+            { "Bundle: Trailblazer Snacks", new BundleDefinition([
                 ("Granola Bar", 2),
                 ("TrailMix", 2)
-            }) },
+            ]) },
             { "Bundle: Lovely Bunch", new BundleDefinition("Item_Coconut", 3) },
             { "Bundle: Bear Favorite", new BundleDefinition("Item_Honeycomb", 6) },
             { "Bundle: Rainy Day", new BundleDefinition("Parasol", 4) },
             { "Bundle: Turkey Day", new BundleDefinition("EggTurkey", 3) },
+            { "Bundle: For Your Health", new BundleDefinition([
+                ("FirstAidKit", 4),
+                ("Bandages", 4)
+            ]) },
         };
         
         private class BundleDefinition

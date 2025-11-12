@@ -800,12 +800,9 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[PeakPelago] Trying to get AchievementManager...");
                 
                 var assembly = typeof(Character).Assembly;
-                _log.LogInfo($"[PeakPelago] Using assembly: {assembly.FullName}");
                 var singletonType = assembly.GetType("Zorro.Core.Singleton`1");
-                _log.LogInfo($"[PeakPelago] Singleton type: {singletonType?.FullName ?? "NULL"}");
                 
                 if (singletonType != null)
                 {
@@ -828,8 +825,6 @@ namespace Peak.AP
                         }
                     }
                 }
-                
-                _log.LogWarning("[PeakPelago] Failed to get AchievementManager - one of the reflection steps failed");
             }
             catch (Exception ex)
             {
@@ -2133,7 +2128,7 @@ namespace Peak.AP
                 case "MESA":
                     return "Nomad " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "ALPINE":
-                    return "Desolate " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Alpinist " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "CALDERA":
                 case "THE KILN":
                     return "Volcanology " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
@@ -2215,37 +2210,6 @@ namespace Peak.AP
         }
 
         // ===== Harmony Patches =====
-        [HarmonyPatch(typeof(Item), "OnConsume")]
-        public static class ItemOnConsumePatch
-        {
-            static void Postfix(Item __instance)
-            {
-                try
-                {
-                    if (_instance == null) return;
-                    
-                    // Only track for master client to avoid duplicates
-                    if (!PhotonNetwork.IsMasterClient) return;
-                    
-                    // Check if the consumed item is a hot dog (glizzy)
-                    string itemName = __instance.UIData.itemName;
-                    if (itemName != null && itemName.ToUpper().Contains("HOT DOG"))
-                    {
-                        _instance._glizzysGobbled++;
-                        _instance._log.LogInfo($"[PeakPelago] Glizzys gobbled: {_instance._glizzysGobbled}");
-                        
-                        _instance.SaveState();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (_instance != null)
-                    {
-                        _instance._log.LogError($"[PeakPelago] OnConsume patch error: {ex.Message}");
-                    }
-                }
-            }
-        }
         [HarmonyPatch(typeof(CharacterItems), "HammerClimbingSpike")]
         public static class CharacterItemsHammerClimbingSpikePatch
         {

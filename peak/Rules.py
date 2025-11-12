@@ -23,6 +23,8 @@ def add_rule(spot: Location | Entrance, rule, combine="and"):
 def apply_rules(world: "PeakWorld"):
     """Apply all access rules for Peak locations."""
     player = world.player
+    required_ascent = world.options.ascent_count.value
+    goal_type = world.options.goal.value
     
     # All regular badge locations are always accessible
     regular_badges = [
@@ -63,13 +65,17 @@ def apply_rules(world: "PeakWorld"):
     
     # Ascent locations require their corresponding Ascent Completed events
     roman_numerals = ["II", "III", "IV", "V", "VI", "VII", "VIII"]
+
+    max_relevant_ascent = 7
+    if goal_type == 0: # Peak Goal
+        max_relevant_ascent = required_ascent
     
-    for ascent_num in range(1, 8):  # Ascents 1-7
-        roman_num = roman_numerals[ascent_num - 1]  # Convert to 0-based index
+    for ascent_num in range(1, max_relevant_ascent + 1):  # Only set rules for relevant ascents
+        roman_num = roman_numerals[ascent_num - 1]
         ascent_locations = [
             f"Beachcomber {roman_num} Badge (Ascent {ascent_num})", 
             f"Trailblazer {roman_num} Badge (Ascent {ascent_num})",
-            f"Desolate {roman_num} Badge (Ascent {ascent_num})", 
+            f"Alpinist {roman_num} Badge (Ascent {ascent_num})", 
             f"Volcanology {roman_num} Badge (Ascent {ascent_num})",
             f"Nomad {roman_num} Badge (Ascent {ascent_num})",
             f"Forestry {roman_num} Badge (Ascent {ascent_num})"
@@ -77,16 +83,18 @@ def apply_rules(world: "PeakWorld"):
         
         for ascent_name in ascent_locations:
             try:
+                # Require 'ascent_num' Progressive Ascent items to access this ascent's locations
                 set_rule(world.get_location(ascent_name), 
-                        lambda state, asc=ascent_num: state.has(f"Ascent {asc} Completed", player))
+                        lambda state, asc=ascent_num: state.has("Progressive Ascent", player, asc))
             except KeyError:
                 pass
     
-    # Event locations require their corresponding unlock items
-    for ascent_num in range(1, 8):  # Ascents 1-7
+    # Event locations require Progressive Ascent items
+    for ascent_num in range(1, max_relevant_ascent + 1):
         try:
+            # Require 'ascent_num' Progressive Ascent items to complete that ascent
             set_rule(world.get_location(f"Ascent {ascent_num} Completed"), 
-                    lambda state, asc=ascent_num: state.has(f"Ascent {asc} Unlock", player))
+                    lambda state, asc=ascent_num: state.has("Progressive Ascent", player, asc))
         except KeyError:
             pass
     

@@ -38,7 +38,7 @@ class BadgeCount(Range):
     There are 54 total badges available in the game
     """
     display_name = "Required Badge Count"
-    range_start = 10
+    range_start = 1
     range_end = 54
     default = 20
 

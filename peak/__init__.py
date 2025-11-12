@@ -3,7 +3,7 @@ import math
 from collections import Counter
 import typing
 
-from BaseClasses import ItemClassification, CollectionState
+from BaseClasses import ItemClassification, CollectionState, LocationProgressType
 from worlds.AutoWorld import World, WebWorld
 from .Items import PeakItem, item_table, progression_table, useful_table, filler_table, trap_table, lookup_id_to_name, item_groups
 from .Locations import LOCATION_TABLE, EXCLUDED_LOCATIONS
@@ -84,12 +84,41 @@ class PeakWorld(World):
     def create_items(self):
         """Create the initial item pool based on the location table."""
         
-        total_locations = len(self.location_name_to_id)
+        # Calculate total locations, accounting for excluded ascent levels
+        goal_type = self.options.goal.value
+        required_ascent = self.options.ascent_count.value
+        
+        # Start with all locations in LOCATION_TABLE
+        total_locations = len(LOCATION_TABLE)
+        
+        # Add event locations
+        total_locations += 12  # 7 Ascent Completed + Mesa/Roots/Alpine Access + Idol Dunked + All Badges Collected
+        
+        # Subtract excluded ascent locations if goal is Reach Peak
+        if goal_type == 0:  # Reach Peak goal
+            excluded_ascent_count = 7 - required_ascent  # Number of ascents to exclude
+            # Each excluded ascent has 6 badge locations (Beachcomber, Trailblazer, Alpinist, Volcanology, Nomad, Forestry)
+            # Plus 1 Scout Sashe location
+            # Plus 1 Ascent Completed event
+            locations_per_ascent = 6 + 1 + 1  # 8 total
+            total_locations -= (excluded_ascent_count * locations_per_ascent)
+            
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {excluded_ascent_count} ascent levels, removing {excluded_ascent_count * locations_per_ascent} locations")
+        
+        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total locations after exclusions: {total_locations}")
+        
         item_pool = []
         
-        # Add progression items (Ascent unlocks)
-        for item_name in progression_table.keys():
-            item_pool.append(self.create_item(item_name))
+        # Add Progressive Ascent items based on goal requirements
+        if goal_type == 0:  # Reach Peak goal - only add enough Progressive Ascent for the required level
+            for _ in range(required_ascent):
+                item_pool.append(self.create_item("Progressive Ascent"))
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {required_ascent} Progressive Ascent items (Reach Peak goal)")
+        else:  # Other goals - add all 7 Progressive Ascent items
+            for _ in range(7):
+                item_pool.append(self.create_item("Progressive Ascent"))
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 7 Progressive Ascent items (non-Reach Peak goal)")
+        
         
         # Add progressive stamina items if enabled
         if self.options.progressive_stamina.value:
