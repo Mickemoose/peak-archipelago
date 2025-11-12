@@ -16,13 +16,13 @@ class PeakItem(Item):
 
 
 progression_table = {
-    "Ascent 1 Unlock": ItemData(76019, ItemClassification.progression),
-    "Ascent 2 Unlock": ItemData(76020, ItemClassification.progression),
-    "Ascent 3 Unlock": ItemData(76021, ItemClassification.progression),
-    "Ascent 4 Unlock": ItemData(76022, ItemClassification.progression),
-    "Ascent 5 Unlock": ItemData(76023, ItemClassification.progression),
-    "Ascent 6 Unlock": ItemData(76024, ItemClassification.progression),
-    "Ascent 7 Unlock": ItemData(76025, ItemClassification.progression),
+    "Progressive Ascent": ItemData(76019, ItemClassification.progression),
+    #"Ascent 2 Unlock": ItemData(76020, ItemClassification.progression),
+    #"Ascent 3 Unlock": ItemData(76021, ItemClassification.progression),
+    #"Ascent 4 Unlock": ItemData(76022, ItemClassification.progression),
+    #"Ascent 5 Unlock": ItemData(76023, ItemClassification.progression),
+    #"Ascent 6 Unlock": ItemData(76024, ItemClassification.progression),
+    #"Ascent 7 Unlock": ItemData(76025, ItemClassification.progression),
 }
 
 useful_table = {

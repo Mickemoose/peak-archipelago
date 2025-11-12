@@ -1416,13 +1416,13 @@ namespace Peak.AP
 
 
                 // Progression Items (76019-76025) - Unlock ascents
-                { "Ascent 1 Unlock", () => UnlockAscent(1) },
-                { "Ascent 2 Unlock", () => UnlockAscent(2) },
-                { "Ascent 3 Unlock", () => UnlockAscent(3) },
-                { "Ascent 4 Unlock", () => UnlockAscent(4) },
-                { "Ascent 5 Unlock", () => UnlockAscent(5) },
-                { "Ascent 6 Unlock", () => UnlockAscent(6) },
-                { "Ascent 7 Unlock", () => UnlockAscent(7) },
+                { "Progressive Ascent", () => UnlockAscent() },
+                //{ "Ascent 2 Unlock", () => UnlockAscent(2) },
+                //{ "Ascent 3 Unlock", () => UnlockAscent(3) },
+                //{ "Ascent 4 Unlock", () => UnlockAscent(4) },
+                //{ "Ascent 5 Unlock", () => UnlockAscent(5) },
+                //{ "Ascent 6 Unlock", () => UnlockAscent(6) },
+                //{ "Ascent 7 Unlock", () => UnlockAscent(7) },
                 { "Progressive Stamina Bar", () => ApplyProgressiveStamina() },
 
                 // Trap Items
@@ -1782,13 +1782,24 @@ namespace Peak.AP
             }
         }
 
-        private void UnlockAscent(int ascentLevel)
+        private void UnlockAscent()
         {
             try
             {
-
+                // Count how many Progressive Ascent items we've received
+                // The next ascent to unlock is count + 1
+                int nextAscentLevel = _unlockedAscents.Count + 1;
+                
+                if (nextAscentLevel > 7)
+                {
+                    _log.LogWarning($"[PeakPelago] Already unlocked all 7 ascents, ignoring extra Progressive Ascent item");
+                    return;
+                }
+                
+                _log.LogInfo($"[PeakPelago] Unlocking ascent {nextAscentLevel} from Progressive Ascent");
+                
                 // Track the unlocked ascent
-                _unlockedAscents.Add(ascentLevel);
+                _unlockedAscents.Add(nextAscentLevel);
 
                 // Use reflection to access the Ascents class and unlock the ascent
                 var ascentsType = Type.GetType("Ascents");
@@ -1797,10 +1808,12 @@ namespace Peak.AP
                     var unlockMethod = ascentsType.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
                     if (unlockMethod != null)
                     {
-                        unlockMethod.Invoke(null, new object[] { ascentLevel });
-
+                        unlockMethod.Invoke(null, new object[] { nextAscentLevel });
+                        _log.LogInfo($"[PeakPelago] Successfully unlocked Ascent {nextAscentLevel}");
+                        
                         // Log all currently unlocked ascents
                         var sortedAscents = _unlockedAscents.OrderBy(x => x).ToList();
+                        _log.LogInfo($"[PeakPelago] Total unlocked ascents: {string.Join(", ", sortedAscents)}");
                     }
                     else
                     {
@@ -1811,12 +1824,15 @@ namespace Peak.AP
                 {
                     _log.LogWarning("[PeakPelago] Could not find Ascents class");
                 }
+                
+                SaveState();
             }
             catch (Exception ex)
             {
-                _log.LogError("[PeakPelago] Error unlocking ascent " + ascentLevel + ": " + ex.Message);
+                _log.LogError("[PeakPelago] Error unlocking progressive ascent: " + ex.Message);
             }
         }
+
         private void DestroyHeldItem()
         {
             try
@@ -3147,6 +3163,22 @@ namespace Peak.AP
                 }
                 
                 _log.LogInfo($"[PeakPelago] === REBUILD COMPLETE: {_collectedBadges.Count} badges ===");
+                
+                // ADD THIS: Check if we've completed the goal
+                if (_slotGoalType == 1 && _collectedBadges.Count >= _slotRequiredBadges)
+                {
+                    _log.LogInfo($"[PeakPelago] Badge goal complete after rebuild: {_collectedBadges.Count}/{_slotRequiredBadges} badges");
+                    SendGoalComplete();
+                    ReportCheckByName("All Badges Collected");
+                }
+                
+                // Also check for 24 Karat Badge goal
+                if (_slotGoalType == 2 && _collectedBadges.Contains(ACHIEVEMENTTYPE.TwentyFourKaratBadge))
+                {
+                    _log.LogInfo("[PeakPelago] 24 Karat Badge goal complete after rebuild");
+                    SendGoalComplete();
+                    ReportCheckByName("Idol Dunked");
+                }
             }
             catch (Exception ex)
             {
@@ -3162,32 +3194,32 @@ namespace Peak.AP
                 // Check received items for ascent unlocks
                 var receivedItems = _session.Items.AllItemsReceived;
                 
+                int progressiveAscentCount = 0;
+                
                 foreach (var item in receivedItems)
                 {
                     string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
                     
-                    // Check if it's an ascent unlock
-                    if (itemName != null && itemName.Contains("Ascent") && itemName.Contains("Unlock"))
+                    // Check if it's a Progressive Ascent item
+                    if (itemName != null && itemName.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Extract the ascent number (e.g., "Ascent 3 Unlock" -> 3)
-                        for (int i = 1; i <= 7; i++)
-                        {
-                            if (itemName.Contains($"Ascent {i} Unlock"))
-                            {
-                                if (!_unlockedAscents.Contains(i))
-                                {
-                                    _unlockedAscents.Add(i);
-                                    _log.LogInfo($"[PeakPelago] Recovered ascent unlock: {i}");
-                                }
-                                break;
-                            }
-                        }
+                        progressiveAscentCount++;
+                    }
+                }
+                
+                // Unlock ascents based on the count of Progressive Ascent items received
+                for (int i = 1; i <= progressiveAscentCount && i <= 7; i++)
+                {
+                    if (!_unlockedAscents.Contains(i))
+                    {
+                        _unlockedAscents.Add(i);
+                        _log.LogInfo($"[PeakPelago] Recovered progressive ascent unlock: {i}");
                     }
                 }
                 
                 if (_unlockedAscents.Count > 0)
                 {
-                    _log.LogInfo($"[PeakPelago] Recovered {_unlockedAscents.Count} ascent unlocks: {string.Join(", ", _unlockedAscents.OrderBy(x => x))}");
+                    _log.LogInfo($"[PeakPelago] Recovered {_unlockedAscents.Count} ascent unlocks from {progressiveAscentCount} Progressive Ascent items: {string.Join(", ", _unlockedAscents.OrderBy(x => x))}");
                 }
             }
             catch (Exception ex)
