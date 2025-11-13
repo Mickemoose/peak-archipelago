@@ -1,3 +1,13 @@
+### v0.5.0
+<ul>
+    <li>A handful of new Traps</li>
+    <li>Energy Link support</li>
+    <li>Save state handling reworked</li>
+    <li>Item Check fixes</li>
+    <li>Badge Check fixes</li>
+    <li>Ascent Unlocks changed to Progressive Ascent</li>
+    <li>Ascent Completion checks wont populate higher than your Ascent Level for the Peak Reached Goal</li>
+</ul>
 
 ### v0.4.9
 <ul>

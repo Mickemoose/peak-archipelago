@@ -34,14 +34,21 @@ namespace Peak.AP
             _session = session;
             _isEnabled = enabled;
 
-            if (_session != null && _isEnabled)
+            if (_isEnabled)
             {
-                _session.Socket.PacketReceived += OnPacketReceived;
+                if (_session != null)
+                {
+                    _session.Socket.PacketReceived += OnPacketReceived;
+                    _log.LogInfo($"[PeakPelago] Ring Link service initialized with session (Connection ID: {_connectionId})");
+                }
+                else
+                {
+                    _log.LogInfo($"[PeakPelago] Ring Link service enabled for client (no session, effects only)");
+                }
+                
                 _harmony = new Harmony("com.mickemoose.peak.ap.ringlink");
                 _harmony.PatchAll(typeof(RingLinkPatches));
                 RingLinkPatches.SetInstance(this);
-                
-                _log.LogInfo($"[PeakPelago] Ring Link service initialized (Connection ID: {_connectionId})");
             }
         }
 

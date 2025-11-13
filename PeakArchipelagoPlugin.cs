@@ -22,7 +22,7 @@ using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.4.9")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.0")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -46,7 +46,15 @@ namespace Peak.AP
         private bool _isConnecting;
         private bool _wantReconnect;
         private string _currentPort = "";
-        private string StateFilePath { get { return Path.Combine(Paths.ConfigPath, "Peak.AP.state." + _currentPort.Replace(":", "_") + ".txt"); } }
+        private string _lastApSessionUuid = "";
+        private string StateFilePath 
+        { 
+            get 
+            { 
+                string safeUuid = string.IsNullOrEmpty(_lastApSessionUuid) ? "default" : _lastApSessionUuid.Replace("/", "_").Replace("\\", "_").Replace(":", "_");
+                return Path.Combine(Paths.ConfigPath, $"Peak.AP.state.{safeUuid}.txt"); 
+            } 
+        }
         private int _lastProcessedItemIndex = 0;
         private readonly HashSet<long> _reportedChecks = new HashSet<long>();
 
@@ -90,6 +98,12 @@ namespace Peak.AP
         private TrapLinkService _trapLinkService;
         private DeathLinkService _deathLinkService;
         private EnergyLinkService _energyLinkService;
+        private bool _ringLinkEnabled = false;
+        private bool _hardRingLinkEnabled = false;
+        private bool _trapLinkEnabled = false;
+        public bool energyLinkEnabled = false;
+        private HashSet<string> _enabledTraps = new HashSet<string>();
+        private string _energyLinkTeamName = "0";
         private int _deathLinkBehavior = 0;
         private bool _deathLinkReceivedThisSession = false;
         private int _deathLinkSendBehavior = 0;
@@ -141,7 +155,6 @@ namespace Peak.AP
                 BlackoutTrapEffect.Initialize(_log, this);
                 CampfireModelSpawner.Initialize(_log);
                 FearTrapEffect.Initialize(_log, this);
-                CheckAndHandlePortChange();
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
                 InitializeItemMapping();
@@ -241,22 +254,141 @@ namespace Peak.AP
             {
                 _log.LogInfo($"[PeakPelago] Player {newPlayer.NickName} joined the room");
 
-                // Only the host syncs stamina to new players
+                // Only the host syncs to new players
                 if (PhotonNetwork.IsMasterClient && _photonView != null)
                 {
                     // Get the current stamina configuration
                     bool progressiveEnabled = _staminaManager?.IsProgressiveStaminaEnabled() ?? false;
                     int totalUpgrades = _staminaManager?.GetStaminaUpgradesReceived() ?? 0;
 
-                    _log.LogInfo($"[PeakPelago] Host syncing to {newPlayer.NickName}: progressive={progressiveEnabled}, upgrades={totalUpgrades}");
+                    _log.LogInfo($"[PeakPelago] Host syncing stamina to {newPlayer.NickName}: progressive={progressiveEnabled}, upgrades={totalUpgrades}");
 
-                    // Always send the configuration, even if progressive is disabled
+                    // Send stamina config
                     _photonView.RPC("SyncStaminaConfiguration", newPlayer, progressiveEnabled, totalUpgrades);
+                    
+                    // Send AP Links config
+                    bool energyLinkEnabled = _energyLinkService?.IsEnabled() ?? false;
+                    
+                    _log.LogInfo($"[PeakPelago] Host syncing AP Links to {newPlayer.NickName}:");
+                    _log.LogInfo($"[PeakPelago]   RingLink={_ringLinkEnabled}, HardRingLink={_hardRingLinkEnabled}");
+                    _log.LogInfo($"[PeakPelago]   TrapLink={_trapLinkEnabled}, EnergyLink={energyLinkEnabled}");
+                    _log.LogInfo($"[PeakPelago]   Team={_energyLinkTeamName}, Traps={_enabledTraps.Count}");
+                    
+                    _photonView.RPC("SyncAPLinksConfiguration", newPlayer, 
+                        _ringLinkEnabled, 
+                        _hardRingLinkEnabled, 
+                        _trapLinkEnabled, 
+                        energyLinkEnabled, 
+                        _energyLinkTeamName,
+                        string.Join(",", _enabledTraps));
+                    if (_energyLinkService != null && _energyLinkService.IsEnabled())
+                    {
+                        int currentEnergy = _energyLinkService.GetCurrentEnergy();
+                        int maxEnergy = _energyLinkService.GetMaxEnergy();
+                        _photonView.RPC("RPC_UpdateEnergy", newPlayer, currentEnergy, maxEnergy);
+                        _log.LogInfo($"[PeakPelago] Sent energy state to {newPlayer.NickName}: {currentEnergy}/{maxEnergy}");
+                    }
+                    
+                    _log.LogInfo($"[PeakPelago] Sent AP Links config to {newPlayer.NickName}");
                 }
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in OnPlayerEnteredRoom: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        private void RPC_PurchaseEnergyLinkStore(int campfireId)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] HOST: Received store purchase request for campfire {campfireId}");
+                
+                if (_energyLinkService == null || !_energyLinkService.IsEnabled())
+                {
+                    _log.LogWarning("[PeakPelago] HOST: EnergyLink not enabled");
+                    return;
+                }
+                
+                // Check if we have enough energy
+                if (_energyLinkService.GetCurrentEnergy() < 300)
+                {
+                    _log.LogWarning($"[PeakPelago] HOST: Not enough energy for purchase (have {_energyLinkService.GetCurrentEnergy()}, need 300)");
+                    return;
+                }
+                
+                // Consume the energy
+                if (_energyLinkService.ConsumeEnergy(300))
+                {
+                    _log.LogInfo($"[PeakPelago] HOST: Purchase successful, broadcasting to all clients");
+                    
+                    // Broadcast to all clients that this store was purchased
+                    object[] data = [campfireId];
+                    RaiseEventOptions raiseEventOptions = new RaiseEventOptions { Receivers = ReceiverGroup.All };
+                    PhotonNetwork.RaiseEvent(117, data, raiseEventOptions, SendOptions.SendReliable);
+                }
+                else
+                {
+                    _log.LogError("[PeakPelago] HOST: Failed to consume energy");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in RPC_PurchaseEnergyLinkStore: {ex.Message}");
+                _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
+            }
+        }
+        [PunRPC]
+        private void SyncAPLinksConfiguration(bool ringLink, bool hardRingLink, bool trapLink, bool energyLink, string energyTeam, string enabledTrapsStr)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] CLIENT: Received AP Links configuration:");
+                _log.LogInfo($"[PeakPelago] CLIENT:   RingLink={ringLink}, HardRingLink={hardRingLink}");
+                _log.LogInfo($"[PeakPelago] CLIENT:   TrapLink={trapLink}, EnergyLink={energyLink}");
+                _log.LogInfo($"[PeakPelago] CLIENT:   EnergyTeam={energyTeam}");
+                
+                // Initialize RingLink
+                if (ringLink && _ringLinkService != null)
+                {
+                    _ringLinkService.Initialize(null, true);
+                    _log.LogInfo("[PeakPelago] CLIENT: Enabled RingLink");
+                }
+                
+                // Initialize HardRingLink
+                if (hardRingLink && _hardRingLinkService != null)
+                {
+                    _hardRingLinkService.Initialize(null, true);
+                    _log.LogInfo("[PeakPelago] CLIENT: Enabled HardRingLink");
+                }
+                
+                // Initialize TrapLink
+                if (trapLink && _trapLinkService != null)
+                {
+                    var enabledTraps = new HashSet<string>(
+                        enabledTrapsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Select(s => s.Trim())
+                            .Where(s => !string.IsNullOrEmpty(s))
+                    );
+                    
+                    _trapLinkService.Initialize(null, true, cfgSlot.Value, enabledTraps, ApplyItemEffect);
+                    _log.LogInfo($"[PeakPelago] CLIENT: Enabled TrapLink with {enabledTraps.Count} traps");
+                }
+                
+                // Initialize EnergyLink
+                if (energyLink && _energyLinkService != null)
+                {
+                    _energyLinkService.Initialize(null, true, energyTeam, this);
+                    CampfireModelSpawner.SetEnergyLinkService(_energyLinkService);
+                    _log.LogInfo($"[PeakPelago] CLIENT: Enabled EnergyLink (team={energyTeam})");
+                }
+                
+                _log.LogInfo("[PeakPelago] CLIENT: Successfully configured all AP Links");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] CLIENT: Error in SyncAPLinksConfiguration: {ex.Message}");
+                _log.LogError($"[PeakPelago] CLIENT: Stack trace: {ex.StackTrace}");
             }
         }
         [PunRPC]
@@ -1466,6 +1598,41 @@ namespace Peak.AP
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
         }
 
+        [PunRPC]
+        private void RPC_ContributeEnergy(int amount)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] HOST: Received energy contribution request: {amount}");
+                
+                if (_energyLinkService != null && _energyLinkService.IsEnabled())
+                {
+                    _energyLinkService.ContributeEnergy(amount);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in RPC_ContributeEnergy: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void RPC_UpdateEnergy(int current, int max)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] Received energy update: {current}/{max}");
+                
+                if (_energyLinkService != null)
+                {
+                    _energyLinkService.UpdateEnergyCache(current, max);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in RPC_UpdateEnergy: {ex.Message}");
+            }
+        }
         [PunRPC]
         private void StartBlackoutTrapRPC()
         {
@@ -2685,8 +2852,6 @@ namespace Peak.AP
             try
             {
                 // Check for port changes before connecting
-                CheckAndHandlePortChange();
-
                 string host = cfgServer.Value;
                 string url = host.Contains(":") ? host : (host + ":" + cfgPort.Value);
                 LoadState();
@@ -2798,6 +2963,7 @@ namespace Peak.AP
                 var loginResult = result as LoginSuccessful;
                 if (loginResult != null && loginResult.SlotData != null)
                 {
+                    CheckAndHandleSessionChange(loginResult);
                     _log.LogInfo("[PeakPelago] Received slot data with " + loginResult.SlotData.Count + " entries");
 
                     _log.LogInfo("[PeakPelago] ===== ALL SLOT DATA =====");
@@ -2810,20 +2976,16 @@ namespace Peak.AP
                     bool progressiveEnabled = false;
                     bool additionalEnabled = false;
                     bool deathLinkEnabled = false;
-                    bool trapLinkEnabled = false;
-                    bool ringLinkEnabled = false;
-                    bool hardRingLinkEnabled = false;
-                    bool energyLinkEnabled = false;
 
                     List<string> tags = new List<string>();
 
                     if (loginResult.SlotData.ContainsKey("ring_link"))
                     {
                         var value = loginResult.SlotData["ring_link"];
-                        ringLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Ring Link from slot data: {ringLinkEnabled}");
+                        _ringLinkEnabled  = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Ring Link from slot data: {_ringLinkEnabled }");
 
-                        if (ringLinkEnabled)
+                        if (_ringLinkEnabled )
                         {
                             tags.Add("RingLink");
                         }
@@ -2838,16 +3000,33 @@ namespace Peak.AP
                         if (energyLinkEnabled)
                         {
                             tags.Add("EnergyLink");
+                            
+                            // Get team name
+                            if (loginResult.SlotData.ContainsKey("team"))
+                            {
+                                var teamValue = loginResult.SlotData["team"];
+                                int teamNumber = Convert.ToInt32(teamValue);
+                                _energyLinkTeamName = teamNumber.ToString();
+                                _log.LogInfo($"[PeakPelago] EnergyLink team from slot data: {_energyLinkTeamName}");
+                            }
                         }
                     }
+                    if (energyLinkEnabled && loginResult.SlotData.ContainsKey("team"))
+                    {
+                        var teamValue = loginResult.SlotData["team"];
+                        int teamNumber = Convert.ToInt32(teamValue);
+                        _energyLinkTeamName = teamNumber.ToString();
+                        _log.LogInfo($"[PeakPelago] EnergyLink team from slot data: {_energyLinkTeamName} (team #{teamNumber})");
+                    }
+
 
                     if (loginResult.SlotData.ContainsKey("hard_ring_link"))
                     {
                         var value = loginResult.SlotData["hard_ring_link"];
-                        hardRingLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Hard Ring Link from slot data: {hardRingLinkEnabled}");
+                        _hardRingLinkEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Hard Ring Link from slot data: {_hardRingLinkEnabled}");
 
-                        if (hardRingLinkEnabled)
+                        if (_hardRingLinkEnabled)
                         {
                             tags.Add("HardRingLink");
                         }
@@ -2856,10 +3035,10 @@ namespace Peak.AP
                     if (loginResult.SlotData.ContainsKey("trap_link"))
                     {
                         var value = loginResult.SlotData["trap_link"];
-                        trapLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Trap Link from slot data: {trapLinkEnabled}");
+                        _trapLinkEnabled = Convert.ToInt32(value) != 0;
+                        _log.LogInfo($"[PeakPelago] Trap Link from slot data: {_trapLinkEnabled}");
 
-                        if (trapLinkEnabled)
+                        if (_trapLinkEnabled)
                         {
                             tags.Add("TrapLink");
                         }
@@ -2888,38 +3067,28 @@ namespace Peak.AP
                         _session.Socket.SendPacket(updatePacket);
                         _log.LogInfo($"[PeakPelago] Sent tags: {string.Join(", ", tags)}");
                     }
-                    if (ringLinkEnabled)
+                    if (_ringLinkEnabled)
                     {
-                        _ringLinkService.Initialize(_session, ringLinkEnabled);
+                        _ringLinkService.Initialize(_session, _ringLinkEnabled);
                     }
-                    if (hardRingLinkEnabled)
+                    if (_hardRingLinkEnabled)
                     {
-                        _hardRingLinkService.Initialize(_session, hardRingLinkEnabled);
+                        _hardRingLinkService.Initialize(_session, _hardRingLinkEnabled);
                     }
                     if (energyLinkEnabled)
                     {
-                        int teamNumber = 0;
-                        if (loginResult.SlotData.ContainsKey("team"))
-                        {
-                            teamNumber = Convert.ToInt32(loginResult.SlotData["team"]);
-                        }
-
-                        string teamName = teamNumber.ToString();
-                        _energyLinkService.Initialize(_session, energyLinkEnabled, teamName);
+                        _energyLinkService.Initialize(_session, energyLinkEnabled, _energyLinkTeamName, this);
                         CampfireModelSpawner.SetEnergyLinkService(_energyLinkService);
                     }
 
-                    if (trapLinkEnabled)
+                    if (_trapLinkEnabled)
                     {
-                        HashSet<string> enabledTraps = new HashSet<string>();
+                        _enabledTraps = new HashSet<string>();
                         if (loginResult.SlotData.ContainsKey("active_traps"))
                         {
                             try
                             {
                                 var activeTrapsData = loginResult.SlotData["active_traps"];
-                                _log.LogInfo($"[PeakPelago] Active traps data type: {activeTrapsData?.GetType().Name}");
-                                _log.LogInfo($"[PeakPelago] Active traps raw value: {activeTrapsData}");
-
                                 if (activeTrapsData is JObject activeTrapsObj)
                                 {
                                     foreach (var kvp in activeTrapsObj)
@@ -2929,8 +3098,7 @@ namespace Peak.AP
                                         string trapName = MapSlotKeyToTrapName(trapKey);
                                         if (weight > 0 && !string.IsNullOrEmpty(trapName))
                                         {
-                                            enabledTraps.Add(trapName);
-                                            _log.LogInfo($"[PeakPelago] Enabled trap: {trapName} (weight: {weight})");
+                                            _enabledTraps.Add(trapName);
                                         }
                                     }
                                 }
@@ -2938,21 +3106,21 @@ namespace Peak.AP
                             catch (Exception ex)
                             {
                                 _log.LogError($"[PeakPelago] Error parsing active_traps: {ex.Message}");
-                                enabledTraps = TrapTypeExtensions.GetAllTrapNames();
+                                _enabledTraps = TrapTypeExtensions.GetAllTrapNames();
                             }
                         }
                         else
                         {
                             _log.LogWarning("[PeakPelago] active_traps not found in slot data, enabling all traps");
-                            enabledTraps = TrapTypeExtensions.GetAllTrapNames();
+                            _enabledTraps = TrapTypeExtensions.GetAllTrapNames();
                         }
 
-                        _log.LogInfo($"[PeakPelago] Initializing Trap Link with {enabledTraps.Count} enabled traps");
+                        _log.LogInfo($"[PeakPelago] Initializing Trap Link with {_enabledTraps.Count} enabled traps");
                         _trapLinkService.Initialize(
                             _session,
-                            trapLinkEnabled,
+                            _trapLinkEnabled,
                             cfgSlot.Value,
-                            enabledTraps,
+                            _enabledTraps,
                             ApplyItemEffect
                         );
                     }
@@ -3372,32 +3540,44 @@ namespace Peak.AP
         }
 
         // ===== Tiny state persistence (no Unity JsonUtility dependency) ======
-        private void CheckAndHandlePortChange()
+        private void CheckAndHandleSessionChange(LoginSuccessful loginResult)
         {
             try
             {
-                // Get the current port from config
-                string host = cfgServer.Value;
-                string currentPort = host.Contains(":") ? host : (host + ":" + cfgPort.Value);
-
-                // If port has changed, clear the cache and update the current port
-                if (_currentPort != currentPort)
+                if (loginResult == null || loginResult.SlotData == null)
                 {
-                    if (!string.IsNullOrEmpty(_currentPort))
-                    {
-                        _log.LogInfo("[PeakPelago] Port changed from " + _currentPort + " to " + currentPort + " - clearing cache");
-                        ClearCacheForPortChange();
-                    }
-                    _currentPort = currentPort;
+                    _log.LogWarning("[PeakPelago] No slot data to check session");
+                    return;
                 }
+
+                // Get the session_id from slot data
+                string currentSessionId = null;
+                if (loginResult.SlotData.ContainsKey("session_id"))
+                {
+                    currentSessionId = loginResult.SlotData["session_id"].ToString();
+                }
+                
+                if (string.IsNullOrEmpty(currentSessionId))
+                {
+                    _log.LogWarning("[PeakPelago] No session_id in slot data");
+                    return;
+                }
+
+                if (!string.IsNullOrEmpty(_lastApSessionUuid) && _lastApSessionUuid != currentSessionId)
+                {
+                    _log.LogInfo($"[PeakPelago] Different session detected (was {_lastApSessionUuid}, now {currentSessionId}) - clearing cache");
+                    ClearCacheForSessionChange();
+                }
+                
+                _lastApSessionUuid = currentSessionId;
             }
             catch (Exception ex)
             {
-                _log.LogError("[PeakPelago] Error checking port change: " + ex.Message);
+                _log.LogError("[PeakPelago] Error checking session change: " + ex.Message);
             }
         }
 
-        private void ClearCacheForPortChange()
+        private void ClearCacheForSessionChange()
         {
             try
             {
@@ -3427,8 +3607,6 @@ namespace Peak.AP
         {
             try
             {
-                CheckAndHandlePortChange();
-
                 if (!File.Exists(StateFilePath))
                 {
                     _log.LogInfo("[PeakPelago] No state file found for port " + _currentPort + " - starting fresh");

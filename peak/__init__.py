@@ -167,8 +167,8 @@ class PeakWorld(World):
         trap_weights += (["Gust Trap"] * self.options.gust_trap_weight.value)
         trap_weights += (["Mandrake Trap"] * self.options.mandrake_trap_weight.value)
         trap_weights += (["Fungal Infection Trap"] * self.options.fungal_infection_trap_weight.value)
-        trap_weights += (["Fear Trap"] * self.options.fear_trap_weight.value),
-        trap_weights += (["Scoutmaster Trap"] * self.options.scoutmaster_trap_weight.value),
+        trap_weights += (["Fear Trap"] * self.options.fear_trap_weight.value)
+        trap_weights += (["Scoutmaster Trap"] * self.options.scoutmaster_trap_weight.value)
         
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -274,6 +274,7 @@ class PeakWorld(World):
 
     def fill_slot_data(self):
         """Return slot data for this player."""
+        session_id = f"{self.multiworld.seed_name}_{self.player}"
         slot_data = {
             "goal": self.options.goal.value,
             "ascent_count": self.options.ascent_count.value,
@@ -289,6 +290,7 @@ class PeakWorld(World):
             "death_link_behavior": self.options.death_link_behavior.value,
             "death_link_send_behavior": self.options.death_link_send_behavior.value,
             "active_traps": self.output_active_traps(),
+            "session_id": session_id,
         }
         
         # Log what we're sending

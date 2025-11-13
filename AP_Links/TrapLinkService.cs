@@ -142,7 +142,7 @@ namespace Peak.AP
             bool enabled, 
             string playerName, 
             HashSet<string> enabledTraps,
-            System.Action<string, bool> applyTrapEffectCallback)
+            Action<string, bool> applyTrapEffectCallback)
         {
             _session = session;
             _isEnabled = enabled;
@@ -150,10 +150,19 @@ namespace Peak.AP
             _enabledTraps = enabledTraps ?? new HashSet<string>();
             _applyTrapEffect = applyTrapEffectCallback;
 
-            if (_session != null && _isEnabled)
+            if (_isEnabled)
             {
-                _session.Socket.PacketReceived += OnPacketReceived;
-                _log.LogInfo($"[PeakPelago] Trap Link service initialized for player: {_playerName}");
+                // Only subscribe to packets if we have a session (host only)
+                if (_session != null)
+                {
+                    _session.Socket.PacketReceived += OnPacketReceived;
+                    _log.LogInfo($"[PeakPelago] Trap Link service initialized with session for player: {_playerName}");
+                }
+                else
+                {
+                    _log.LogInfo($"[PeakPelago] Trap Link service enabled for client: {_playerName} (no session, effects only)");
+                }
+                
                 _log.LogInfo($"[PeakPelago] Enabled traps: {string.Join(", ", _enabledTraps)}");
             }
         }

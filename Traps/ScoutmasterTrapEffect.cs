@@ -44,7 +44,7 @@ namespace Peak.AP
 
                 if (Scoutmaster.GetPrimaryScoutmaster(out Scoutmaster scoutmaster))
                 {
-                    scoutmaster.SetCurrentTarget(targetCharacter, forceForTime: 35f);
+                    scoutmaster.SetCurrentTarget(targetCharacter, forceForTime: 45f);
                     
                     log.LogInfo($"[PeakPelago] Scoutmaster now hunting {characterName}!");
                 }

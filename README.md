@@ -46,15 +46,16 @@ This mod consists of two main components:
 
 ### Client Plugin Installation
 
+## Manual Install
 1. **Install BepInEx**:
    - Download BepInEx 5.x for your platform
    - Extract to your PEAK game directory
    - Run the game once to generate BepInEx folders
 
 2. **Install the Plugin**:
-   - Download the `PeakArchipelagoPluginDLL` folder from the releases
-   - Drag the entire `PeakArchipelagoPluginDLL` folder into your `BepInEx/plugins/` directory
-   - The folder contains all necessary DLLs including the plugin
+   - Download the `peakpelago` folder from the releases
+   - Drag the entire `peakpelago` folder into your `BepInEx/plugins/` directory
+   - The folder contains all necessary files
 
 3. **Launch the Game**:
    - Start PEAK - the plugin will create a configuration file on first run
@@ -80,11 +81,10 @@ When generating an Archipelago game, the following PEAK-specific options are ava
 - **Ring Link**: Enable RingLink with other linked players.
 - **Hard Ring Link**: Enable HardRingLink with other linked players.
 - **Trap Link**: Enable TrapLink with other linked players.
+- **Energy Link**: Enable EnergyLink to utilize a linked Energy bank with other linked players.
 - **Death Link**: Enable death synchronization with other players
 - **Death Link Behavior**: Choose between full run reset or checkpoint reset
 - **Death Link Send Behavior**: Choose between sending on any players death or on failed run
-
-**EnergyLink option will appear but is non functioning at this current time**
 
 ## How to Play
 
@@ -164,11 +164,7 @@ The Python world code follows Archipelago's world API:
 
 ## Version
 
-Current Version: **0.4.9**
-
-## License
-
-[Specify your license here]
+Current Version: **0.5.0**
 
 ## Links
 

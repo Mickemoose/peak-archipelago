@@ -110,8 +110,17 @@ namespace Peak.AP
         [HarmonyPatch(typeof(Campfire), nameof(Campfire.Awake))]
         static void OnCampfireAwake(Campfire __instance)
         {
-            if (_energyLinkService?.IsEnabled() != true) return;
-            if (modelPrefab == null) return;
+            if (_energyLinkService?.IsEnabled() != true)
+            {
+                _log?.LogDebug("[CampfireSpawner] EnergyLink not enabled, skipping store spawn");
+                return;
+            }
+            
+            if (modelPrefab == null)
+            {
+                _log?.LogWarning("[CampfireSpawner] Model prefab not loaded!");
+                return;
+            }
 
             GameObject model = UnityEngine.Object.Instantiate(modelPrefab);
             model.SetActive(true);
@@ -128,7 +137,7 @@ namespace Peak.AP
             model.transform.SetParent(__instance.transform, worldPositionStays: true);
             
             var interactable = model.AddComponent<EnergyLinkStoreInteractable>();
-            interactable.Initialize(_log, _energyLinkService, null); // Pass null - animation is on prefab
+            interactable.Initialize(_log, _energyLinkService, null);
             
             spawnedModels[__instance] = model;
 
@@ -568,18 +577,54 @@ namespace Peak.AP
                 return;
             }
 
+            // Send purchase request to host (or process locally if we are host)
+            if (PhotonNetwork.IsMasterClient)
+            {
+                // Host processes directly
+                _log?.LogInfo($"[EnergyLinkStore] HOST: Processing purchase");
+                ProcessPurchase();
+            }
+            else
+            {
+                // Client sends RPC to host
+                if (_parentCampfire != null)
+                {
+                    int campfireId = _parentCampfire.GetInstanceID();
+                    _log?.LogInfo($"[EnergyLinkStore] CLIENT: Sending purchase request to host for campfire {campfireId}");
+                    
+                    // Send to host to process
+                    var photonView = PhotonNetwork.LocalPlayer.TagObject as PhotonView;
+                    if (photonView == null)
+                    {
+                        // Try to find the plugin's photon view
+                        var plugin = UnityEngine.Object.FindFirstObjectByType<PeakArchipelagoPlugin>();
+                        if (plugin != null && plugin.PhotonView != null)
+                        {
+                            plugin.PhotonView.RPC("RPC_PurchaseEnergyLinkStore", RpcTarget.MasterClient, campfireId);
+                        }
+                    }
+                }
+            }
+        }
+        private void ProcessPurchase()
+        {
             if (_energyLinkService.ConsumeEnergy(BUNDLE_COST))
             {
                 _log?.LogInfo($"[EnergyLinkStore] Purchase successful!");
                 
-                // Send custom Photon event
+                // Broadcast to all clients that this store was purchased
                 int campfireId = _parentCampfire.GetInstanceID();
                 object[] data = [campfireId];
                 
                 RaiseEventOptions raiseEventOptions = new RaiseEventOptions { Receivers = ReceiverGroup.All };
                 PhotonNetwork.RaiseEvent(117, data, raiseEventOptions, SendOptions.SendReliable);
                 
+                // Update local cache
                 _cachedEnergy = _energyLinkService.GetCurrentEnergy();
+            }
+            else
+            {
+                _log?.LogWarning("[EnergyLinkStore] Failed to consume energy for purchase");
             }
         }
         public void MarkAsUsed()

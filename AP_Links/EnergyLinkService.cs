@@ -10,6 +10,7 @@ using TMPro;
 using HarmonyLib;
 using Archipelago.MultiClient.Net.Enums;
 using Zorro.Core;
+using Photon.Pun;
 
 namespace Peak.AP
 {
@@ -32,6 +33,7 @@ namespace Peak.AP
         private float _conversionProgress = 0f;
         private const float CONVERSION_TIME = 1.5f;
         private Item _convertingItem = null;
+        private PeakArchipelagoPlugin _plugin;
         public EnergyLinkService(ManualLogSource log, ArchipelagoNotificationManager notifications)
         {
             _log = log;
@@ -41,37 +43,48 @@ namespace Peak.AP
         /// <summary>
         /// Initialize the EnergyLink service with an Archipelago session
         /// </summary>
-        public void Initialize(ArchipelagoSession session, bool enabled, string teamName)
+        public void Initialize(ArchipelagoSession session, bool enabled, string teamName, PeakArchipelagoPlugin plugin = null)
         {
             _session = session;
             _isEnabled = enabled;
             _teamName = teamName;
+            _plugin = plugin;
             
             // Construct the team-specific key
             _energyKey = $"EnergyLink_{_teamName}";
 
-            if (_session != null && _isEnabled)
+            if (_isEnabled)
             {
                 try
                 {
-                    _dataStorageHelper = _session.DataStorage;
-                    
-                    // Subscribe to EnergyLink updates for our team
-                    var energyScope = _dataStorageHelper[Scope.Global, _energyKey];
-                    
-                    // Initialize to default structure if doesn't exist
-                    var initialData = new JObject
+                    // Only initialize data storage if we have a session (HOST only)
+                    if (_session != null)
                     {
-                        ["energy"] = 0,
-                        ["max_energy"] = 0
-                    };
-                    energyScope.Initialize(initialData);
+                        _dataStorageHelper = _session.DataStorage;
+                        
+                        // Subscribe to EnergyLink updates for our team
+                        var energyScope = _dataStorageHelper[Scope.Global, _energyKey];
+                        
+                        // Initialize to default structure if doesn't exist
+                        var initialData = new JObject
+                        {
+                            ["energy"] = 0,
+                            ["max_energy"] = 0
+                        };
+                        energyScope.Initialize(initialData);
+                        
+                        _log.LogInfo($"[PeakPelago] EnergyLink service initialized with session for team: {_teamName} (key: {_energyKey})");
+                        RefreshEnergyState();
+                    }
+                    else
+                    {
+                        _log.LogInfo($"[PeakPelago] EnergyLink enabled for CLIENT - will use RPC to sync");
+                    }
+                    
+                    // Always set up Harmony patches (needed for both host and clients)
                     _harmony = new Harmony("com.mickemoose.peak.ap.energylink");
                     _harmony.PatchAll(typeof(EnergyLinkPatches));
                     EnergyLinkPatches.SetInstance(this);
-                    
-                    _log.LogInfo($"[PeakPelago] EnergyLink service initialized for team: {_teamName} (key: {_energyKey})");
-                    RefreshEnergyState();
                 }
                 catch (Exception ex)
                 {
@@ -123,8 +136,26 @@ namespace Peak.AP
         /// </summary>
         public void ContributeEnergy(int amount)
         {
-            if (_session == null || !_isEnabled || amount <= 0) return;
+            if (!_isEnabled || amount <= 0) return;
 
+            _log.LogInfo($"[PeakPelago] ContributeEnergy called: {amount} (HasSession: {_session != null})");
+
+            // If we're a client (no session), ask the host to contribute
+            if (_session == null)
+            {
+                if (_plugin != null && _plugin.PhotonView != null && PhotonNetwork.IsConnected)
+                {
+                    _log.LogInfo($"[PeakPelago] CLIENT: Requesting host to contribute {amount} energy");
+                    _plugin.PhotonView.RPC("RPC_ContributeEnergy", RpcTarget.MasterClient, amount);
+                }
+                else
+                {
+                    _log.LogWarning($"[PeakPelago] CLIENT: Cannot contribute energy - not connected to host");
+                }
+                return;
+            }
+
+            // Host path - actually contribute to DataStorage
             _currentEnergy += amount;
             if (_maxEnergy > 0)
             {
@@ -133,8 +164,26 @@ namespace Peak.AP
 
             System.Threading.Tasks.Task.Run(() => ContributeEnergyAsync(amount));
 
-            _log.LogInfo($"[PeakPelago] Contributed {amount} energy to EnergyLink (new total: {_currentEnergy}/{_maxEnergy})");
+            _log.LogInfo($"[PeakPelago] HOST: Contributed {amount} energy to EnergyLink (new total: {_currentEnergy}/{_maxEnergy})");
             _notifications.ShowEnergyLinkNotification($"EnergyLink: Contributed +{amount} energy");
+            
+            // Broadcast the updated energy to all clients
+            BroadcastEnergyUpdate();
+        }
+
+        public void BroadcastEnergyUpdate()
+        {
+            if (_plugin != null && _plugin.PhotonView != null && PhotonNetwork.IsConnected)
+            {
+                _plugin.PhotonView.RPC("RPC_UpdateEnergy", RpcTarget.All, _currentEnergy, _maxEnergy);
+            }
+        }
+
+        public void UpdateEnergyCache(int current, int max)
+        {
+            _currentEnergy = current;
+            _maxEnergy = max;
+            _log.LogInfo($"[PeakPelago] Updated energy cache: {_currentEnergy}/{_maxEnergy}");
         }
 
         private void ContributeEnergyAsync(int amount)
@@ -196,7 +245,16 @@ namespace Peak.AP
         /// </summary>
         public bool ConsumeEnergy(int amount)
         {
-            if (_session == null || !_isEnabled || amount <= 0) return false;
+            if (!_isEnabled || amount <= 0) return false;
+
+            _log.LogInfo($"[PeakPelago] ConsumeEnergy called: {amount} (HasSession: {_session != null})");
+
+            // Only host can actually consume from DataStorage
+            if (_session == null)
+            {
+                _log.LogWarning("[PeakPelago] CLIENT: Cannot consume energy directly - must go through host");
+                return false;
+            }
 
             try
             {
@@ -233,6 +291,9 @@ namespace Peak.AP
                 _currentEnergy = newEnergy;
                 _log.LogInfo($"[PeakPelago] Consumed {amount} energy from EnergyLink (remaining: {newEnergy}/{maxEnergy})");
                 _notifications.ShowEnergyLinkNotification($"EnergyLink: Consumed -{amount} energy");
+                
+                // Broadcast the updated energy to all clients
+                BroadcastEnergyUpdate();
                 
                 return true;
             }

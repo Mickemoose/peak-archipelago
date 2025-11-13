@@ -35,14 +35,23 @@ namespace Peak.AP
             _session = session;
             _isEnabled = enabled;
 
-            if (_session != null && _isEnabled)
+            if (_isEnabled)
             {
-                _session.Socket.PacketReceived += OnPacketReceived;
+                // Always set up Harmony patches for applying effects (needed for both host and clients)
                 _harmony = new Harmony("com.mickemoose.peak.ap.hardringlink");
                 _harmony.PatchAll(typeof(HardRingLinkPatches));
                 HardRingLinkPatches.SetInstance(this);
 
-                _log.LogInfo($"[PeakPelago] Hard Ring Link service initialized (Connection ID: {_connectionId})");
+                // Only subscribe to packets if we have a session (host only)
+                if (_session != null)
+                {
+                    _session.Socket.PacketReceived += OnPacketReceived;
+                    _log.LogInfo($"[PeakPelago] Hard Ring Link service initialized with session (Connection ID: {_connectionId})");
+                }
+                else
+                {
+                    _log.LogInfo($"[PeakPelago] Hard Ring Link service enabled for client (no session, effects only)");
+                }
             }
         }
 
