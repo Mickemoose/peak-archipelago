@@ -222,6 +222,7 @@ namespace Peak.AP
         private const float ENERGY_UPDATE_INTERVAL = 0.5f;
         private float _lastEnergyUpdateTime = 0f;
         private bool _isAvailable = true;
+        private PhotonView _photonView;
         private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new()
         {
             { "Bundle: Trailblazer Snacks", new BundleDefinition([
@@ -255,6 +256,15 @@ namespace Peak.AP
         {
             _log = log;
             _energyLinkService = energyLinkService;
+            _photonView = GetComponent<PhotonView>();
+            if (_photonView == null)
+            {
+                _log?.LogError("[EnergyLinkStore] No PhotonView found!");
+            }
+            else
+            {
+                _log?.LogInfo("[EnergyLinkStore] PhotonView found and ready");
+            }
             
             var physicsCollider = gameObject.AddComponent<BoxCollider>();
             physicsCollider.center = new Vector3(-0.16f, 0f, 0.1f);
@@ -510,6 +520,13 @@ namespace Peak.AP
                 _log?.LogWarning("[EnergyLinkStore] EnergyLink not enabled");
                 return;
             }
+
+            if (!_isAvailable)
+            {
+                _log?.LogInfo("[EnergyLinkStore] Store already used");
+                return;
+            }
+
             UpdateCachedEnergy();
             if (_cachedEnergy < BUNDLE_COST)
             {
@@ -519,12 +536,13 @@ namespace Peak.AP
 
             if (_energyLinkService.ConsumeEnergy(BUNDLE_COST))
             {
-                _log?.LogInfo($"[EnergyLinkStore] Purchase successful! Dispensing {_selectedBundleName}");
-                
-                _isAvailable = false;
-                SetEmissiveTexture(CampfireModelSpawner.greenEmissiveTexture);
-                
-                _selectedBundleAction?.Invoke();
+                _log?.LogInfo($"[EnergyLinkStore] Purchase successful!");
+
+                if (_photonView != null)
+                {
+                    _photonView.RPC("RPC_PurchaseStore", RpcTarget.All);
+                }
+
                 _cachedEnergy = _energyLinkService.GetCurrentEnergy();
                 _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
             }
@@ -533,7 +551,15 @@ namespace Peak.AP
                 _log?.LogWarning("[EnergyLinkStore] Failed to consume energy");
             }
         }
-
+        
+        [PunRPC]
+        private void RPC_PurchaseStore()
+        {
+            _log?.LogInfo("[EnergyLinkStore] RPC received - executing purchase");
+            _isAvailable = false;
+            SetEmissiveTexture(CampfireModelSpawner.greenEmissiveTexture);
+            _selectedBundleAction?.Invoke();
+        }
         public void CancelCast(Character interactor)
         {
         }

@@ -54,7 +54,8 @@ namespace Peak.AP
             natu,
             wooper,
             swinub,
-            
+            politoed,
+
         }
 
         private static Dictionary<Pokemon, CharacterAfflictions.STATUSTYPE> _pokemonAfflictions = new()
@@ -95,6 +96,7 @@ namespace Peak.AP
             { Pokemon.natu, CharacterAfflictions.STATUSTYPE.Drowsy },
             { Pokemon.wooper, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.swinub, CharacterAfflictions.STATUSTYPE.Cold },
+            { Pokemon.politoed, CharacterAfflictions.STATUSTYPE.Poison },
         };
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)
@@ -511,6 +513,7 @@ namespace Peak.AP
             new PokemonTriviaQuestion("Which Pokemon is known for its round, blue body and tail?", Pokemon.marill),
             new PokemonTriviaQuestion("Which Psychic/Flying type Pokemon is known for its small size and big eyes?", Pokemon.natu),
             new PokemonTriviaQuestion("Which of these Pokemon has a regional form that evolves into Clodsire?", Pokemon.wooper),
+            new PokemonTriviaQuestion("Which of these evolves from Poliwhirl?", Pokemon.politoed),
 
 
         };
