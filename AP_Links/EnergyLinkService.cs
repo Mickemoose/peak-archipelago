@@ -30,7 +30,7 @@ namespace Peak.AP
         private float _lastConversionTime = 0f;
         private const float CONVERSION_COOLDOWN = 0.5f;
         private float _conversionProgress = 0f;
-        private const float CONVERSION_TIME = 2.0f;
+        private const float CONVERSION_TIME = 1.5f;
         private Item _convertingItem = null;
         public EnergyLinkService(ManualLogSource log, ArchipelagoNotificationManager notifications)
         {
@@ -136,13 +136,13 @@ namespace Peak.AP
             _log.LogInfo($"[PeakPelago] Contributed {amount} energy to EnergyLink (new total: {_currentEnergy}/{_maxEnergy})");
             _notifications.ShowEnergyLinkNotification($"EnergyLink: Contributed +{amount} energy");
         }
-        
+
         private void ContributeEnergyAsync(int amount)
         {
             try
             {
                 var energyScope = _dataStorageHelper[Scope.Global, _energyKey];
-                
+
                 var currentData = energyScope.To<JObject>();
                 if (currentData == null)
                 {
@@ -152,10 +152,10 @@ namespace Peak.AP
                         ["max_energy"] = 0
                     };
                 }
-                
+
                 int currentEnergy = currentData["energy"]?.ToObject<int>() ?? 0;
                 int maxEnergy = currentData["max_energy"]?.ToObject<int>() ?? 0;
-                
+
                 // Calculate new energy (capped at max if max > 0)
                 int newEnergy = maxEnergy > 0 ? Math.Min(currentEnergy + amount, maxEnergy) : currentEnergy + amount;
                 var newData = new JObject
@@ -163,13 +163,28 @@ namespace Peak.AP
                     ["energy"] = newEnergy,
                     ["max_energy"] = maxEnergy
                 };
-                
+
                 _dataStorageHelper[Scope.Global, _energyKey] = newData;
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Failed to contribute energy async: {ex.Message}");
             }
+        }
+        
+        private int GetItemEnergyValue(Item item)
+        {
+            if (item == null) return 0;
+            
+            string itemName = item.GetName().ToLower();
+            if (itemName.Contains("cursed skull") || itemName.Contains("pirate's compass") || itemName.Contains("faerie lantern") || itemName.Contains("pandora")
+                || itemName.Contains("scout effigy") || itemName.Contains("cure-all") || itemName.Contains("the book of bones"))
+                return 250;
+            if (itemName.Contains("ancient idol"))
+                return 1000;
+            
+            // Default value for misc items
+            return 100;
         }
 
         /// <summary>
@@ -423,9 +438,11 @@ namespace Peak.AP
                     _convertingItem = null;
                     
                     string itemName = item.GetName();
-                    _log.LogInfo($"[PeakPelago] Converting {itemName} to energy");
+                    int energyValue = GetItemEnergyValue(item);
                     
-                    ContributeEnergy(100);
+                    _log.LogInfo($"[PeakPelago] Converting {itemName} to {energyValue} energy");
+                    
+                    ContributeEnergy(energyValue);
                     item.overrideProgress = 0f;
                     item.overrideForceProgress = false;
                     item.StartCoroutine(item.ConsumeDelayed(ignoreActions: true));

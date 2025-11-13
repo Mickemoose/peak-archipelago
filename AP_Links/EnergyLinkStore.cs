@@ -14,10 +14,11 @@ namespace Peak.AP
     public class CampfireModelSpawner
     {
         private static GameObject modelPrefab;
-        private static AnimationClip openAnimationClip;
         private static ManualLogSource _log;
         private static readonly Dictionary<Campfire, GameObject> spawnedModels = new Dictionary<Campfire, GameObject>();
         private static EnergyLinkService _energyLinkService;
+        public static Texture2D redEmissiveTexture;
+        public static Texture2D greenEmissiveTexture;
 
         public static void Initialize(ManualLogSource log)
         {
@@ -42,41 +43,27 @@ namespace Peak.AP
                     AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
                     if (bundle != null)
                     {
-                        _log?.LogInfo("[CampfireSpawner] All assets in bundle:");
-                        foreach (var name in bundle.GetAllAssetNames())
-                        {
-                            _log?.LogInfo($"[CampfireSpawner]   - {name}");
-                        }
-                        modelPrefab = bundle.LoadAsset<GameObject>("energy_link_store");
-                        openAnimationClip = bundle.LoadAsset<AnimationClip>("armature_anim_open");
+                        modelPrefab = bundle.LoadAsset<GameObject>("EnergyLinkStore");
+                        redEmissiveTexture = bundle.LoadAsset<Texture2D>("RED");
+                        greenEmissiveTexture = bundle.LoadAsset<Texture2D>("GREEN");
                         
                         if (modelPrefab != null)
                         {
                             UnityEngine.Object.DontDestroyOnLoad(modelPrefab);
-                            if (openAnimationClip != null)
-                            {
-                                UnityEngine.Object.DontDestroyOnLoad(openAnimationClip);
-                                _log?.LogInfo($"[CampfireSpawner] Loaded model and animation from AssetBundle");
-                            }
-                            else
-                            {
-                                _log?.LogWarning("[CampfireSpawner] Animation clip not found in bundle");
-                            }
-                            _log?.LogInfo($"[CampfireSpawner] Loaded model '{modelPrefab.name}' from AssetBundle");
-                            return;
+                            _log?.LogInfo($"[CampfireSpawner] Loaded prefab from AssetBundle");
                         }
-                        else
+                        
+                        if (redEmissiveTexture != null)
                         {
-                            _log?.LogError("[CampfireSpawner] Model not found in AssetBundle. Available assets:");
-                            foreach (var name in bundle.GetAllAssetNames())
-                            {
-                                _log?.LogInfo($"[CampfireSpawner]   - {name}");
-                            }
+                            UnityEngine.Object.DontDestroyOnLoad(redEmissiveTexture);
+                            _log?.LogInfo($"[CampfireSpawner] Loaded RED emissive texture");
                         }
-                    }
-                    else
-                    {
-                        _log?.LogError("[CampfireSpawner] Failed to load AssetBundle");
+                        
+                        if (greenEmissiveTexture != null)
+                        {
+                            UnityEngine.Object.DontDestroyOnLoad(greenEmissiveTexture);
+                            _log?.LogInfo($"[CampfireSpawner] Loaded GREEN emissive texture");
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -84,26 +71,14 @@ namespace Peak.AP
                     _log?.LogError($"[CampfireSpawner] Error loading AssetBundle: {ex.Message}");
                 }
             }
-            else
-            {
-                _log?.LogWarning($"[CampfireSpawner] AssetBundle not found at: {bundlePath}");
-            }
         }
 
         [HarmonyPostfix]
         [HarmonyPatch(typeof(Campfire), nameof(Campfire.Awake))]
         static void OnCampfireAwake(Campfire __instance)
         {
-            if (_energyLinkService?.IsEnabled() != true)
-            {
-                _log?.LogDebug("[CampfireSpawner] EnergyLink not enabled, skipping store spawn");
-                return;
-            }
-            if (modelPrefab == null)
-            {
-                _log?.LogWarning("[CampfireSpawner] Model prefab not loaded!");
-                return;
-            }
+            if (_energyLinkService?.IsEnabled() != true) return;
+            if (modelPrefab == null) return;
 
             GameObject model = UnityEngine.Object.Instantiate(modelPrefab);
             model.SetActive(true);
@@ -111,17 +86,16 @@ namespace Peak.AP
             ApplyPeakShaderToModel(model);
 
             Vector3 campfirePos = __instance.transform.position;
-            
             Vector3 offset = new Vector3(6f, -0.25f, 2f);
             model.transform.position = campfirePos + offset;
             model.transform.LookAt(campfirePos);
-            
             Vector3 currentRotation = model.transform.eulerAngles;
             model.transform.eulerAngles = new Vector3(0f, currentRotation.y, 0f);
             model.transform.localScale = Vector3.one * 2f;
             model.transform.SetParent(__instance.transform, worldPositionStays: true);
+            
             var interactable = model.AddComponent<EnergyLinkStoreInteractable>();
-            interactable.Initialize(_log, _energyLinkService, openAnimationClip);
+            interactable.Initialize(_log, _energyLinkService, null); // Pass null - animation is on prefab
             
             spawnedModels[__instance] = model;
 
@@ -238,15 +212,16 @@ namespace Peak.AP
         private ManualLogSource _log;
         private EnergyLinkService _energyLinkService;
         private BoxCollider _collider;
-        private Animation _animation;
+        private Animator _animator;
         private int _cachedEnergy = 0;
         private int _cachedMaxEnergy = 0;
         private string _selectedBundleName;
         private Action _selectedBundleAction;
         private const int BUNDLE_COST = 300;
-        private const float PURCHASE_TIME = 3f;
+        private const float PURCHASE_TIME = 2f;
         private const float ENERGY_UPDATE_INTERVAL = 0.5f;
         private float _lastEnergyUpdateTime = 0f;
+        private bool _isAvailable = true;
         private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new()
         {
             { "Bundle: Trailblazer Snacks", new BundleDefinition([
@@ -291,33 +266,16 @@ namespace Peak.AP
             _collider.size = new Vector3(1.5f, 2.7f, 1.05f);
             _collider.isTrigger = true;
 
-            if (openClip != null)
+            _animator = GetComponentInChildren<Animator>();
+            
+            if (_animator != null)
             {
-                
-                openClip.legacy = true;
-                _animation = gameObject.AddComponent<Animation>();
-                _animation.AddClip(openClip, "open_animation");
-                _animation.playAutomatically = false;
-                
-                AnimationState state = _animation["open_animation"];
-                if (state != null)
-                {
-                    state.wrapMode = WrapMode.Once;
-                    state.speed = 1f;
-                    state.layer = 0;
-                    state.enabled = true;
-                    _log?.LogInfo($"[EnergyLinkStore] Animation clip length: {openClip.length}s");
-                }
-                else
-                {
-                    _log?.LogWarning("[EnergyLinkStore] Failed to get animation state!");
-                }
-                
-                _log?.LogInfo("[EnergyLinkStore] Added animation component");
+                _log?.LogInfo($"[EnergyLinkStore] Found Animator component");
+                _animator.enabled = false; // Don't auto-play
             }
             else
             {
-                _log?.LogWarning("[EnergyLinkStore] No animation clip provided!");
+                _log?.LogWarning("[EnergyLinkStore] No Animator found!");
             }
                     
             if (_energyLinkService?.IsEnabled() == true)
@@ -328,6 +286,7 @@ namespace Peak.AP
             }
             UpdateCachedEnergy();
             SelectRandomBundle();
+            SetEmissiveTexture(CampfireModelSpawner.redEmissiveTexture);
         }
 
         private void SelectRandomBundle()
@@ -342,22 +301,19 @@ namespace Peak.AP
 
             _log?.LogInfo($"[EnergyLinkStore] Selected bundle: {_selectedBundleName}");
         }
-
         private void DispenseBundle(BundleDefinition bundle)
         {
-            if (_animation != null && _animation["open_animation"] != null)
+            if (_animator != null)
             {
-                _log?.LogInfo("[EnergyLinkStore] Playing open animation");
-                _animation.Play("open_animation");
+                _log?.LogInfo($"[EnergyLinkStore] Playing animation");
+                _animator.enabled = true;
+                _animator.Play("armature|anim_open", 0, 0f);
                 
-                float animLength = _animation["open_animation"].length;
-                float dispenseDelay = Mathf.Max(animLength * 0.7f, 0.5f);
-                
-                StartCoroutine(DispenseAfterDelay(bundle, dispenseDelay));
+                StartCoroutine(DispenseAfterDelay(bundle, 3f));
             }
             else
             {
-                _log?.LogWarning("[EnergyLinkStore] Animation not available, dispensing immediately");
+                _log?.LogWarning("[EnergyLinkStore] No animator, dispensing immediately");
                 StartCoroutine(DispenseAfterDelay(bundle, 0.1f));
             }
         }
@@ -365,11 +321,16 @@ namespace Peak.AP
         private IEnumerator DispenseAfterDelay(BundleDefinition bundle, float delay)
         {
             yield return new WaitForSeconds(delay);
-
-            Vector3 dispenserOffset = new Vector3(0f, 1.5f, 1f);
+            
+            if (_animator != null)
+            {
+                _animator.enabled = false;
+            }
+            
+            Vector3 dispenserOffset = new Vector3(-0.453f, 0.523f, 0.512f);
             Vector3 dispenserPosition = transform.position + transform.TransformDirection(dispenserOffset);
-
             _log?.LogInfo($"[EnergyLinkStore] Dispensing from position: {dispenserPosition}");
+
             foreach (var (itemName, count) in bundle.Items)
             {
                 SpawnPhysicalItems(itemName, count, dispenserPosition);
@@ -441,14 +402,11 @@ namespace Peak.AP
                     var rb = spawnedItem.GetComponent<Rigidbody>();
                     if (rb != null)
                     {
-                        Vector3 force = dispenserForward * UnityEngine.Random.Range(2f, 3f) + Vector3.up * 2f;
+                        Vector3 force = dispenserForward * UnityEngine.Random.Range(1f, 1.5f) + Vector3.up * 1f;
                         rb.AddForce(force, ForceMode.Impulse);
                     }
                     
                     _log?.LogInfo($"[EnergyLinkStore] Spawned {itemName} at {spawnPosition}");
-                    
-                    // Small delay between spawns to prevent physics explosions
-                    System.Threading.Thread.Sleep(50);
                 }
             }
             catch (Exception ex)
@@ -503,6 +461,46 @@ namespace Peak.AP
             _log?.LogInfo($"[EnergyLinkStore] Player {interactor.photonView.Owner.NickName} interacted with Energy Link Store");
         }
 
+        private void SetEmissiveTexture(Texture2D texture)
+        {
+            if (texture == null) return;
+            
+            try
+            {
+                Renderer[] renderers = GetComponentsInChildren<Renderer>();
+                
+                foreach (var renderer in renderers)
+                {
+                    foreach (var material in renderer.materials)
+                    {
+                        bool found = false;
+                        
+                        // Try all common emission texture property names
+                        string[] possibleNames = { "_EmissionMap", "_EmissiveMap", "_Emission", "_EmissiveTex", "_Emissive" };
+                        
+                        foreach (string propName in possibleNames)
+                        {
+                            if (material.HasProperty(propName))
+                            {
+                                material.SetTexture(propName, texture);
+                                _log?.LogInfo($"[EnergyLinkStore] Set texture on property: {propName}");
+                                found = true;
+                            }
+                        }
+                        
+                        if (!found)
+                        {
+                            _log?.LogWarning($"[EnergyLinkStore] No emission property found on material {material.name}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError($"[EnergyLinkStore] Error changing emissive texture: {ex.Message}");
+            }
+        }
+
         public void Interact_CastFinished(Character interactor)
         {
             _log?.LogInfo($"[EnergyLinkStore] Interact_CastFinished called!");
@@ -522,6 +520,10 @@ namespace Peak.AP
             if (_energyLinkService.ConsumeEnergy(BUNDLE_COST))
             {
                 _log?.LogInfo($"[EnergyLinkStore] Purchase successful! Dispensing {_selectedBundleName}");
+                
+                _isAvailable = false;
+                SetEmissiveTexture(CampfireModelSpawner.greenEmissiveTexture);
+                
                 _selectedBundleAction?.Invoke();
                 _cachedEnergy = _energyLinkService.GetCurrentEnergy();
                 _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
@@ -542,9 +544,8 @@ namespace Peak.AP
 
         public bool IsInteractible(Character interactor)
         {
-            return _energyLinkService?.IsEnabled() == true;
+            return _isAvailable && _energyLinkService?.IsEnabled() == true;
         }
-
 
         public bool IsConstantlyInteractable(Character interactor)
         {
