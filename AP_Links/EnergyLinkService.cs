@@ -182,6 +182,10 @@ namespace Peak.AP
                 return 250;
             if (itemName.Contains("ancient idol"))
                 return 1000;
+            if (itemName.Contains("conch"))
+                return 25;
+            if (itemName.Contains("bing bong"))
+                return 1;
             
             // Default value for misc items
             return 100;

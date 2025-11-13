@@ -243,7 +243,7 @@ namespace Peak.AP
             public (string itemName, int count)[] Items { get; }
             public BundleDefinition(string itemName, int count)
             {
-                Items = new[] { (itemName, count) };
+                Items = [(itemName, count)];
             }
             public BundleDefinition((string itemName, int count)[] items)
             {
@@ -271,7 +271,7 @@ namespace Peak.AP
             if (_animator != null)
             {
                 _log?.LogInfo($"[EnergyLinkStore] Found Animator component");
-                _animator.enabled = false; // Don't auto-play
+                _animator.enabled = false;
             }
             else
             {
