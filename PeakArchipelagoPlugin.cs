@@ -1459,6 +1459,7 @@ namespace Peak.AP
                 duration: 5.0f
                 ) },
                 { "Fear Trap", () => FearTrapEffect.ApplyFearTrap(_log) },
+                { "Scoutmaster Trap", () => ScoutmasterTrapEffect.TriggerScoutmasterTrap(_log)}
 
             };
 
@@ -3222,7 +3223,8 @@ namespace Peak.AP
                 { "gust_trap", "Gust Trap" },
                 { "mandrake_trap", "Mandrake Trap" },
                 { "fungal_infection_trap", "Fungal Infection Trap" },
-                { "fear_trap", "Fear Trap" }
+                { "fear_trap", "Fear Trap" },
+                { "scoutmaster_trap", "Scoutmaster Trap" }
             };
             
             return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;

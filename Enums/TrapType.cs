@@ -33,7 +33,8 @@ namespace Peak.AP
         ItemsToBombs,
         PokemonTriviaTrap,
         BlackoutTrap,
-        FearTrap
+        FearTrap,
+        ScoutmasterTrap,
     }
 
     public static class TrapTypeExtensions
@@ -67,6 +68,7 @@ namespace Peak.AP
             { TrapType.PokemonTriviaTrap, "Pokemon Trivia Trap" },
             { TrapType.BlackoutTrap, "Blackout Trap" },
             { TrapType.FearTrap, "Fear Trap" },
+            { TrapType.ScoutmasterTrap, "Scoutmaster Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

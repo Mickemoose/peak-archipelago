@@ -148,6 +148,7 @@ trap_table = {
     "Blackout Trap":              ItemData(77089, ItemClassification.trap),
     "Fear Trap":                  ItemData(77090, ItemClassification.trap),
     "Injury Trap":                ItemData(77091, ItemClassification.trap),
+    "Scoutmaster Trap":           ItemData(77092, ItemClassification.trap),
 }
 
 item_table = {

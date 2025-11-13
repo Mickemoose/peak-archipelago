@@ -167,7 +167,8 @@ class PeakWorld(World):
         trap_weights += (["Gust Trap"] * self.options.gust_trap_weight.value)
         trap_weights += (["Mandrake Trap"] * self.options.mandrake_trap_weight.value)
         trap_weights += (["Fungal Infection Trap"] * self.options.fungal_infection_trap_weight.value)
-        trap_weights += (["Fear Trap"] * self.options.fear_trap_weight.value)
+        trap_weights += (["Fear Trap"] * self.options.fear_trap_weight.value),
+        trap_weights += (["Scoutmaster Trap"] * self.options.scoutmaster_trap_weight.value),
         
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -222,6 +223,7 @@ class PeakWorld(World):
         trap_data["mandrake_trap"] = self.options.mandrake_trap_weight.value
         trap_data["fungal_infection_trap"] = self.options.fungal_infection_trap_weight.value
         trap_data["fear_trap"] = self.options.fear_trap_weight.value
+        trap_data["scoutmaster_trap"] = self.options.scoutmaster_trap_weight.value
 
         return trap_data
 

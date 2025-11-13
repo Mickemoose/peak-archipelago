@@ -7,6 +7,8 @@ using System.IO;
 using System;
 using Photon.Pun;
 using System.Collections;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
@@ -24,6 +26,37 @@ namespace Peak.AP
         {
             _log = log;
             LoadModelPrefab();
+            PhotonNetwork.NetworkingClient.EventReceived += OnPhotonEvent;
+        }
+        private static void OnPhotonEvent(ExitGames.Client.Photon.EventData photonEvent)
+        {
+            if (photonEvent.Code == 117)
+            {
+                object[] data = (object[])photonEvent.CustomData;
+                if (data != null && data.Length > 0 && data[0] is int campfireId)
+                {
+                    HandleStorePurchase(campfireId);
+                }
+            }
+        }
+
+        public static void HandleStorePurchase(int campfireInstanceId)
+        {
+            _log?.LogInfo($"[CampfireSpawner] Handling store purchase for campfire {campfireInstanceId}");
+            
+            foreach (var kvp in spawnedModels)
+            {
+                if (kvp.Key != null && kvp.Key.GetInstanceID() == campfireInstanceId)
+                {
+                    var store = kvp.Value?.GetComponent<EnergyLinkStoreInteractable>();
+                    if (store != null)
+                    {
+                        store.MarkAsUsed();
+                        _log?.LogInfo($"[CampfireSpawner] Store marked as used");
+                    }
+                    break;
+                }
+            }
         }
 
         public static void SetEnergyLinkService(EnergyLinkService service)
@@ -35,7 +68,7 @@ namespace Peak.AP
         private static void LoadModelPrefab()
         {
             string bundlePath = Path.Combine(BepInEx.Paths.PluginPath, "peakpelago", "energylinkstore.peakbundle");
-            
+
             if (File.Exists(bundlePath))
             {
                 try
@@ -46,19 +79,19 @@ namespace Peak.AP
                         modelPrefab = bundle.LoadAsset<GameObject>("EnergyLinkStore");
                         redEmissiveTexture = bundle.LoadAsset<Texture2D>("RED");
                         greenEmissiveTexture = bundle.LoadAsset<Texture2D>("GREEN");
-                        
+
                         if (modelPrefab != null)
                         {
                             UnityEngine.Object.DontDestroyOnLoad(modelPrefab);
                             _log?.LogInfo($"[CampfireSpawner] Loaded prefab from AssetBundle");
                         }
-                        
+
                         if (redEmissiveTexture != null)
                         {
                             UnityEngine.Object.DontDestroyOnLoad(redEmissiveTexture);
                             _log?.LogInfo($"[CampfireSpawner] Loaded RED emissive texture");
                         }
-                        
+
                         if (greenEmissiveTexture != null)
                         {
                             UnityEngine.Object.DontDestroyOnLoad(greenEmissiveTexture);
@@ -194,7 +227,7 @@ namespace Peak.AP
                 
                 _log?.LogInfo($"[CampfireSpawner] Applied Peak shader to {fixedCount} materials across {renderers.Length} renderers");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 _log?.LogError($"[CampfireSpawner] Error applying Peak shader: {ex.Message}");
                 _log?.LogError($"[CampfireSpawner] Stack trace: {ex.StackTrace}");
@@ -222,7 +255,7 @@ namespace Peak.AP
         private const float ENERGY_UPDATE_INTERVAL = 0.5f;
         private float _lastEnergyUpdateTime = 0f;
         private bool _isAvailable = true;
-        private PhotonView _photonView;
+        private Campfire _parentCampfire;
         private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new()
         {
             { "Bundle: Trailblazer Snacks", new BundleDefinition([
@@ -256,14 +289,10 @@ namespace Peak.AP
         {
             _log = log;
             _energyLinkService = energyLinkService;
-            _photonView = GetComponent<PhotonView>();
-            if (_photonView == null)
+            _parentCampfire = GetComponentInParent<Campfire>();
+            if (_parentCampfire == null)
             {
-                _log?.LogError("[EnergyLinkStore] No PhotonView found!");
-            }
-            else
-            {
-                _log?.LogInfo("[EnergyLinkStore] PhotonView found and ready");
+                _log?.LogError("[EnergyLinkStore] No parent Campfire found!");
             }
             
             var physicsCollider = gameObject.AddComponent<BoxCollider>();
@@ -520,13 +549,13 @@ namespace Peak.AP
                 _log?.LogWarning("[EnergyLinkStore] EnergyLink not enabled");
                 return;
             }
-
+            
             if (!_isAvailable)
             {
                 _log?.LogInfo("[EnergyLinkStore] Store already used");
                 return;
             }
-
+            
             UpdateCachedEnergy();
             if (_cachedEnergy < BUNDLE_COST)
             {
@@ -537,19 +566,22 @@ namespace Peak.AP
             if (_energyLinkService.ConsumeEnergy(BUNDLE_COST))
             {
                 _log?.LogInfo($"[EnergyLinkStore] Purchase successful!");
-
-                if (_photonView != null)
-                {
-                    _photonView.RPC("RPC_PurchaseStore", RpcTarget.All);
-                }
-
+                
+                // Send custom Photon event
+                int campfireId = _parentCampfire.GetInstanceID();
+                object[] data = [campfireId];
+                
+                RaiseEventOptions raiseEventOptions = new RaiseEventOptions { Receivers = ReceiverGroup.All };
+                PhotonNetwork.RaiseEvent(117, data, raiseEventOptions, SendOptions.SendReliable);
+                
                 _cachedEnergy = _energyLinkService.GetCurrentEnergy();
-                _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
             }
-            else
-            {
-                _log?.LogWarning("[EnergyLinkStore] Failed to consume energy");
-            }
+        }
+        public void MarkAsUsed()
+        {
+            _isAvailable = false;
+            SetEmissiveTexture(CampfireModelSpawner.greenEmissiveTexture);
+            _selectedBundleAction?.Invoke();
         }
         
         [PunRPC]

@@ -261,7 +261,7 @@ class MandrakeTrapWeight(BaseTrapWeight):
     display_name = "MandrakeTrap Weight"
 class FungalInfectionTrapWeight(BaseTrapWeight):
     """
-    Likelihood of receiving a trap which applies a Possession Affliction over time to a player
+    Likelihood of receiving a trap which applies a Spores Affliction over time to a player
     """
     display_name = "FungalInfectionTrap Weight"
 class FearTrapWeight(BaseTrapWeight):
@@ -269,6 +269,12 @@ class FearTrapWeight(BaseTrapWeight):
     Likelihood of receiving a spooky trap
     """
     display_name = "FearTrap Weight"
+
+class ScoutmasterTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which summons the Scoutmaster to hinder a player
+    """
+    display_name = "ScoutmasterTrap Weight"
 
 class TrapPercentage(Range):
     """
@@ -329,6 +335,7 @@ peak_option_groups = [
         MandrakeTrapWeight,
         FungalInfectionTrapWeight,
         FearTrapWeight,
+        ScoutmasterTrapWeight,
     ]),
 ]
 
@@ -377,3 +384,4 @@ class PeakOptions(PerGameCommonOptions):
     mandrake_trap_weight: MandrakeTrapWeight
     fungal_infection_trap_weight: FungalInfectionTrapWeight
     fear_trap_weight: FearTrapWeight
+    scoutmaster_trap_weight: ScoutmasterTrapWeight

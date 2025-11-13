@@ -55,6 +55,10 @@ namespace Peak.AP
             wooper,
             swinub,
             politoed,
+            ledyba,
+
+            terriermon,
+            wizardmon,
 
         }
 
@@ -97,6 +101,10 @@ namespace Peak.AP
             { Pokemon.wooper, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.swinub, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.politoed, CharacterAfflictions.STATUSTYPE.Poison },
+            { Pokemon.ledyba, CharacterAfflictions.STATUSTYPE.Web },
+
+            { Pokemon.terriermon, CharacterAfflictions.STATUSTYPE.Curse },
+            { Pokemon.wizardmon, CharacterAfflictions.STATUSTYPE.Curse },
         };
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)
