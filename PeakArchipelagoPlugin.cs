@@ -1430,7 +1430,7 @@ namespace Peak.AP
                 { "Deadly Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.95f, CharacterAfflictions.STATUSTYPE.Poison) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
                 { "Pokemon Trivia Trap", () => PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },
-                { "Swap Trap", () => SwapTrapEffect.ApplyPositionSwapTrap(_log) },
+                { "Swap Trap", () => PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },//SwapTrapEffect.ApplyPositionSwapTrap(_log) },
                 { "Nap Time Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Drowsy) },
                 { "Hungry Hungry Camper Trap", () => HungryHungryCamperTrapEffect.ApplyHungerTrap(_log) },
                 { "Balloon Trap", () => BalloonTrapEffect.ApplyBalloonTrap(_log) },

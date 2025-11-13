@@ -7,6 +7,8 @@ using UnityEngine.UI;
 using BepInEx.Logging;
 using Photon.Pun;
 using System.IO;
+using Zorro.Core;
+using TMPro;
 
 namespace Peak.AP
 {
@@ -140,11 +142,20 @@ namespace Peak.AP
         {
             try
             {
+                if (_isActive)
+                {
+                    log.LogInfo("[PeakPelago] Pokemon Trivia already active, queueing for later");
+
+                    _plugin.StartCoroutine(QueueTriviaForLater(log));
+                    return;
+                }
+
                 if (Character.localCharacter == null)
                 {
                     log.LogWarning("[PeakPelago] Cannot apply Pokemon Trivia - no local character");
                     return;
                 }
+
                 if (PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
                 {
                     PeakArchipelagoPlugin._instance.PhotonView.RPC(
@@ -162,11 +173,25 @@ namespace Peak.AP
                 log.LogError($"[PeakPelago] Error applying Pokemon Trivia trap: {ex.Message}");
             }
         }
+        
+        private static IEnumerator QueueTriviaForLater(ManualLogSource log)
+        {
+            while (_isActive)
+            {
+                yield return new WaitForSeconds(3f);
+            }
+            
+            yield return new WaitForSeconds(2f);
+            
+            log.LogInfo("[PeakPelago] Starting queued Pokemon Trivia trap");
+            ApplyPokemonTriviaTrap(log);
+        }
 
         private static IEnumerator PokemonTriviaCoroutine(ManualLogSource log)
         {
             _isActive = true;
             var question = GetRandomQuestion();
+            InputSpriteData inputSpriteData = SingletonAsset<InputSpriteData>.Instance;
             var triviaUI = new GameObject("PokemonTriviaUI");
             var canvas = triviaUI.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -210,6 +235,7 @@ namespace Peak.AP
             };
             var answerObjects = new List<GameObject>();
             var pokemonImages = new List<Image>();
+            var inputActions = new[] { "Move Up", "Move Left", "Move Right", "Move Down" };
             for (int i = 0; i < 4; i++)
             {
                 var pokemonObj = new GameObject($"Pokemon{i}");
@@ -223,7 +249,7 @@ namespace Peak.AP
                 var pokemonImage = pokemonObj.AddComponent<Image>();
                 pokemonImage.preserveAspect = true;
                 pokemonImage.color = Color.white;
-                
+
                 // Load Pokemon sprite
                 Texture2D pokemonTex = LoadPokemonTexture(question.Options[i]);
                 if (pokemonTex != null)
@@ -233,6 +259,25 @@ namespace Peak.AP
                         new Rect(0, 0, pokemonTex.width, pokemonTex.height),
                         new Vector2(0.5f, 0.5f)
                     );
+                }
+
+                var glyphObj = new GameObject($"InputGlyph{i}");
+                glyphObj.transform.SetParent(pokemonObj.transform);
+                var glyphRect = glyphObj.AddComponent<RectTransform>();
+                glyphRect.anchorMin = new Vector2(0f, 1f);
+                glyphRect.anchorMax = new Vector2(0f, 1f);
+                glyphRect.pivot = new Vector2(0f, 1f);
+                glyphRect.anchoredPosition = new Vector2(10, -10);
+                glyphRect.sizeDelta = new Vector2(80, 80);
+
+                var glyphImage = glyphObj.AddComponent<Image>();
+                glyphImage.preserveAspect = true;
+                glyphImage.color = Color.white;
+
+                Sprite glyphSprite = GetInputGlyphSprite(i, inputSpriteData);
+                if (glyphSprite != null)
+                {
+                    glyphImage.sprite = glyphSprite;
                 }
 
                 pokemonObj.SetActive(false);
@@ -378,6 +423,95 @@ namespace Peak.AP
             UnityEngine.Object.Destroy(triviaUI);
             _isActive = false;
             log.LogInfo("[PeakPelago] Pokemon Trivia trap completed");
+        }
+        
+        private static Sprite GetInputGlyphSprite(int answerIndex, InputSpriteData inputSpriteData)
+        {
+            if (inputSpriteData == null) return null;
+            
+            try
+            {
+                // Check if using gamepad - simplified approach
+                bool usingGamepad = UnityEngine.Input.GetJoystickNames().Length > 0 && 
+                                !string.IsNullOrEmpty(UnityEngine.Input.GetJoystickNames()[0]);
+                
+                TMP_SpriteAsset spriteAsset = null;
+                int spriteIndex = 0;
+                
+                if (usingGamepad)
+                {
+                    // Check controller icon setting to determine which sprite set to use
+                    var iconSetting = SettingsHandler.Instance?.GetSetting<ControllerIconSetting>();
+                    if (iconSetting != null)
+                    {
+                        switch (iconSetting.Value)
+                        {
+                            case ControllerIconSetting.IconMode.Style1:
+                                spriteAsset = inputSpriteData.xboxSprites;
+                                break;
+                            case ControllerIconSetting.IconMode.Style2:
+                                spriteAsset = inputSpriteData.ps5Sprites;
+                                break;
+                            case ControllerIconSetting.IconMode.KBM:
+                                usingGamepad = false; // Force keyboard mode
+                                break;
+                            case ControllerIconSetting.IconMode.Auto:
+                            default:
+                                spriteAsset = inputSpriteData.xboxSprites; // Default to Xbox
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        spriteAsset = inputSpriteData.xboxSprites;
+                    }
+                    
+                    if (usingGamepad)
+                    {
+                        spriteIndex = answerIndex switch
+                        {
+                            0 => 12, // up
+                            1 => 14, // left
+                            2 => 15, // right
+                            3 => 13, // down
+                            _ => 12
+                        };
+                    }
+                }
+                
+                if (!usingGamepad)
+                {
+                    spriteAsset = inputSpriteData.keyboardSprites;
+                    
+                    spriteIndex = answerIndex switch
+                    {
+                        0 => 32, // w
+                        1 => 10, // a
+                        2 => 13, // d
+                        3 => 28, // s
+                        _ => 32
+                    };
+                }
+                
+                if (spriteAsset != null && spriteIndex < spriteAsset.spriteGlyphTable.Count)
+                {
+                    var spriteGlyph = spriteAsset.spriteGlyphTable[spriteIndex];
+                    var glyphRect = spriteGlyph.glyphRect;
+                    
+                    // Convert GlyphRect to Rect
+                    return Sprite.Create(
+                        spriteAsset.spriteSheet as Texture2D,
+                        new Rect(glyphRect.x, glyphRect.y, glyphRect.width, glyphRect.height),
+                        new Vector2(0.5f, 0.5f)
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.LogWarning($"[PeakPelago] Failed to load input glyph: {ex.Message}");
+            }
+            
+            return null;
         }
         private static Font LoadCustomFont()
         {
