@@ -260,15 +260,20 @@ namespace Peak.AP
         {
             { "Bundle: Trailblazer Snacks", new BundleDefinition([
                 ("Granola Bar", 2),
-                ("TrailMix", 2)
+                ("TrailMix", 4)
             ]) },
-            { "Bundle: Lovely Bunch", new BundleDefinition("Item_Coconut", 3) },
+            { "Bundle: Lovely Bunch", new BundleDefinition("Item_Coconut", 4) },
             { "Bundle: Bear Favorite", new BundleDefinition("Item_Honeycomb", 6) },
             { "Bundle: Rainy Day", new BundleDefinition("Parasol", 4) },
             { "Bundle: Turkey Day", new BundleDefinition("EggTurkey", 3) },
+            { "Bundle: Special Delivery", new BundleDefinition("Dynamite", 5) },
             { "Bundle: For Your Health", new BundleDefinition([
                 ("FirstAidKit", 4),
                 ("Bandages", 4)
+            ]) },
+            { "Bundle: Rooty Tooty", new BundleDefinition([
+                ("MedicinalRoot", 6),
+                ("Mandrake", 1)
             ]) },
         };
         
