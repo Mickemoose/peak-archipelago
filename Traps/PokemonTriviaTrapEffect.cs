@@ -619,7 +619,7 @@ namespace Peak.AP
         private static readonly List<PokemonTriviaQuestion> PokemonTriviaQuestions = new List<PokemonTriviaQuestion>
         {
             new PokemonTriviaQuestion("Which Pokemon is the water starter of Johto?", Pokemon.totodile),
-            new PokemonTriviaQuestion("Which Pokemon is a the evolve form of Cyndaquill?", Pokemon.quilava),
+            new PokemonTriviaQuestion("Which Pokemon is the evolve form of Cyndaquill?", Pokemon.quilava),
             new PokemonTriviaQuestion("Which Pokemon can be found in the Ruins Of Alph?", Pokemon.unown),
             new PokemonTriviaQuestion("Which Pokemon eventually evolves into Raichu?", Pokemon.pichu),
             new PokemonTriviaQuestion("Which Pokemon evolves into Feraligatr?", Pokemon.totodile),
