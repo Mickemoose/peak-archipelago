@@ -19,7 +19,7 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
    - Download a mod manager like [Gale Mod Manager](https://thunderstore.io/c/peak/p/Kesomannen/GaleModManager/)
 
 2. **Install the PEAKPELAGO Mod**:
-   - **Download [PEAKPELAGO Mod](https://thunderstore.io/c/peak/p/PeakArchipelago/PEAKPELAGO/)
+   - Download [PEAKPELAGO Mod](https://thunderstore.io/c/peak/p/PeakArchipelago/PEAKPELAGO/)
 
 3. **Launch the Game**:
    - Start PEAK - the plugin will create a configuration file on first run
