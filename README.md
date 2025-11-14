@@ -157,7 +157,7 @@ The Python world code follows Archipelago's world API:
 
 ## Credits
 
-- **Mod Contributors**: ArchipelagoBrad, ManNamedGarbo, Mickemoose
+- **Mod Contributors**: ArchipelagoBrad, ManNamedGarbo, Mickemoose, Dmonet
 - **EnergyLink Vendor Assets**: [Dmonet](https://bsky.app/profile/dmonett.bsky.social)
 - **Archipelago**: [Archipelago Team](https://archipelago.gg/)
 - **PEAK**: [Landfall](https://landfall.se/) & [Aggro Crab](https://aggrocrab.com/)
