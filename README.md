@@ -157,7 +157,7 @@ The Python world code follows Archipelago's world API:
 
 ## Credits
 
-- **Mod Contributors**: ArchipelagoBrad, ManNamedGarbo, Mickemoose
+- **Mod Contributors**: ArchipelagoBrad, ManNamedGarbo, Mickemoose, Dmonet
 - **Archipelago**: [Archipelago Team](https://archipelago.gg/)
 - **PEAK**: [Landfall](https://landfall.se/) & [Aggro Crab](https://aggrocrab.com/)
 - **BepInEx**: [BepInEx Team](https://github.com/BepInEx/BepInEx)
