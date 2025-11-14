@@ -12,9 +12,9 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
 
 ## Installation
 
-### Client Plugin Installation
+## Client Plugin Installation
 
-## Thunderstore Install
+### Thunderstore Install
 1. **Install Mod Loader/Manager**:
    - Download a mod manager like [Gale Mod Manager](https://thunderstore.io/c/peak/p/Kesomannen/GaleModManager/)
 
@@ -25,7 +25,7 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
    - Start PEAK - the plugin will create a configuration file on first run
    - Connect using the in game UI
 
-## Manual Install
+### Manual Install
 1. **Install BepInEx**:
    - Download BepInEx 5.x for your platform
    - Extract to your PEAK game directory
@@ -40,13 +40,13 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
    - Start PEAK - the plugin will create a configuration file on first run
    - Connect using the in game UI
 
-### Archipelago World Installation
+## Archipelago World Installation
 
 1. **Locate Archipelago Installation**:
    - Double click the peak.apworld file to install the PEAK AP World into your Archipelago installation
 
 
-## How to Play
+### How to Play
 
 1. **Generate a Multiworld**:
    - Create a YAML configuration for your PEAK world
@@ -67,7 +67,7 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
    - Receive items from other players as they complete their objectives
    - Work together (or compete) to complete your goals!
 
-## Multiplayer
+### Multiplayer
 
 If you wish to climb the PEAK with your friends you can do so!
 All players just need to download the PEAKPELAGO Mod for their PEAK Game and join you as they would normally.
