@@ -1,3 +1,9 @@
+### v0.5.1
+<ul>
+    <li>hotfix for Death Links breaking when players are still waking up on the SHORE</li>
+    <li>hotfix for save state loading logic happening out of order</li>
+</ul>
+
 ### v0.5.0
 <ul>
     <li>A handful of new Traps</li>
