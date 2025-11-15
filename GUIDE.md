@@ -33,6 +33,7 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
    - Download the `peakpelago` folder from the releases
    - Drag the entire `peakpelago` folder into your `BepInEx/plugins/` directory
    - The folder contains all necessary files
+   - If you have a PeakArcihpelagoPluginDLL folder still, delete it
 
 3. **Launch the Game**:
    - Start PEAK - the plugin will create a configuration file on first run
