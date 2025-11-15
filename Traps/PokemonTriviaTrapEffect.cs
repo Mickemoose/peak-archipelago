@@ -61,6 +61,7 @@ namespace Peak.AP
 
             terriermon,
             wizardmon,
+            cheat,
 
         }
 
@@ -107,6 +108,7 @@ namespace Peak.AP
 
             { Pokemon.terriermon, CharacterAfflictions.STATUSTYPE.Curse },
             { Pokemon.wizardmon, CharacterAfflictions.STATUSTYPE.Curse },
+            { Pokemon.cheat, CharacterAfflictions.STATUSTYPE.Curse },
         };
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)

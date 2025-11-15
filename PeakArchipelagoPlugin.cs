@@ -567,10 +567,19 @@ namespace Peak.AP
             }
 
             string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            
             if (!currentScene.StartsWith("Level_"))
             {
+                _log.LogDebug($"[PeakPelago] Death link blocked - not in Level scene (current: {currentScene})");
                 return;
             }
+            
+            if (Character.localCharacter != null && Character.localCharacter.data.passedOutOnTheBeach > 0f)
+            {
+                _log.LogDebug("[PeakPelago] Death link blocked - player is passed out on beach");
+                return;
+            }
+
 
             try
             {
@@ -2854,7 +2863,7 @@ namespace Peak.AP
                 // Check for port changes before connecting
                 string host = cfgServer.Value;
                 string url = host.Contains(":") ? host : (host + ":" + cfgPort.Value);
-                LoadState();
+                //LoadState();
                 _log.LogInfo("[PeakPelago] Connecting to " + url + " as " + cfgSlot.Value + " (game=" + cfgGameId.Value + ")");
 
                 _session = ArchipelagoSessionFactory.CreateSession(url);
@@ -2964,6 +2973,7 @@ namespace Peak.AP
                 if (loginResult != null && loginResult.SlotData != null)
                 {
                     CheckAndHandleSessionChange(loginResult);
+                    LoadState();
                     _log.LogInfo("[PeakPelago] Received slot data with " + loginResult.SlotData.Count + " entries");
 
                     _log.LogInfo("[PeakPelago] ===== ALL SLOT DATA =====");
@@ -3609,7 +3619,7 @@ namespace Peak.AP
             {
                 if (!File.Exists(StateFilePath))
                 {
-                    _log.LogInfo("[PeakPelago] No state file found for port " + _currentPort + " - starting fresh");
+                    _log.LogInfo("[PeakPelago] No state file found - starting fresh");
                     return;
                 }
                 

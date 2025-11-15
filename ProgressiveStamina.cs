@@ -54,9 +54,11 @@ namespace Peak.AP
                 if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(STAMINA_KEY, out object existingStamina))
                 {
                     float existing = (float)existingStamina;
-                    if (existing != 1.0f) // Has non-default stamina
+                    // Only preserve if it's a VALID stamina value (0.25 or higher)
+                    // Don't preserve default/uninitialized values (0.0 or 1.0)
+                    if (existing >= 0.25f && existing != 1.0f)
                     {
-                        _log.LogInfo($"[PeakPelago] Player already has stamina: {existing:F2} - preserving it");
+                        _log.LogInfo($"[PeakPelago] Player already has valid stamina: {existing:F2} - preserving it");
                         return;
                     }
                 }
@@ -64,7 +66,7 @@ namespace Peak.AP
 
             if (_progressiveStaminaEnabled)
             {
-                _log.LogInfo("[PeakPelago] Progressive Stamina ENABLED - base max stamina set to 0.25 for new players");
+                _log.LogInfo("[PeakPelago] Progressive Stamina ENABLED - base max stamina set to 0.25");
 
                 // Set our local player's stamina property
                 if (PhotonNetwork.LocalPlayer != null)
