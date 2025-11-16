@@ -22,7 +22,7 @@ using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.1")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.2")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -1317,7 +1317,7 @@ namespace Peak.AP
         private float _lastAcquiredItemTime = 0f;
 
         // Mapping from in-game item names to Archipelago location names
-        private Dictionary<string, string> _itemToLocationMapping = new Dictionary<string, string>();
+        private Dictionary<ushort, string> _itemIdToLocationMapping = new Dictionary<ushort, string>();
 
         // Track which ascent badges have been awarded to avoid duplicates
         private HashSet<string> _awardedAscentBadges = new HashSet<string>();
@@ -1329,122 +1329,126 @@ namespace Peak.AP
 
         private void InitializeItemMapping()
         {
-            // Map in-game item names (all caps) to Archipelago location names
-            // Based on the Locations.py file from the .apworld
-            _itemToLocationMapping = new Dictionary<string, string>
+            // First, let's log all item IDs so we can map them correctly
+            //_log.LogInfo("[PeakPelago] === DISCOVERING ITEM IDS ===");
+            //for (ushort itemID = 0; itemID < 300; itemID++)
+            //{
+            //    if (ItemDatabase.TryGetItem(itemID, out Item item))
+            //    {
+            //        _log.LogInfo($"[PeakPelago] ID {itemID}: {item.name} | Display: {item.UIData.itemName}");
+            //    }
+            //}
+            //_log.LogInfo("[PeakPelago] === END ITEM ID DISCOVERY ===");
+            _itemIdToLocationMapping = new Dictionary<ushort, string>
             {
                 // Rope items
-                { "ROPE SPOOL", "Acquire Rope Spool" },
-                { "ROPE CANNON", "Acquire Rope Cannon" },
-                { "ANTI-ROPE SPOOL", "Acquire Anti-Rope Spool" },
-                { "ANTI-ROPE CANNON", "Acquire Anti-Rope Cannon" },
-                { "CHAIN LAUNCHER", "Acquire Chain Launcher" },
-                { "PITON", "Acquire Piton" },
-                { "RESCUE CLAW", "Acquire Rescue Claw" },
+                { 65, "Acquire Rope Spool" },
+                { 63, "Acquire Rope Cannon" },
+                { 1, "Acquire Anti-Rope Spool" },
+                { 64, "Acquire Anti-Rope Cannon" },
+                { 17, "Acquire Chain Launcher" },
+                { 18, "Acquire Piton" },
+                { 100, "Acquire Rescue Claw" },
                 
-                // Special items
-                { "MAGIC BEAN", "Acquire Magic Bean" },
-                { "PARASOL", "Acquire Parasol" },
-                { "BALLOON", "Acquire Balloon" },
-                { "BALLOON BUNCH", "Acquire Balloon Bunch" },
-                { "SCOUT CANNON", "Acquire Scout Cannon" },
-                { "FLYING DISC", "Acquire Flying Disc" },
-                { "GUIDEBOOK", "Acquire Guidebook" },
+                { 45, "Acquire Magic Bean" },
+                { 98, "Acquire Parasol" },
+                { 105, "Acquire Balloon" },
+                { 37, "Acquire Balloon Bunch" },
+                { 107, "Acquire Scout Cannon" },
+                { 99, "Acquire Flying Disc" },
+                { 34, "Acquire Guidebook" },
                 
-                // Fire/light items
-                { "PORTABLE STOVE", "Acquire Portable Stove" },
-                { "FIREWOOD", "Acquire FireWood" },
-                { "LANTERN", "Acquire Lantern" },
-                { "FLARE", "Acquire Flare" },
-                { "TORCH", "Acquire Torch" },
-                { "FAERIE LANTERN", "Acquire Faerie Lantern" },
+                { 62, "Acquire Portable Stove" },
+                { 28, "Acquire FireWood" },
+                { 42, "Acquire Lantern" },
+                { 32, "Acquire Flare" },
+                { 109, "Acquire Torch" },
+                { 43, "Acquire Faerie Lantern" },
                 
-                // Navigation items
-                { "CACTUS", "Acquire Cactus" },
-                { "COMPASS", "Acquire Compass" },
-                { "PIRATE'S COMPASS", "Acquire Pirate Compass" },
-                { "BINOCULARS", "Acquire Binoculars" },
-                
-                // Medical items
-                { "BANDAGES", "Acquire Bandages" },
-                { "FIRST AID KIT", "Acquire First-Aid Kit" },
-                { "ANTIDOTE", "Acquire Antidote" },
-                { "HEAT PACK", "Acquire Heat Pack" },
-                { "CURE-ALL", "Acquire Cure-All" },
-                { "REMEDY FUNGUS", "Acquire Remedy Fungus" },
-                { "MEDICINAL ROOT", "Acquire Medicinal Root" },
-                { "ALOE VERA", "Acquire Aloe Vera" },
-                { "SUNSCREEN", "Acquire Sunscreen" },
-                { "MARSHMALLOW", "Acquire Marshmallow" },
-                { "HOT DOG", "Acquire Glizzy" },
-                { "FORTIFIED MILK", "Acquire Fortified Milk" },
+                { 48, "Acquire Cactus" },
+                { 23, "Acquire Compass" },
+                { 61, "Acquire Pirate Compass" },
+                { 14, "Acquire Binoculars" },
+                { 7, "Acquire Bandages" },
+                { 29, "Acquire First-Aid Kit" },
+                { 2, "Acquire Antidote" },
+                { 35, "Acquire Heat Pack" },
+                { 24, "Acquire Cure-All" },
+                { 90, "Acquire Remedy Fungus" },
+                { 81, "Acquire Medicinal Root" },
+                { 101, "Acquire Aloe Vera" },
+                { 104, "Acquire Sunscreen" },
+                { 46, "Acquire Marshmallow" },
+                { 154, "Acquire Glizzy" },
+                { 152, "Acquire Fortified Milk" },
                 
                 // Special objects
-                { "SCOUT EFFIGY", "Acquire Scout Effigy" },
-                { "CURSED SKULL", "Acquire Cursed Skull" },
-                { "PANDORA'S LUNCHBOX", "Acquire Pandora's Lunchbox" },
-                { "ANCIENT IDOL", "Acquire Ancient Idol" },
-                { "STRANGE GEM", "Acquire Strange Gem" },
-                { "THE BOOK OF BONES", "Acquire Book of Bones" },
-                { "CHECKPOINT FLAG", "Acquire Checkpoint Flag" },
+                { 67, "Acquire Scout Effigy" },
+                { 25, "Acquire Cursed Skull" },
+                { 58, "Acquire Pandora's Lunchbox" },
+                { 47, "Acquire Ancient Idol" },
+                { 112, "Acquire Strange Gem" },
+                { 115, "Acquire Book of Bones" },
+                { 30, "Acquire Checkpoint Flag" },
+                { 117, "Acquire Cloud Fungus" },
                 
                 // Musical items
-                { "BUGLE OF FRIENDSHIP", "Acquire Bugle of Friendship" },
-                { "BUGLE", "Acquire Bugle" },
+                { 16, "Acquire Bugle of Friendship" },
+                { 15, "Acquire Bugle" },
                 
                 // Mushrooms
-                { "SHELF FUNGUS", "Acquire Shelf Shroom" },
-                { "BOUNCE SHROOM", "Acquire Bounce Shroom" },
-                { "BUTTON SHROOM", "Acquire Button Shroom" },
-                { "BUGLE SHROOM", "Acquire Bugle Shroom" },
-                { "CLUSTER SHROOM", "Acquire Cluster Shroom" },
-                { "CHUBBY SHROOM", "Acquire Chubby Shroom" },
+                { 68, "Acquire Shelf Shroom" },
+                { 79, "Acquire Bounce Shroom" },
+                { 102, "Acquire Button Shroom" },
+                { 93, "Acquire Bugle Shroom" },
+                { 88, "Acquire Cluster Shroom" },
+                { 83, "Acquire Chubby Shroom" },
                 
                 // Food items
-                { "TRAIL MIX", "Acquire Trail Mix" },
-                { "GRANOLA BAR", "Acquire Granola Bar" },
-                { "SCOUT COOKIES", "Acquire Scout Cookies" },
-                { "AIRLINE FOOD", "Acquire Airline Food" },
-                { "ENERGY DRINK", "Acquire Energy Drink" },
-                { "SPORTS DRINK", "Acquire Sports Drink" },
-                { "BIG LOLLIPOP", "Acquire Big Lollipop" },
-                { "BIG EGG", "Acquire Big Egg" },
-                { "EGG", "Acquire Egg" },
-                { "BIRD", "Acquire Cooked Bird" },
-                { "HONEYCOMB", "Acquire Honeycomb" },
-                { "BEEHIVE", "Acquire Beehive" },
-                { "SCORPION", "Acquire Scorpion" },
+                { 73, "Acquire Trail Mix" },
+                { 33, "Acquire Granola Bar" },
+                { 66, "Acquire Scout Cookies" },
+                { 0, "Acquire Airline Food" },
+                { 27, "Acquire Energy Drink" },
+                { 71, "Acquire Sports Drink" },
+                { 44, "Acquire Big Lollipop" },
+                { 57, "Acquire Big Egg" },
+                { 26, "Acquire Egg" },
+                { 114, "Acquire Cooked Bird" },
+                { 38, "Acquire Honeycomb" },
+                { 8, "Acquire Beehive" },
+                { 111, "Acquire Scorpion" },
                 
                 // Miscellaneous items
-                { "CONCH", "Acquire Conch" },
-                { "BERRYNANA PEEL", "Acquire Berrynana Peel" },
-                { "DYNAMITE", "Acquire Dynamite" },
-                { "BING BONG", "Acquire Bing Bong" },
-                { "MANDRAKE", "Acquire Mandrake" },
+                { 69, "Acquire Conch" },
+                { 94, "Acquire Berrynana Peel" },
+                { 106, "Acquire Dynamite" },
+                { 13, "Acquire Bing Bong" },
+                { 155, "Acquire Mandrake" },
                 
                 // Berries
-                { "RED CRISPBERRY", "Acquire Red Crispberry" },
-                { "GREEN CRISPBERRY", "Acquire Green Crispberry" },
-                { "YELLOW CRISPBERRY", "Acquire Yellow Crispberry" },
-                { "COCONUT", "Acquire Coconut" },
-                { "COCONUT HALF", "Acquire Coconut Half" },
-                { "BROWN BERRYNANA", "Acquire Brown Berrynana" },
-                { "BLUE BERRYNANA", "Acquire Blue Berrynana" },
-                { "PINK BERRYNANA", "Acquire Pink Berrynana" },
-                { "YELLOW BERRYNANA", "Acquire Yellow Berrynana" },
-                { "ORANGE WINTERBERRY", "Acquire Orange Winterberry" },
-                { "YELLOW WINTERBERRY", "Acquire Yellow Winterberry" },
-                { "RED PRICKLEBERRY", "Acquire Red Prickleberry" },
-                { "GOLD PRICKLEBERRY", "Acquire Gold Prickleberry" },
+                { 4, "Acquire Red Crispberry" },
+                { 3, "Acquire Green Crispberry" },
+                { 5, "Acquire Yellow Crispberry" },
+                { 36, "Acquire Coconut" },
+                { 55, "Acquire Coconut Half" },
+                { 10, "Acquire Brown Berrynana" },
+                { 9, "Acquire Blue Berrynana" },
+                { 11, "Acquire Pink Berrynana" },
+                { 12, "Acquire Yellow Berrynana" },
+                { 75, "Acquire Orange Winterberry" },
+                { 76, "Acquire Yellow Winterberry" },
+                { 108, "Acquire Red Prickleberry" },
+                { 103, "Acquire Gold Prickleberry" },
 
-                { "RED SHROOMBERRY", "Acquire Red Shroomberry" },
-                { "BLUE SHROOMBERRY", "Acquire Blue Shroomberry" },
-                { "GREEN SHROOMBERRY", "Acquire Green Shroomberry" },
-                { "YELLOW SHROOMBERRY", "Acquire Yellow Shroomberry" },
-                { "PURPLE SHROOMBERRY", "Acquire Purple Shroomberry" },
+                { 161, "Acquire Red Shroomberry" },
+                { 158, "Acquire Blue Shroomberry" },
+                { 159, "Acquire Green Shroomberry" },
+                { 162, "Acquire Yellow Shroomberry" },
+                { 160, "Acquire Purple Shroomberry" },
             };
 
-            _log.LogInfo("[PeakPelago] Initialized item mapping with " + _itemToLocationMapping.Count + " items");
+            _log.LogInfo("[PeakPelago] Initialized item ID mapping with " + _itemIdToLocationMapping.Count + " items");
         }
 
         private void InitializeItemEffectHandlers()
@@ -2152,22 +2156,30 @@ namespace Peak.AP
 
         private void TrackItemAcquisition(string itemName, ushort itemId = 0)
         {
-            if (string.IsNullOrEmpty(itemName)) return;
+            _log.LogInfo($"[PeakPelago] TrackItemAcquisition: '{itemName}' (ID: {itemId})");
+            
+            if (itemId == 0)
+            {
+                _log.LogWarning("[PeakPelago] Item ID is 0, skipping");
+                return;
+            }
 
             // Update last acquired item info
             _lastAcquiredItemName = itemName;
             _lastAcquiredItemId = itemId;
             _lastAcquiredItemTime = Time.time;
 
-            // Check if this item has an Archipelago location to report
-            if (_itemToLocationMapping.TryGetValue(itemName.ToUpper(), out string locationName))
+            // Check if this item ID has an Archipelago location to report
+            if (_itemIdToLocationMapping.TryGetValue(itemId, out string locationName))
             {
+                _log.LogInfo($"[PeakPelago] Found AP location for ID {itemId}: {locationName}");
                 ReportCheckByName(locationName);
             }
             else
             {
-                _log.LogDebug("[PeakPelago] No Archipelago location found for item: " + itemName);
+                _log.LogDebug($"[PeakPelago] No Archipelago location found for item ID: {itemId} ({itemName})");
             }
+            
             SaveState();
         }
 
@@ -2387,6 +2399,27 @@ namespace Peak.AP
         }
 
         // ===== Harmony Patches =====
+        [HarmonyPatch(typeof(RunManager), "StartRun")]
+        public static class RunManagerStartRunPatch
+        {
+            static void Postfix(RunManager __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    
+                    _instance._log.LogInfo("[PeakPelago] New run started - resetting run counters");
+                    _instance.ResetRunCounters();
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] StartRun patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
         [HarmonyPatch(typeof(CharacterItems), "HammerClimbingSpike")]
         public static class CharacterItemsHammerClimbingSpikePatch
         {
@@ -2463,7 +2496,10 @@ namespace Peak.AP
                 try
                 {
                     if (_instance == null) return;
+                    
                     int currentSegment = (int)__instance.GetCurrentSegment();
+                    
+                    // Update spawn points for DeathLink
                     if (currentSegment >= 0 && currentSegment < __instance.segments.Length)
                     {
                         var segment = __instance.segments[currentSegment];
@@ -2479,9 +2515,27 @@ namespace Peak.AP
                             
                             _instance._log.LogInfo($"[PeakPelago] Updated spawn point for all players to segment {currentSegment}: {segment.reconnectSpawnPos.position}");
                         }
-                        else
+                    }
+                    
+                    // Award badge for the segment we just COMPLETED (previous segment)
+                    if (currentSegment > 0)
+                    {
+                        var previousSegment = __instance.segments[currentSegment - 1];
+                        var progressHandler = MountainProgressHandler.Instance;
+                        
+                        if (progressHandler != null && progressHandler.progressPoints != null)
                         {
-                            _instance._log.LogWarning($"[PeakPelago] Segment {currentSegment} has no reconnect spawn position");
+                            // Find the progress point that matches the biome we just completed
+                            foreach (var point in progressHandler.progressPoints)
+                            {
+                                if (point.biome == previousSegment.biome)
+                                {
+                                    string peakName = point.title;
+                                    _instance._log.LogInfo($"[PeakPelago] Completed segment: {peakName} (biome: {previousSegment.biome})");
+                                    _instance.HandleAscentPeakReached(peakName);
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -2490,6 +2544,7 @@ namespace Peak.AP
                     if (_instance != null)
                     {
                         _instance._log.LogError($"[PeakPelago] GoToSegment patch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
                     }
                 }
             }
@@ -2813,25 +2868,24 @@ namespace Peak.AP
                 {
                     if (_instance == null) return;
 
-                    // Get the peak name from the progress point
-                    string peakName = "Unknown";
-                    if (pointReached != null)
+                    string peakName = pointReached?.title ?? "Unknown";
+                    
+                    // ONLY handle PEAK here - other segments are handled by GoToSegment patch
+                    if (peakName.ToUpper() == "PEAK")
                     {
-                        var titleField = pointReached.GetType().GetField("title");
-                        if (titleField != null)
-                        {
-                            peakName = (string)titleField.GetValue(pointReached) ?? "Unknown";
-                        }
+                        _instance._log.LogInfo($"[PeakPelago] Player reached final PEAK: {peakName}");
+                        _instance.HandleAscentPeakReached(peakName);
                     }
-
-                    _instance._log.LogInfo("[PeakPelago] Player reached peak: " + peakName);
-                    _instance.HandleAscentPeakReached(peakName);
+                    else
+                    {
+                        _instance._log.LogDebug($"[PeakPelago] Ignoring progress point {peakName} - handled by GoToSegment");
+                    }
                 }
                 catch (Exception ex)
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError("[PeakPelago] CheckAreaAchievement patch error: " + ex.Message);
+                        _instance._log.LogError($"[PeakPelago] CheckAreaAchievement patch error: {ex.Message}");
                     }
                 }
             }
@@ -3350,19 +3404,36 @@ namespace Peak.AP
                     }
                 }
                 
+                _log.LogInfo($"[PeakPelago] Recovery: Found {progressiveAscentCount} Progressive Ascent items, currently have {_unlockedAscents.Count} unlocked");
+                
                 // Unlock ascents based on the count of Progressive Ascent items received
                 for (int i = 1; i <= progressiveAscentCount && i <= 7; i++)
                 {
                     if (!_unlockedAscents.Contains(i))
                     {
                         _unlockedAscents.Add(i);
-                        _log.LogInfo($"[PeakPelago] Recovered progressive ascent unlock: {i}");
+                        
+                        // Use reflection to access the Ascents class and unlock the ascent
+                        var ascentsType = Type.GetType("Ascents");
+                        if (ascentsType != null)
+                        {
+                            var unlockMethod = ascentsType.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                            if (unlockMethod != null)
+                            {
+                                unlockMethod.Invoke(null, new object[] { i });
+                                _log.LogInfo($"[PeakPelago] Recovered and unlocked ascent: {i}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _log.LogDebug($"[PeakPelago] Ascent {i} already in unlocked set, skipping");
                     }
                 }
                 
                 if (_unlockedAscents.Count > 0)
                 {
-                    _log.LogInfo($"[PeakPelago] Recovered {_unlockedAscents.Count} ascent unlocks from {progressiveAscentCount} Progressive Ascent items: {string.Join(", ", _unlockedAscents.OrderBy(x => x))}");
+                    _log.LogInfo($"[PeakPelago] Recovery complete: {_unlockedAscents.Count} total ascents unlocked: {string.Join(", ", _unlockedAscents.OrderBy(x => x))}");
                 }
             }
             catch (Exception ex)
@@ -3532,7 +3603,13 @@ namespace Peak.AP
                 
                 if (isTrap)
                 {
-                    _trapLinkService?.QueueTrap(itemName);
+                    if (_trapLinkService != null && _trapLinkEnabled)
+                    {
+                        _trapLinkService?.QueueTrap(itemName);
+                    } else 
+                    {
+                        ApplyItemEffect(itemName);
+                    }
                 }
                 else
                 {

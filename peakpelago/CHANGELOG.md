@@ -1,3 +1,14 @@
+
+### v0.5.2
+<ul>
+    <li>Hotfix for Traps not working if TrapLink was disabled</li>
+    <li>Hotfix for assetbundle loading when downloaded through a mod manager</li>
+    <li>Luggage Checks Per Run now properly resets</li>
+    <li>EnergyLink wasn't properly communicating with the server</li>
+    <li>Item mapping changed to IDs for more consistent results</li>
+    <li>Yeet Trap needed updating due to one of the later post ROOTS updates</li>
+</ul>
+
 ### v0.5.1
 <ul>
     <li>hotfix for Death Links breaking when players are still waking up on the SHORE</li>

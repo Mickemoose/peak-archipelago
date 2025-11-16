@@ -117,7 +117,7 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Brown Berrynana",
         "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", "Acquire Yellow Winterberry",
         "Acquire Strange Gem", "Acquire Egg", "Acquire Cooked Bird", "Acquire Honeycomb", "Acquire Beehive", "Acquire Big Egg",
-        "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk"
+        "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk", "Acquire Cloud Fungus"
     ]
     
     for acquire_name in acquire_locations:

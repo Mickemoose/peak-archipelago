@@ -22,14 +22,12 @@ namespace Peak.AP
 
                 if (targetMode == TargetMode.RandomPlayer)
                 {
-                    // Use the static AllCharacters list for random selection
                     if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
                     {
                         log.LogWarning("[PeakPelago] Cannot apply yeet trap - no characters found");
                         return;
                     }
 
-                    // Filter to only active, alive characters that are holding items
                     var validCharacters = Character.AllCharacters.Where(c => 
                         c != null && 
                         c.gameObject.activeInHierarchy && 
@@ -43,23 +41,20 @@ namespace Peak.AP
                         return;
                     }
 
-                    // Pick a random character
                     var random = new System.Random();
                     targetCharacter = validCharacters[random.Next(validCharacters.Count)];
                 }
                 else
                 {
-                    // Default to local player
                     targetCharacter = Character.localCharacter;
                 }
 
-                if (targetCharacter == null || targetCharacter.refs.items == null)
+                if (targetCharacter == null)
                 {
-                    log.LogWarning("[PeakPelago] Cannot apply yeet trap - target character or items not found");
+                    log.LogWarning("[PeakPelago] Cannot apply yeet trap - target character not found");
                     return;
                 }
 
-                // Check if character is actually holding an item
                 if (targetCharacter.data.currentItem == null)
                 {
                     log.LogWarning("[PeakPelago] Cannot apply yeet trap - target character not holding an item");
@@ -70,8 +65,7 @@ namespace Peak.AP
                 string itemName = targetCharacter.data.currentItem.UIData?.itemName ?? "item";
                 log.LogInfo($"[PeakPelago] Applying Yeet Item Trap to {characterName} - throwing {itemName}!");
 
-                // Apply the yeet during the next fixed update to ensure proper timing
-                targetCharacter.StartCoroutine(YeetItemNextFrame(targetCharacter, log));
+                targetCharacter.StartCoroutine(YeetItemNextFrame(targetCharacter, characterName, log));
             }
             catch (Exception ex)
             {
@@ -80,7 +74,7 @@ namespace Peak.AP
             }
         }
 
-        private static IEnumerator YeetItemNextFrame(Character targetCharacter, ManualLogSource log)
+        private static IEnumerator YeetItemNextFrame(Character targetCharacter, string characterName, ManualLogSource log)
         {
             yield return new WaitForFixedUpdate();
 
@@ -99,20 +93,13 @@ namespace Peak.AP
                 }
 
                 var characterItems = targetCharacter.refs.items;
+                Item currentItem = targetCharacter.data.currentItem;
                 
-                // Check if we have a valid selected slot
                 if (!characterItems.currentSelectedSlot.IsSome)
                 {
                     log.LogWarning("[PeakPelago] No slot selected, cannot yeet item");
                     yield break;
                 }
-
-                characterItems.throwChargeLevel = 1.0f;
-
-                Item currentItem = targetCharacter.data.currentItem;
-                Vector3 itemPosition = currentItem.transform.position;
-                Vector3 itemVelocity = currentItem.rig.linearVelocity;
-                Quaternion itemRotation = currentItem.transform.rotation;
 
                 byte currentSlot = characterItems.currentSelectedSlot.Value;
                 
@@ -123,18 +110,21 @@ namespace Peak.AP
                     yield break;
                 }
 
+                // Set max throw charge
+                characterItems.throwChargeLevel = 1.0f;
                 characterItems.photonView.RPC(
                     "DropItemRpc", 
                     Photon.Pun.RpcTarget.All, 
-                    1.0f,
-                    currentSlot, 
-                    itemPosition, 
-                    itemVelocity, 
-                    itemRotation, 
-                    itemSlot.data
+                    1.0f,                           // float throwCharge
+                    currentSlot,                    // byte slotID
+                    currentItem.transform.position, // Vector3 spawnPos
+                    currentItem.rig.linearVelocity, // Vector3 velocity
+                    currentItem.transform.rotation, // Quaternion rotation
+                    itemSlot.data,                  // ItemInstanceData itemInstanceData
+                    false                           // bool cacheToDroppedItems
                 );
 
-                log.LogInfo($"[PeakPelago] Successfully yeeted item from {targetCharacter.characterName ?? "player"}!");
+                log.LogInfo($"[PeakPelago] Successfully yeeted item from {characterName}!");
             }
             catch (Exception ex)
             {

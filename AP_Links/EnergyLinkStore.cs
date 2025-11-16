@@ -67,7 +67,11 @@ namespace Peak.AP
 
         private static void LoadModelPrefab()
         {
-            string bundlePath = Path.Combine(BepInEx.Paths.PluginPath, "peakpelago", "energylinkstore.peakbundle");
+            // Get the directory where this DLL is located
+            string pluginDirectory = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            string bundlePath = Path.Combine(pluginDirectory, "energylinkstore.peakbundle");
+
+            _log?.LogInfo($"[CampfireSpawner] Looking for AssetBundle at: {bundlePath}");
 
             if (File.Exists(bundlePath))
             {
@@ -103,6 +107,10 @@ namespace Peak.AP
                 {
                     _log?.LogError($"[CampfireSpawner] Error loading AssetBundle: {ex.Message}");
                 }
+            }
+            else
+            {
+                _log?.LogError($"[CampfireSpawner] AssetBundle not found at: {bundlePath}");
             }
         }
 
@@ -256,7 +264,6 @@ namespace Peak.AP
         private BoxCollider _collider;
         private Animator _animator;
         private int _cachedEnergy = 0;
-        private int _cachedMaxEnergy = 0;
         private string _selectedBundleName;
         private Action _selectedBundleAction;
         private const int BUNDLE_COST = 300;
@@ -330,12 +337,11 @@ namespace Peak.AP
             {
                 _log?.LogWarning("[EnergyLinkStore] No Animator found!");
             }
-                    
+                        
             if (_energyLinkService?.IsEnabled() == true)
             {
                 _cachedEnergy = _energyLinkService.GetCurrentEnergy();
-                _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
-                _log?.LogInfo($"[EnergyLinkStore] Initial energy: {_cachedEnergy}/{_cachedMaxEnergy}");
+                _log?.LogInfo($"[EnergyLinkStore] Initial energy: {_cachedEnergy}"); // REMOVED max energy
             }
             UpdateCachedEnergy();
             SelectRandomBundle();
@@ -403,7 +409,6 @@ namespace Peak.AP
             if (_energyLinkService?.IsEnabled() == true)
             {
                 _cachedEnergy = _energyLinkService.GetCurrentEnergy();
-                _cachedMaxEnergy = _energyLinkService.GetMaxEnergy();
             }
         }
         
