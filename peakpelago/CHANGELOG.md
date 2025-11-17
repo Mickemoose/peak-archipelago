@@ -1,3 +1,10 @@
+### v0.5.3
+<ul>
+    <li>hotfix for items sometimes not sending until the next run</li>
+    <li>hotfix for progressive stamina bars not loading properly</li>
+    <li>Sudden disconnects will attempt reconnection</li>
+    <li>AP UI will reset if reconnect attempts fail showing the Connection UI</li>
+</ul>
 
 ### v0.5.2
 <ul>

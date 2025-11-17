@@ -64,16 +64,41 @@ namespace Peak.AP
             int xPos = 16;
             int yPos = 36;
             int labelWidth = rectWidth / 2;
-
-            // Check if we're connected (either as host or synced from host)
-            bool isConnected = _plugin != null && _plugin.Status == "Connected";
+            bool isConnected = _plugin.Status == "Connected";
             bool isHost = PhotonNetwork.IsMasterClient;
             bool inMultiplayer = PhotonNetwork.IsConnected && PhotonNetwork.CurrentRoom != null;
-
+            bool isReconnecting = _plugin != null && _plugin.IsReconnecting;
+            int reconnectAttempts = _plugin != null ? _plugin._reconnectAttempts : 0;
+            int maxReconnectAttempts = _plugin != null ? PeakArchipelagoPlugin.MAX_RECONNECT_ATTEMPTS : 10;
+            int offlineCheckCount = _plugin != null ? _plugin.OfflineCheckCount : 0;
+            /*
+            if (isConnected && GUI.Button(new Rect(xPos, yPos + rowHeight * 2, 120, rowHeight), "TEST: Disconnect"))
+            {
+                _plugin._log.LogInfo("[PeakPelago] Disconnect button clicked");
+                _plugin.Session.Socket.Disconnect();
+                _plugin._log.LogInfo("[PeakPelago] Disconnect() called");
+                _plugin._status = "Disconnected";
+            }*/
             if (!isConnected)
             {
-                // Show connection UI only if we're the host or in single player
-                if (isHost || !inMultiplayer)
+                if (isReconnecting && (isHost || !inMultiplayer))
+                {
+                    int totalHeight = 12 + rowHeight * 2;
+                    _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
+                    
+                    GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), 
+                        $"Reconnecting... (Attempt {reconnectAttempts}/{maxReconnectAttempts})", 
+                        labelStyle);
+                    yPos += rowHeight;
+                    
+                    if (offlineCheckCount > 0)
+                    {
+                        GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), 
+                            $"{offlineCheckCount} checks queued", 
+                            labelStyle);
+                    }
+                }
+                else if (!isReconnecting && (isHost || !inMultiplayer))
                 {
                     int totalHeight = 12 + rowHeight * 6;
                     _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
@@ -141,7 +166,6 @@ namespace Peak.AP
                 }
                 else
                 {
-                    // Client in multiplayer
                     int totalHeight = 12 + rowHeight;
                     _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
                     GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), "Archipelago: Connected to Host", labelStyle);
@@ -149,7 +173,6 @@ namespace Peak.AP
             }
             else
             {
-                // Connected - show different message based on role
                 int totalHeight = 12 + rowHeight;
                 _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
                 
@@ -164,8 +187,6 @@ namespace Peak.AP
                 }
 
                 GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), message, labelStyle);
-                
-                
             }
         }
 

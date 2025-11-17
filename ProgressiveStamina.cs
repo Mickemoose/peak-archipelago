@@ -8,6 +8,7 @@ using Photon.Realtime;
 using UnityEngine;
 using ExitGames.Client.Photon;
 using Zorro.Core;
+using Archipelago.MultiClient.Net;
 
 namespace Peak.AP
 {
@@ -20,6 +21,10 @@ namespace Peak.AP
         
         // Store the loaded stamina value to apply later when Photon is ready
         private float? _pendingStaminaLoad = null;
+        
+        // NEW: Track local state to avoid Photon sync delays
+        public float _localBaseMaxStamina = 0.25f;
+        public int _localStaminaUpgrades = 0;
 
         public ProgressiveStaminaManager(ManualLogSource log)
         {
@@ -59,6 +64,9 @@ namespace Peak.AP
                     if (existing >= 0.25f && existing != 1.0f)
                     {
                         _log.LogInfo($"[PeakPelago] Player already has valid stamina: {existing:F2} - preserving it");
+                        // Update local state to match
+                        _localBaseMaxStamina = existing;
+                        _localStaminaUpgrades = Mathf.RoundToInt((existing - 0.25f) / 0.25f);
                         return;
                     }
                 }
@@ -67,6 +75,10 @@ namespace Peak.AP
             if (_progressiveStaminaEnabled)
             {
                 _log.LogInfo("[PeakPelago] Progressive Stamina ENABLED - base max stamina set to 0.25");
+
+                // Initialize local state
+                _localBaseMaxStamina = 0.25f;
+                _localStaminaUpgrades = 0;
 
                 // Set our local player's stamina property
                 if (PhotonNetwork.LocalPlayer != null)
@@ -79,6 +91,9 @@ namespace Peak.AP
                 _log.LogInfo("[PeakPelago] Progressive Stamina DISABLED - using normal 1.0 max stamina");
                 
                 // Reset to default
+                _localBaseMaxStamina = 1.0f;
+                _localStaminaUpgrades = 0;
+                
                 if (PhotonNetwork.LocalPlayer != null)
                 {
                     SetPlayerStamina(PhotonNetwork.LocalPlayer, 1.0f);
@@ -91,6 +106,14 @@ namespace Peak.AP
             Hashtable props = new Hashtable();
             props[STAMINA_KEY] = baseMax;
             player.SetCustomProperties(props);
+            
+            // Update local state immediately
+            if (player == PhotonNetwork.LocalPlayer)
+            {
+                _localBaseMaxStamina = baseMax;
+                _localStaminaUpgrades = Mathf.RoundToInt((baseMax - 0.25f) / 0.25f);
+            }
+            
             _log.LogInfo($"[PeakPelago] Set stamina for player {player.ActorNumber} to {baseMax}");
         }
 
@@ -104,24 +127,34 @@ namespace Peak.AP
 
             if (PhotonNetwork.LocalPlayer == null) return;
 
-            float currentStamina = GetPlayerStamina(PhotonNetwork.LocalPlayer);
             int maxUpgrades = _additionalBarsEnabled ? 7 : 4;
-            int currentUpgrades = Mathf.RoundToInt((currentStamina - 0.25f) / 0.25f);
             
-            if (currentUpgrades >= maxUpgrades)
+            // Use local state instead of reading from Photon
+            if (_localStaminaUpgrades >= maxUpgrades)
             {
                 _log.LogInfo($"[PeakPelago] Already at max stamina upgrades ({maxUpgrades})");
                 return;
             }
 
-            float newStamina = currentStamina + 0.25f;
-            SetPlayerStamina(PhotonNetwork.LocalPlayer, newStamina);
+            // Update local state first
+            _localStaminaUpgrades++;
+            _localBaseMaxStamina += 0.25f;
             
-            _log.LogInfo($"[PeakPelago] Applied stamina upgrade: new base max = {newStamina}");
+            // Then sync to Photon (this may take time)
+            SetPlayerStamina(PhotonNetwork.LocalPlayer, _localBaseMaxStamina);
+            
+            _log.LogInfo($"[PeakPelago] Applied stamina upgrade: now at {_localStaminaUpgrades} upgrades, {_localBaseMaxStamina} base max");
         }
 
         public float GetPlayerStamina(Photon.Realtime.Player player)
         {
+            // For local player, use local state (most up-to-date)
+            if (player == PhotonNetwork.LocalPlayer && _progressiveStaminaEnabled)
+            {
+                return _localBaseMaxStamina;
+            }
+            
+            // For other players, read from Photon
             if (player == null || player.CustomProperties == null)
             {
                 return _progressiveStaminaEnabled ? 0.25f : 1.0f;
@@ -161,7 +194,7 @@ namespace Peak.AP
             {
                 return GetBaseMaxStamina(Character.observedCharacter);
             }
-            return _progressiveStaminaEnabled ? 0.25f : 1.0f;
+            return _progressiveStaminaEnabled ? _localBaseMaxStamina : 1.0f;
         }
 
         public float GetEffectiveMaxStamina()
@@ -189,10 +222,8 @@ namespace Peak.AP
         {
             if (!_progressiveStaminaEnabled) return 0;
             
-            if (PhotonNetwork.LocalPlayer == null) return 0;
-            
-            float currentStamina = GetPlayerStamina(PhotonNetwork.LocalPlayer);
-            return Mathf.RoundToInt((currentStamina - 0.25f) / 0.25f);
+            // Return local state (most up-to-date)
+            return _localStaminaUpgrades;
         }
 
         public bool IsProgressiveStaminaEnabled()
@@ -217,13 +248,34 @@ namespace Peak.AP
             }
         }
 
+        public void SyncWithArchipelago(ArchipelagoSession session)
+        {
+            if (!_progressiveStaminaEnabled || session == null) return;
+            
+            int staminaItems = session.Items.AllItemsReceived.Count(item =>
+            {
+                string itemName = session.Items.GetItemName(item.ItemId, item.ItemGame);
+                return itemName?.Equals("Progressive Stamina Bar", StringComparison.OrdinalIgnoreCase) ?? false;
+            });
+            
+            float correctStamina = 0.25f + (staminaItems * 0.25f);
+            
+            _localBaseMaxStamina = correctStamina;
+            _localStaminaUpgrades = staminaItems;
+            
+            if (PhotonNetwork.LocalPlayer != null)
+            {
+                Hashtable props = new Hashtable();
+                props["AP_Stamina"] = correctStamina;
+                PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+                _log.LogInfo($"[PeakPelago] Synced stamina to {correctStamina} ({staminaItems} items)");
+            }
+        }
+
         public string SaveState()
         {
-            if (PhotonNetwork.LocalPlayer == null) return "0,0.25";
-            
-            int upgrades = GetStaminaUpgradesReceived();
-            float stamina = GetPlayerStamina(PhotonNetwork.LocalPlayer);
-            return $"{upgrades},{stamina:F2}";
+            // Use local state (always accurate)
+            return $"{_localStaminaUpgrades},{_localBaseMaxStamina:F2}";
         }
 
         public void LoadState(string stateData)
@@ -235,18 +287,23 @@ namespace Peak.AP
                 var parts = stateData.Split(',');
                 if (parts.Length >= 2)
                 {
+                    int upgrades = int.Parse(parts[0]);
                     float stamina = float.Parse(parts[1]);
                     
-                    // Try to apply immediately if Photon is ready, otherwise store it
+                    // Update local state immediately
+                    _localStaminaUpgrades = upgrades;
+                    _localBaseMaxStamina = stamina;
+                    
+                    // Try to apply to Photon if ready, otherwise store it
                     if (PhotonNetwork.LocalPlayer != null)
                     {
                         SetPlayerStamina(PhotonNetwork.LocalPlayer, stamina);
-                        _log.LogInfo($"[PeakPelago] Loaded stamina state: {stamina:F2} max");
+                        _log.LogInfo($"[PeakPelago] Loaded stamina state: {upgrades} upgrades, {stamina:F2} max");
                     }
                     else
                     {
                         _pendingStaminaLoad = stamina;
-                        _log.LogInfo($"[PeakPelago] Stored pending stamina load: {stamina:F2} max (will apply when Photon connects)");
+                        _log.LogInfo($"[PeakPelago] Stored pending stamina load: {upgrades} upgrades, {stamina:F2} max (will apply when Photon connects)");
                     }
                 }
             }
@@ -349,7 +406,10 @@ namespace Peak.AP
                 return true;
             }
         }
+        
     }
+
+    
 
     [HarmonyPatch(typeof(Character), "GetMaxStamina")]
     public static class CharacterGetMaxStaminaPatch

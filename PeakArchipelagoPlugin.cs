@@ -22,7 +22,7 @@ using ExitGames.Client.Photon;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.2")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.3")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -42,7 +42,8 @@ namespace Peak.AP
 
         // ===== Session =====
         private ArchipelagoSession _session;
-        private string _status = "Disconnected";
+        public ArchipelagoSession Session => _session;
+        public string _status = "Disconnected";
         private bool _isConnecting;
         private bool _wantReconnect;
         private string _currentPort = "";
@@ -57,11 +58,21 @@ namespace Peak.AP
         }
         private int _lastProcessedItemIndex = 0;
         private readonly HashSet<long> _reportedChecks = new HashSet<long>();
+        // ===== Reconnection =====
+        private float _reconnectAttemptTime = 0f;
+        private const float RECONNECT_DELAY = 5f;
+        public int _reconnectAttempts = 0;
+        public const int MAX_RECONNECT_ATTEMPTS = 10;
+        private readonly HashSet<long> _offlineChecks = new HashSet<long>();
+        public bool IsReconnecting => _wantReconnect && !_isConnecting;
+        public int OfflineCheckCount => _offlineChecks.Count;
+        private bool _wasConnected = false;
 
         // ===== Archipelago Item Receiving Debug =====
         private int _itemsReceivedFromAP = 0;
         private string _lastReceivedItemName = "None";
         private DateTime _lastReceivedItemTime = DateTime.MinValue;
+        private Dictionary<string, long> _locationCache = new Dictionary<string, long>();
 
         // ===== Debug counter for luggage opens =====
         private int _luggageOpenedCount = 0;
@@ -1114,35 +1125,71 @@ namespace Peak.AP
                     return;
                 }
 
-                // Host processing: Report to Archipelago
-                if (_session == null)
-                {
-                    _log.LogWarning("[PeakPelago] Not connected to AP; cannot report checks.");
-                    return;
-                }
-
+                // Host processing
                 try
                 {
-                    long id = _session.Locations.GetLocationIdFromName(cfgGameId.Value, locationName);
+                    long id = -1;
+                    
+                    // Try to get location ID
+                    if (_session != null && _session.Locations != null)
+                    {
+                        try
+                        {
+                            id = _session.Locations.GetLocationIdFromName(cfgGameId.Value, locationName);
+                            // Cache it for offline use
+                            _locationCache[locationName] = id;
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogWarning($"[PeakPelago] Could not get location ID for '{locationName}': {ex.Message}");
+                        }
+                    }
+                    
+                    // If we couldn't get it from session, try cache
+                    if (id <= 0 && _locationCache.ContainsKey(locationName))
+                    {
+                        id = _locationCache[locationName];
+                        _log.LogInfo($"[PeakPelago] Using cached location ID {id} for '{locationName}'");
+                    }
 
                     if (id <= 0)
                     {
-                        _log.LogDebug($"[PeakPelago] Location '{locationName}' not found in AP");
+                        _log.LogWarning($"[PeakPelago] Location '{locationName}' not found in session or cache");
                         return;
                     }
 
-                    if (_reportedChecks.Add(id))
+                    // Check if already reported
+                    if (_reportedChecks.Contains(id))
                     {
-                        _session.Locations.CompleteLocationChecks(new long[] { id });
-                        _log.LogInfo($"[PeakPelago] ✓ Reported NEW check: {locationName} (ID: {id})");
-                        SaveState();
+                        _log.LogDebug($"[PeakPelago] ✗ Check already reported: {locationName} (ID: {id})");
+                        return;
+                    }
 
-                        // Broadcast to all clients that this check was completed
-                        BroadcastCheckCompleted(locationName, id);
+                    // If connected, report immediately
+                    if (_session != null && _session.Socket != null && _session.Socket.Connected)
+                    {
+                        try
+                        {
+                            _session.Locations.CompleteLocationChecks(new long[] { id });
+                            _reportedChecks.Add(id);
+                            _log.LogInfo($"[PeakPelago] ✓ Reported NEW check: {locationName} (ID: {id})");
+                            
+                            BroadcastCheckCompleted(locationName, id);
+                            SaveState();
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogWarning($"[PeakPelago] Failed to report check '{locationName}', queueing for reconnect: {ex.Message}");
+                            _offlineChecks.Add(id);
+                            SaveOfflineChecks();
+                        }
                     }
                     else
                     {
-                        _log.LogDebug($"[PeakPelago] ✗ Check already reported: {locationName} (ID: {id})");
+                        // Not connected - queue for later
+                        _log.LogInfo($"[PeakPelago] 📦 Queued check for reconnect: {locationName} (ID: {id})");
+                        _offlineChecks.Add(id);
+                        SaveOfflineChecks();
                     }
                 }
                 catch (Exception ex)
@@ -1840,24 +1887,56 @@ namespace Peak.AP
                     return;
                 }
 
-                int upgradesBeforeApply = _staminaManager.GetStaminaUpgradesReceived();
-
-                _staminaManager.ApplyStaminaUpgrade();
-
-                int totalUpgradesAfterApply = upgradesBeforeApply + 1;
-                if (_photonView != null && PhotonNetwork.IsConnected)
+                int staminaItems = 0;
+                if (_session != null && _session.Items != null)
                 {
-                    _photonView.RPC("SyncStaminaUpgrade", RpcTarget.Others, totalUpgradesAfterApply);
-                    _log.LogInfo($"[PeakPelago] Broadcasted stamina upgrade to others: {totalUpgradesAfterApply} total");
+                    staminaItems = _session.Items.AllItemsReceived.Count(item =>
+                    {
+                        string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                        return itemName?.Equals("Progressive Stamina Bar", StringComparison.OrdinalIgnoreCase) ?? false;
+                    });
+                    
+                    _log.LogInfo($"[PeakPelago] Received {staminaItems} Progressive Stamina items from AP");
                 }
 
+                float targetStamina = 0.25f + (staminaItems * 0.25f);
+                float currentStamina = _staminaManager.GetBaseMaxStamina();
+                
+                if (Math.Abs(targetStamina - currentStamina) < 0.01f)
+                {
+                    _log.LogInfo($"[PeakPelago] Stamina already correct: {currentStamina}");
+                    return;
+                }
+
+                _log.LogInfo($"[PeakPelago] Updating stamina: {currentStamina} -> {targetStamina}");
+
+                // UPDATE LOCAL STATE FIRST (so UI reads correct value)
+                _staminaManager._localBaseMaxStamina = targetStamina;
+                _staminaManager._localStaminaUpgrades = staminaItems;
+
+                // Then set Photon
+                if (PhotonNetwork.LocalPlayer != null)
+                {
+                    Hashtable props = new Hashtable();
+                    props["AP_Stamina"] = targetStamina;
+                    PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+                    
+                    _log.LogInfo($"[PeakPelago] Set stamina to {targetStamina} ({staminaItems} upgrades)");
+                }
+
+                // Broadcast to other players
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("SyncStaminaUpgrade", RpcTarget.Others, staminaItems);
+                }
+
+                // Update UI
                 if (Character.localCharacter != null)
                 {
                     StartCoroutine(ForceStaminaUIUpdate());
                 }
 
                 SaveState();
-                _log.LogInfo("[PeakPelago] Saved stamina state after upgrade");
             }
             catch (Exception ex)
             {
@@ -1865,7 +1944,6 @@ namespace Peak.AP
             }
         }
         
-
         private void SpawnPhysicalItems(string itemName, int quantity)
         {
             for (int i = 0; i < quantity; i++)
@@ -1881,7 +1959,7 @@ namespace Peak.AP
             {
                 Item itemToSpawn = null;
 
-                // DEBUG: Log all available items in the database
+                /* DEBUG: Log all available items in the database
                 _log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
                 for (ushort itemID = 1; itemID < 300; itemID++)
                 {
@@ -1891,7 +1969,7 @@ namespace Peak.AP
                     }
                 }
                 _log.LogInfo("[PeakPelago] === END OF AVAILABLE ITEMS ===");
-
+                */
                 for (ushort itemID = 1; itemID < 1000; itemID++)
                 {
                     if (ItemDatabase.TryGetItem(itemID, out Item item))
@@ -2925,16 +3003,16 @@ namespace Peak.AP
                 // Log server messages to the BepInEx console
                 _session.MessageLog.OnMessageReceived += OnApMessage;
 
-                // Correct signature: one string argument (reason)
                 _session.Socket.SocketClosed += reason =>
                 {
                     _log.LogWarning("[PeakPelago] Socket closed: " + reason);
                     _status = "Disconnected";
-                    if (cfgAutoReconnect.Value)
-                    {
-                        _wantReconnect = true;
-                    }
+                    _wantReconnect = true;
+                    _reconnectAttempts = 0;
+                    _reconnectAttemptTime = Time.time + RECONNECT_DELAY;
+                    _log.LogInfo($"[PeakPelago] Will attempt reconnection in {RECONNECT_DELAY} seconds");
                 };
+                
 
                 // Use TryConnectAndLogin instead of ConnectAsync/LoginAsync
                 var result = _session.TryConnectAndLogin(
@@ -3047,7 +3125,7 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["ring_link"];
                         _ringLinkEnabled  = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Ring Link from slot data: {_ringLinkEnabled }");
+                        //_log.LogInfo($"[PeakPelago] Ring Link from slot data: {_ringLinkEnabled }");
 
                         if (_ringLinkEnabled )
                         {
@@ -3059,7 +3137,7 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["energy_link"];
                         energyLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Energy Link from slot data: {energyLinkEnabled}");
+                        //_log.LogInfo($"[PeakPelago] Energy Link from slot data: {energyLinkEnabled}");
 
                         if (energyLinkEnabled)
                         {
@@ -3071,7 +3149,7 @@ namespace Peak.AP
                                 var teamValue = loginResult.SlotData["team"];
                                 int teamNumber = Convert.ToInt32(teamValue);
                                 _energyLinkTeamName = teamNumber.ToString();
-                                _log.LogInfo($"[PeakPelago] EnergyLink team from slot data: {_energyLinkTeamName}");
+                                //_log.LogInfo($"[PeakPelago] EnergyLink team from slot data: {_energyLinkTeamName}");
                             }
                         }
                     }
@@ -3080,7 +3158,7 @@ namespace Peak.AP
                         var teamValue = loginResult.SlotData["team"];
                         int teamNumber = Convert.ToInt32(teamValue);
                         _energyLinkTeamName = teamNumber.ToString();
-                        _log.LogInfo($"[PeakPelago] EnergyLink team from slot data: {_energyLinkTeamName} (team #{teamNumber})");
+                        //_log.LogInfo($"[PeakPelago] EnergyLink team from slot data: {_energyLinkTeamName} (team #{teamNumber})");
                     }
 
 
@@ -3088,7 +3166,7 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["hard_ring_link"];
                         _hardRingLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Hard Ring Link from slot data: {_hardRingLinkEnabled}");
+                        //_log.LogInfo($"[PeakPelago] Hard Ring Link from slot data: {_hardRingLinkEnabled}");
 
                         if (_hardRingLinkEnabled)
                         {
@@ -3100,7 +3178,7 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["trap_link"];
                         _trapLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Trap Link from slot data: {_trapLinkEnabled}");
+                        //_log.LogInfo($"[PeakPelago] Trap Link from slot data: {_trapLinkEnabled}");
 
                         if (_trapLinkEnabled)
                         {
@@ -3114,7 +3192,7 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["death_link"];
                         deathLinkEnabled = Convert.ToInt32(value) != 0;
-                        _log.LogInfo($"[PeakPelago] Death Link from slot data: {deathLinkEnabled}");
+                        //_log.LogInfo($"[PeakPelago] Death Link from slot data: {deathLinkEnabled}");
 
                         if (deathLinkEnabled)
                         {
@@ -3129,7 +3207,7 @@ namespace Peak.AP
                             Tags = tags.ToArray()
                         };
                         _session.Socket.SendPacket(updatePacket);
-                        _log.LogInfo($"[PeakPelago] Sent tags: {string.Join(", ", tags)}");
+                        //_log.LogInfo($"[PeakPelago] Sent tags: {string.Join(", ", tags)}");
                     }
                     if (_ringLinkEnabled)
                     {
@@ -3179,7 +3257,7 @@ namespace Peak.AP
                             _enabledTraps = TrapTypeExtensions.GetAllTrapNames();
                         }
 
-                        _log.LogInfo($"[PeakPelago] Initializing Trap Link with {_enabledTraps.Count} enabled traps");
+                        //_log.LogInfo($"[PeakPelago] Initializing Trap Link with {_enabledTraps.Count} enabled traps");
                         _trapLinkService.Initialize(
                             _session,
                             _trapLinkEnabled,
@@ -3228,7 +3306,7 @@ namespace Peak.AP
                     }
                     else
                     {
-                        _log.LogWarning("[PeakPelago] death_link_behavior not found in slot data");
+                        //_log.LogWarning("[PeakPelago] death_link_behavior not found in slot data");
                     }
                     if (loginResult.SlotData.ContainsKey("death_link_send_behavior"))
                     {
@@ -3238,7 +3316,7 @@ namespace Peak.AP
                     }
                     else
                     {
-                        _log.LogWarning("[PeakPelago] death_link_send_behavior not found in slot data");
+                        //_log.LogWarning("[PeakPelago] death_link_send_behavior not found in slot data");
                     }
 
                     if (loginResult.SlotData.ContainsKey("progressive_stamina"))
@@ -3248,7 +3326,7 @@ namespace Peak.AP
                     }
                     else
                     {
-                        _log.LogWarning("[PeakPelago] progressive_stamina not found in slot data");
+                        //_log.LogWarning("[PeakPelago] progressive_stamina not found in slot data");
                     }
 
                     if (loginResult.SlotData.ContainsKey("additional_stamina_bars"))
@@ -3258,11 +3336,23 @@ namespace Peak.AP
                     }
                     else
                     {
-                        _log.LogWarning("[PeakPelago] additional_stamina_bars not found in slot data");
+                        //_log.LogWarning("[PeakPelago] additional_stamina_bars not found in slot data");
                     }
+                    LoadOfflineChecks();
+                    if (_offlineChecks.Count > 0)
+                    {
+                        ReportOfflineChecks();
+                    }
+                    _reconnectAttempts = 0;
+                    _wantReconnect = false;
+
+
+
                     RecoverAscentUnlocks();
                     _log.LogInfo($"[PeakPelago] Initializing stamina manager with progressive={progressiveEnabled}, additional={additionalEnabled}");
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
+                    
+
                 }
                 else
                 {
@@ -3479,7 +3569,7 @@ namespace Peak.AP
             return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;
         }
 
-        private void TryCloseSession()
+        public void TryCloseSession()
         {
             try
             {
@@ -3535,6 +3625,36 @@ namespace Peak.AP
         {
             try
             {
+                bool isCurrentlyConnected = _session != null && _session.Socket != null && _session.Socket.Connected;
+                if (_wasConnected && !isCurrentlyConnected)
+                {
+                    _log.LogWarning("[PeakPelago] Connection lost detected in Update()");
+                    _status = "Disconnected";
+                    _wantReconnect = true;
+                    _reconnectAttempts = 0;
+                    _reconnectAttemptTime = Time.time + RECONNECT_DELAY;
+                }
+                
+                _wasConnected = isCurrentlyConnected;
+                if (_wantReconnect && !_isConnecting && Time.time >= _reconnectAttemptTime)
+                {
+                    if (_reconnectAttempts < MAX_RECONNECT_ATTEMPTS)
+                    {
+                        _reconnectAttempts++;
+                        _log.LogInfo($"[PeakPelago] Reconnection attempt {_reconnectAttempts}/{MAX_RECONNECT_ATTEMPTS}");
+                        
+                        Connect();
+                        
+                        // Schedule next attempt if this one fails
+                        _reconnectAttemptTime = Time.time + RECONNECT_DELAY;
+                    }
+                    else
+                    {
+                        _log.LogError($"[PeakPelago] Max reconnection attempts ({MAX_RECONNECT_ATTEMPTS}) reached. Giving up.");
+                        _wantReconnect = false;
+                        _status = "Failed to reconnect";
+                    }
+                }
                 _trapLinkService?.Update();
                 ProcessItemQueue();
                 CampfireModelSpawner.CleanupDestroyedCampfires();
@@ -3552,6 +3672,7 @@ namespace Peak.AP
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in Update: {ex.Message}");
+                _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
             }
         }
         private System.Collections.IEnumerator WaitForCharacterAndRebuild()
@@ -3563,7 +3684,14 @@ namespace Peak.AP
                 yield return new WaitForSeconds(0.5f);
             }
             
-            _log.LogInfo("[PeakPelago] Character ready! Rebuilding badges...");
+            _log.LogInfo("[PeakPelago] Character ready!");
+            
+            // NEW: Sync stamina NOW (Photon is ready)
+            if (_session != null && _staminaManager != null)
+            {
+                _staminaManager.SyncWithArchipelago(_session);
+            }
+            
             RebuildCollectedBadgesFromChecks();
         }
 
@@ -3572,11 +3700,11 @@ namespace Peak.AP
         /// </summary>
         private void ProcessItemQueue()
         {
+            
             if (_itemQueue.Count == 0 || Time.time - _lastItemProcessed < ITEM_PROCESSING_COOLDOWN)
             {
                 return;
             }
-            
             var (itemName, isTrap, itemIndex) = _itemQueue.First.Value;
             string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
 
@@ -3584,17 +3712,26 @@ namespace Peak.AP
             bool isInAirport = currentScene.Contains("Airport");
             bool isProgressionItem = itemName.Contains("Progressive Stamina") || itemName.Contains("Unlock") || itemName.Contains("Badge");
 
-            // Progression items (stamina/ascent unlocks) can only be processed in Airport
-            if (isProgressionItem && !isInAirport)
+            // Progression items work in BOTH Airport AND Levels
+            // Regular items ONLY work in Levels
+            
+            if (isProgressionItem)
             {
-                return;
+                // Progression: needs Airport OR Level
+                if (!isInAirport && !isInLevel)
+                {
+                    return;
+                }
             }
-
-            // Regular items can only be processed in levels (not in airport/menus)
-            if (!isProgressionItem && !isInLevel)
+            else
             {
-                return;
+                // Regular items: needs Level only
+                if (!isInLevel)
+                {
+                    return;
+                }
             }
+            
             _itemQueue.RemoveFirst();
             
             try
@@ -3830,6 +3967,7 @@ namespace Peak.AP
                 }
                 
                 _log.LogInfo($"[PeakPelago] State loaded successfully: {_reportedChecks.Count} checks, {_totalLuggageOpened} luggage, {_unlockedAscents.Count} ascents");
+                LoadOfflineChecks();
             }
             catch (Exception ex)
             {
@@ -3847,6 +3985,11 @@ namespace Peak.AP
         {
             try
             {
+                if (_session == null || _session.Socket == null || !_session.Socket.Connected)
+                {
+                    _log.LogDebug("[PeakPelago] Skipping state save - not connected to AP");
+                    return;
+                }
                 string line1 = _lastProcessedItemIndex.ToString();
                 string line2 = string.Join(",", _reportedChecks.Select(x => x.ToString()).ToArray());
                 string line3 = _totalLuggageOpened.ToString();
@@ -3873,6 +4016,148 @@ namespace Peak.AP
                 _log.LogError("[PeakPelago] Failed to save state file: " + ex.Message);
                 _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
                 // Don't crash the game just because we couldn't save >:[
+            }
+        }
+        private void SaveOfflineChecks()
+        {
+            try
+            {
+                string offlineChecksPath = StateFilePath + ".offline";
+                string line = string.Join(",", _offlineChecks.Select(x => x.ToString()).ToArray());
+                
+                string tempPath = offlineChecksPath + ".tmp";
+                File.WriteAllText(tempPath, line);
+                
+                if (File.Exists(offlineChecksPath))
+                {
+                    File.Delete(offlineChecksPath);
+                }
+                File.Move(tempPath, offlineChecksPath);
+                
+                _log.LogDebug($"[PeakPelago] Saved {_offlineChecks.Count} offline checks");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Failed to save offline checks: " + ex.Message);
+            }
+        }
+
+        private void LoadOfflineChecks()
+        {
+            try
+            {
+                string offlineChecksPath = StateFilePath + ".offline";
+                
+                if (!File.Exists(offlineChecksPath))
+                {
+                    return;
+                }
+                
+                string line = File.ReadAllText(offlineChecksPath);
+                
+                if (string.IsNullOrEmpty(line))
+                {
+                    return;
+                }
+                
+                var parts = line.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                int count = 0;
+                
+                foreach (var p in parts)
+                {
+                    if (long.TryParse(p.Trim(), out long id))
+                    {
+                        _offlineChecks.Add(id);
+                        count++;
+                    }
+                }
+                
+                _log.LogInfo($"[PeakPelago] Loaded {count} offline checks");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Failed to load offline checks: " + ex.Message);
+            }
+        }
+
+        private void ReportOfflineChecks()
+        {
+            try
+            {
+                if (_offlineChecks.Count == 0)
+                {
+                    return;
+                }
+                
+                _log.LogInfo($"[PeakPelago] Reporting {_offlineChecks.Count} queued checks from offline queue");
+                
+                // Convert to array to avoid modification during iteration
+                var checksToReport = _offlineChecks.ToArray();
+                var successfulChecks = new List<long>();
+                
+                foreach (long checkId in checksToReport)
+                {
+                    try
+                    {
+                        // Skip if already reported
+                        if (_reportedChecks.Contains(checkId))
+                        {
+                            successfulChecks.Add(checkId);
+                            continue;
+                        }
+                        
+                        // Report the check
+                        _session.Locations.CompleteLocationChecks(new long[] { checkId });
+                        _reportedChecks.Add(checkId);
+                        successfulChecks.Add(checkId);
+                        
+                        string locationName = "Unknown";
+                        try
+                        {
+                            locationName = _session.Locations.GetLocationNameFromId(checkId, cfgGameId.Value);
+                        }
+                        catch { }
+                        
+                        _log.LogInfo($"[PeakPelago] ✓ Reported queued check: {locationName} (ID: {checkId})");
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogWarning($"[PeakPelago] Failed to report queued check {checkId}: {ex.Message}");
+                    }
+                }
+                
+                // Remove successfully reported checks from offline queue
+                foreach (long checkId in successfulChecks)
+                {
+                    _offlineChecks.Remove(checkId);
+                }
+                
+                // Save updated offline checks
+                if (_offlineChecks.Count > 0)
+                {
+                    _log.LogWarning($"[PeakPelago] {_offlineChecks.Count} checks still queued (failed to report)");
+                    SaveOfflineChecks();
+                }
+                else
+                {
+                    // Delete offline checks file if empty
+                    try
+                    {
+                        string offlineChecksPath = StateFilePath + ".offline";
+                        if (File.Exists(offlineChecksPath))
+                        {
+                            File.Delete(offlineChecksPath);
+                        }
+                    }
+                    catch { }
+                }
+                
+                // Save main state after reporting
+                SaveState();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error reporting offline checks: " + ex.Message);
             }
         }
         /// <summary>Handle achievement events to report badge checks to Archipelago</summary>
