@@ -85,6 +85,9 @@
     <Reference Include="UnityEngine.UI">
       <HintPath>F:\SteamLibrary\steamapps\common\PEAK\PEAK_Data\Managed\UnityEngine.UI.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>F:\SteamLibrary\steamapps\common\PEAK\PEAK_Data\Managed\UnityEngine.ParticleSystemModule.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.RenderPipelines.Universal.Runtime">
       <HintPath>F:\SteamLibrary\steamapps\common\PEAK\PEAK_Data\Managed\Unity.RenderPipelines.Universal.Runtime.dll</HintPath>
       <Private>False</Private>

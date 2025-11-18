@@ -48,7 +48,7 @@ useful_table = {
     "Faerie Lantern":               ItemData(77026, ItemClassification.useful),
     "Cactus":                       ItemData(77016, ItemClassification.useful),
     "Compass":                      ItemData(77017, ItemClassification.useful),
-    "Pirate Compass":               ItemData(77018, ItemClassification.useful),
+    "Pirate's Compass":             ItemData(77018, ItemClassification.useful),
     "Binoculars":                   ItemData(77019, ItemClassification.useful),
     "Guidebook":                    ItemData(77065, ItemClassification.useful),
     "Portable Stove":               ItemData(77011, ItemClassification.useful),
@@ -124,6 +124,7 @@ filler_table = {
     "Black Clusterberry":           ItemData(77097, ItemClassification.filler),
     "Red Clusterberry":             ItemData(77098, ItemClassification.filler),
     "Yellow Clusterberry":          ItemData(77099, ItemClassification.filler),
+    "Tick":                         ItemData(77121, ItemClassification.filler)
 
 }
 
@@ -164,6 +165,7 @@ trap_table = {
     "Screen Flip Trap":           ItemData(77101, ItemClassification.trap),
     "Drop Everything Trap":       ItemData(77102, ItemClassification.trap),
     "Pixel Trap":                 ItemData(77103, ItemClassification.trap),
+    "Eruption Trap":              ItemData(77104, ItemClassification.trap),
 }
 
 item_table = {

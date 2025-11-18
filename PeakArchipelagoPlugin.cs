@@ -34,9 +34,6 @@ namespace Peak.AP
         private ConfigEntry<int> cfgPort;
         private ConfigEntry<string> cfgSlot;
         private ConfigEntry<string> cfgPassword;
-        private ConfigEntry<int> cfgGoalType;
-        private ConfigEntry<int> cfgRequiredBadges;
-        private ConfigEntry<int> cfgRequiredAscent;
 
         // ===== Session =====
         private ArchipelagoSession _session;
@@ -139,9 +136,6 @@ namespace Peak.AP
                 cfgPort = Config.Bind("Connection", "Port", 38281, "Port (ignored if Server already contains :port)");
                 cfgSlot = Config.Bind("Connection", "Slot", "Player", "Your AP slot name");
                 cfgPassword = Config.Bind("Connection", "Password", "", "Room password (optional)");
-                cfgGoalType = Config.Bind("Goal", "Type", 0, "Goal type: 0=Reach Peak, 1=All Badges, 2=24 Karat Badge");
-                cfgRequiredBadges = Config.Bind("Goal", "BadgeCount", 20, "Number of badges required for Complete All Badges goal");
-                cfgRequiredAscent = Config.Bind("Goal", "RequiredAscent", 4, "Ascent level required for Reach Peak goal (0-7)");
                 _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
@@ -166,6 +160,7 @@ namespace Peak.AP
                 BlackoutTrapEffect.Initialize(_log, this);
                 CampfireModelSpawner.Initialize(_log);
                 FearTrapEffect.Initialize(_log, this);
+                EruptionTrapEffect.Initialize(_log);
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
                 InitializeItemMapping();
@@ -1596,6 +1591,10 @@ namespace Peak.AP
                 { "Compass", () => SpawnPhysicalItem("Compass") },
                 { "Mandrake", () => SpawnPhysicalItem("Mandrake") },
                 { "Pirate's Compass", () => SpawnPhysicalItem("Pirate Compass") },
+                { "Pirates Compass", () => SpawnPhysicalItem("Pirate Compass") },
+                { "Pirate Compass", () => SpawnPhysicalItem("Pirate Compass") },
+                { "Tick", () => SpawnPhysicalItem("Bugfix") },
+                { "Hidden Mandrake", () => SpawnPhysicalItem("Mandrake_Hidden") },
                 { "Binoculars", () => SpawnPhysicalItem("Binoculars") },
                 { "Flying Disc", () => SpawnPhysicalItem("Frisbee") },
                 { "Bandages", () => SpawnPhysicalItem("Bandages") },
@@ -1716,9 +1715,10 @@ namespace Peak.AP
                 { "Zoom Trap", () => ZoomTrapEffect.ApplyZoomTrap(_log) },
                 { "Pixel Trap", () => PixelTrapEffect.ApplyPixelTrap(_log) },
                 { "Screen Flip Trap", () => ScreenFlipTrapEffect.ApplyScreenFlipTrap(_log) },
-                { "Gust Trap", () => GustTrapEffect.ApplyGustTrap(_log) },
+                { "Gust Trap", () => BlizzardTrapEffect.ApplyBlizzardTrap(_log) },
                 { "Mandrake Trap", () => ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "Mandrake") },
                 { "Blackout Trap", () => BlackoutTrapEffect.ApplyBlackoutTrap(_log) },
+                { "Eruption Trap", () => EruptionTrapEffect.ApplyEruptionTrap(_log) },
                 { "Fungal Infection Trap", () => StatusOverTimeTrapEffect.ApplyStatusOverTime(_log, StatusOverTimeTrapEffect.TargetMode.RandomPlayer,
                 CharacterAfflictions.STATUSTYPE.Spores,
                 amountPerTick: 0.1f,
@@ -1732,7 +1732,12 @@ namespace Peak.AP
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
         }
-
+        [PunRPC]
+        public void SpawnEruptionTrapRPC(Vector3 position)
+        {
+            _log.LogInfo($"[PeakPelago] RPC received: Spawn Eruption at {position}");
+            EruptionTrapEffect.SpawnEruptionLocal(position, _log);
+        }
         [PunRPC]
         private void RPC_ContributeEnergy(int amount)
         {
@@ -1797,32 +1802,17 @@ namespace Peak.AP
         }
 
         [PunRPC]
-        private void ExpandWindBoundsRPC(float centerX, float centerY, float centerZ)
+        public void StartGustTrapRPC()
         {
-            try
-            {
-                Vector3 center = new Vector3(centerX, centerY, centerZ);
-                _log.LogInfo($"[PeakPelago] RPC received: ExpandWindBounds at ({centerX}, {centerY}, {centerZ})");
-                GustTrapEffect.ExpandWindBounds(center);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error in ExpandWindBoundsRPC: {ex.Message}");
-            }
+            _log.LogInfo("[PeakPelago] RPC received: Start Gust Trap");
+            GustTrapEffect.ActivateGustLocal(_log);
         }
 
         [PunRPC]
-        private void RestoreWindBoundsRPC()
+        public void StartBlizzardTrapRPC()
         {
-            try
-            {
-                _log.LogInfo($"[PeakPelago] RPC received: RestoreWindBounds");
-                GustTrapEffect.RestoreWindBounds();
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error in RestoreWindBoundsRPC: {ex.Message}");
-            }
+            _log.LogInfo("[PeakPelago] RPC received: Start Blizzard Trap");
+            BlizzardTrapEffect.ActivateBlizzardLocal(_log);
         }
 
         [PunRPC]
@@ -3818,19 +3808,11 @@ namespace Peak.AP
                         var value = loginResult.SlotData["goal"];
                         _slotGoalType = Convert.ToInt32(value);
                     }
-                    else
-                    {
-                        _slotGoalType = cfgGoalType.Value;
-                    }
 
                     if (loginResult.SlotData.ContainsKey("ascent_count"))
                     {
                         var value = loginResult.SlotData["ascent_count"];
                         _slotRequiredAscent = Convert.ToInt32(value);
-                    }
-                    else
-                    {
-                        _slotRequiredAscent = cfgRequiredAscent.Value;
                     }
 
                     if (loginResult.SlotData.ContainsKey("badge_count"))
@@ -3838,11 +3820,6 @@ namespace Peak.AP
                         var value = loginResult.SlotData["badge_count"];
                         _slotRequiredBadges = Convert.ToInt32(value);
                         _log.LogInfo($"[PeakPelago] Required badges from slot data: {_slotRequiredBadges}");
-                    }
-                    else
-                    {
-                        _slotRequiredBadges = cfgRequiredBadges.Value;
-                        _log.LogWarning($"[PeakPelago] badge_count not found in slot data, using config: {_slotRequiredBadges}");
                     }
 
                     if (loginResult.SlotData.ContainsKey("death_link_behavior"))
@@ -4115,6 +4092,7 @@ namespace Peak.AP
                 { "screen_flip_trap", "Screen Flip Trap" },
                 { "drop_everything_trap", "Drop Everything Trap"},
                 { "pixel_trap", "Pixel Trap" },
+                { "eruption_trap", "Eruption Trap" }
             };
             
             return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;

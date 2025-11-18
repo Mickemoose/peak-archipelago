@@ -196,6 +196,7 @@ class PeakWorld(World):
         trap_weights += (["Screen Flip Trap"] * self.options.screen_flip_trap_weight.value)
         trap_weights += (["Drop Everything Trap"] * self.options.drop_everything_trap_weight.value)
         trap_weights += (["Pixel Trap"] * self.options.pixel_trap_weight.value)
+        trap_weights += (["Eruption Trap"] * self.options.eruption_trap_weight.value)
         
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -255,6 +256,7 @@ class PeakWorld(World):
         trap_data["screen_flip_trap"] = self.options.screen_flip_trap_weight.value
         trap_data["drop_everything_trap"] = self.options.drop_everything_trap_weight.value
         trap_data["pixel_trap"] = self.options.pixel_trap_weight.value
+        trap_data["eruption_trap"] = self.options.eruption_trap_weight.value
 
         return trap_data
 

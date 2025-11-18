@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Linq;
 using BepInEx.Logging;
-using HarmonyLib;
 using Photon.Pun;
 using UnityEngine;
 
@@ -10,9 +9,6 @@ namespace Peak.AP
 {
     public static class GustTrapEffect
     {
-        private static Bounds _originalBounds;
-        private static bool _boundsModified = false;
-        
         public static void ApplyGustTrap(ManualLogSource log)
         {
             try
@@ -38,10 +34,15 @@ namespace Peak.AP
 
                 log.LogInfo($"[PeakPelago] Applying Gust Trap! Wind will blow for 10 seconds");
 
-                // Only the host starts the trap
-                if (PhotonNetwork.IsMasterClient)
+                // Send RPC to all clients
+                if (PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
                 {
-                    PeakArchipelagoPlugin._instance.StartCoroutine(ActivateGust(log));
+                    PeakArchipelagoPlugin._instance.PhotonView.RPC("StartGustTrapRPC", RpcTarget.All);
+                }
+                else
+                {
+                    log.LogWarning("[PeakPelago] PhotonView not available, starting locally only");
+                    ActivateGustLocal(log);
                 }
             }
             catch (Exception ex)
@@ -50,120 +51,120 @@ namespace Peak.AP
             }
         }
 
-        private static IEnumerator ActivateGust(ManualLogSource log)
+        public static void ActivateGustLocal(ManualLogSource log)
         {
-            WindChillZone windZone = WindChillZone.instance;
+            PeakArchipelagoPlugin._instance.StartCoroutine(ActivateGustCoroutine(log));
+        }
+
+        private static IEnumerator ActivateGustCoroutine(ManualLogSource log)
+        {
+            GameObject windStormObject = null;
+            bool wasActive = false;
+            bool weSpawnedIt = false;
+
+            // First, try to find an existing WindStorm in the scene
+            windStormObject = GameObject.Find("WindStorm");
             
-            if (windZone == null)
+            if (windStormObject != null)
             {
-                windZone = UnityEngine.Object.FindFirstObjectByType<WindChillZone>();
+                log.LogInfo("[PeakPelago] Found existing WindStorm in scene");
+                wasActive = windStormObject.activeSelf;
             }
-            
-            if (windZone == null)
+            else
             {
-                log.LogError("[PeakPelago] Cannot find WindChillZone!");
-                yield break;
+                // If no WindStorm exists, search ALL objects including inactive ones
+                log.LogInfo("[PeakPelago] No WindStorm in current biome, searching all objects including inactive...");
+                
+                GameObject[] allWindStorms = Resources.FindObjectsOfTypeAll<GameObject>();
+                
+                foreach (var obj in allWindStorms)
+                {
+                    if (obj.name == "WindStorm" && obj.scene.IsValid())
+                    {
+                        log.LogInfo($"[PeakPelago] Found WindStorm: {obj.name} in scene, active: {obj.activeInHierarchy}");
+                        
+                        //instantiate a copy
+                        Vector3 spawnPos = Character.localCharacter.transform.position;
+                        windStormObject = UnityEngine.Object.Instantiate(obj, spawnPos, Quaternion.identity);
+                        windStormObject.name = "GustTrap_WindStorm";
+                        weSpawnedIt = true;
+                        wasActive = false;
+                        break;
+                    }
+                }
+                
+                if (windStormObject == null)
+                {
+                    log.LogError("[PeakPelago] Could not find any WindStorm object!");
+                    yield break;
+                }
             }
 
-            var photonView = windZone.GetComponent<PhotonView>();
-            
-            if (photonView == null)
+            // Activate the WindStorm
+            if (!wasActive)
             {
-                log.LogError("[PeakPelago] WindChillZone has no PhotonView!");
-                yield break;
+                log.LogInfo("[PeakPelago] Activating WindStorm...");
+                windStormObject.SetActive(true);
             }
-
-            // Tell ALL clients to expand the wind bounds to cover the entire map
-            if (PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
+            else
             {
-                // Send current bounds center so all clients expand from the same point
-                Vector3 boundsCenter = windZone.windZoneBounds.center;
-                PeakArchipelagoPlugin._instance.PhotonView.RPC("ExpandWindBoundsRPC", RpcTarget.All, boundsCenter.x, boundsCenter.y, boundsCenter.z);
+                log.LogInfo("[PeakPelago] WindStorm already active, extending duration...");
             }
 
-            yield return new WaitForSeconds(0.2f); // Wait for bounds to expand on all clients
-
-            // Generate random wind direction
-            Vector3 windDirection = GenerateRandomWindDirection();
-            
-            // Activate wind (goes to ALL clients via game's existing RPC)
-            photonView.RPC("RPCA_ToggleWind", RpcTarget.All, true, windDirection, 10f);
-            
-            log.LogInfo($"[PeakPelago] Gust Trap activated - wind direction: {windDirection}");
-
-            // Wait 10 seconds
             yield return new WaitForSeconds(10f);
 
-            // Tell ALL clients to restore original bounds
-            if (PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
+            if (weSpawnedIt)
             {
-                PeakArchipelagoPlugin._instance.PhotonView.RPC("RestoreWindBoundsRPC", RpcTarget.All);
+                log.LogInfo("[PeakPelago] Destroying spawned WindStorm");
+                
+                // Disable all child particle systems and audio sources first
+                ParticleSystem[] particles = windStormObject.GetComponentsInChildren<ParticleSystem>();
+                foreach (var ps in particles)
+                {
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
+                
+                AudioSource[] audioSources = windStormObject.GetComponentsInChildren<AudioSource>();
+                foreach (var audio in audioSources)
+                {
+                    audio.Stop();
+                }
+                
+                // Wait a frame for particles to clear
+                yield return null;
+                
+                UnityEngine.Object.Destroy(windStormObject);
+            }
+            else if (!wasActive)
+            {
+                log.LogInfo("[PeakPelago] Deactivating WindStorm");
+                
+                // Stop particles before deactivating
+                ParticleSystem[] particles = windStormObject.GetComponentsInChildren<ParticleSystem>();
+                foreach (var ps in particles)
+                {
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
+                
+                windStormObject.SetActive(false);
             }
 
             log.LogInfo("[PeakPelago] Gust Trap complete!");
         }
+    }
+}
 
-        private static Vector3 GenerateRandomWindDirection()
+public static class TransformExtensions
+{
+    public static string GetFullPath(this Transform transform)
+    {
+        string path = transform.name;
+        Transform parent = transform.parent;
+        while (parent != null)
         {
-            float randomValue = UnityEngine.Random.value;
-            Vector3 baseDirection = Vector3.right * (randomValue > 0.5f ? 1f : -1f);
-            return Vector3.Lerp(baseDirection, Vector3.forward, 0.2f).normalized;
+            path = parent.name + "/" + path;
+            parent = parent.parent;
         }
-
-        // Called via RPC to expand bounds on all clients
-        public static void ExpandWindBounds(Vector3 center)
-        {
-            try
-            {
-                WindChillZone windZone = WindChillZone.instance;
-                if (windZone == null)
-                {
-                    Debug.LogError("[PeakPelago] Cannot find WindChillZone to expand bounds!");
-                    return;
-                }
-
-                if (!_boundsModified)
-                {
-                    // Save original bounds
-                    _originalBounds = windZone.windZoneBounds;
-                    _boundsModified = true;
-                    Debug.Log($"[PeakPelago] Saved original wind bounds: {_originalBounds}");
-                }
-
-                // Make the bounds MASSIVE to cover entire map
-                windZone.windZoneBounds = new Bounds(center, new Vector3(10000f, 10000f, 10000f));
-                Debug.Log($"[PeakPelago] Expanded wind bounds to cover entire map!");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[PeakPelago] Error expanding wind bounds: {ex.Message}");
-            }
-        }
-
-        // Called via RPC to restore bounds on all clients
-        public static void RestoreWindBounds()
-        {
-            try
-            {
-                WindChillZone windZone = WindChillZone.instance;
-                if (windZone == null)
-                {
-                    Debug.LogError("[PeakPelago] Cannot find WindChillZone to restore bounds!");
-                    return;
-                }
-
-                if (_boundsModified)
-                {
-                    // Restore original bounds
-                    windZone.windZoneBounds = _originalBounds;
-                    _boundsModified = false;
-                    Debug.Log($"[PeakPelago] Restored original wind bounds!");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[PeakPelago] Error restoring wind bounds: {ex.Message}");
-            }
-        }
+        return path;
     }
 }

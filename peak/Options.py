@@ -295,6 +295,11 @@ class PixelTrapWeight(BaseTrapWeight):
     Likelihood of receiving a trap which reduces a player's screen resolution to pixelated graphics temporarily
     """
     display_name = "Pixel Trap Weight"
+class EruptionTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which creates a fiery eruption at a player's location
+    """
+    display_name = "Eruption Trap Weight"
 
 class TrapPercentage(Range):
     """
@@ -376,6 +381,7 @@ peak_option_groups = [
         ScreenFlipTrapWeight,
         DropEverythingTrapWeight,
         PixelTrapWeight,
+        EruptionTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,
@@ -434,6 +440,7 @@ class PeakOptions(PerGameCommonOptions):
     screen_flip_trap_weight: ScreenFlipTrapWeight
     drop_everything_trap_weight: DropEverythingTrapWeight
     pixel_trap_weight: PixelTrapWeight
+    eruption_trap_weight: EruptionTrapWeight
 
     disable_multiplayer_badges: DisableMultiplayerBadges
     disable_hard_badges: DisableHardBadges

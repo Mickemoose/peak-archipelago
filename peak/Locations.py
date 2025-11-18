@@ -206,6 +206,7 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Red Clusterberry": 76292,
     "Acquire Yellow Clusterberry": 76293,
     "Acquire Scoutmaster's Bugle": 76294,
+    "Acquire Tick": 76295,
     
     # Peak Badge
     "Peak Badge": 76305,
