@@ -29,7 +29,7 @@ def apply_rules(world: "PeakWorld"):
     # All regular badge locations are always accessible
     regular_badges = [
         "Astronomy Badge", "24 Karat Badge", "Gourmand Badge", "Daredevil Badge",
-        "Mycology Badge", "Megaentomology Badge", "Speed Climber Badge", "Bookwork Badge",
+        "Mycology Badge", "Megaentomology Badge", "Speed Climber Badge",
         "Balloon Badge", "Nomad Badge", "Animal Serenading Badge", "Arborist Badge",
         "Endurance Badge", "Toxicology Badge", "Foraging Badge", "Bouldering Badge",
         "Bing Bong Badge", "Cooking Badge", "Plunderer Badge", "Lone Wolf Badge",

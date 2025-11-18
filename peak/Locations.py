@@ -15,7 +15,6 @@ LOCATION_TABLE: Dict[str, int] = {
     "Mycology Badge": 76104,
     "Megaentomology Badge": 76105,
     "Speed Climber Badge": 76106,
-    "Bookwork Badge": 76107,
     "Balloon Badge": 76108,
     "Nomad Badge": 76109,
     "Animal Serenading Badge": 76110,

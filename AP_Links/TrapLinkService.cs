@@ -138,6 +138,8 @@ namespace Peak.AP
                 { "Trivia Trap", "Pokemon Trivia Trap" },
                 { "144p Trap", "Pixel Trap"},
                 { "Pixellation Trap", "Pixel Trap"},
+                { "Pixelate Trap", "Pixel Trap"},
+                { "W I D E Trap", "Zoom Trap"}
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
