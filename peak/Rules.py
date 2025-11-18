@@ -40,7 +40,7 @@ def apply_rules(world: "PeakWorld"):
         "Tread Lightly Badge", "Cryptogastronomy Badge", "Calcium Intake Badge", "Advanced Mycology Badge",
         "Applied Esoterica Badge", "Undead Encounter Badge", "Web Security Badge", "Mycoacrobatics Badge",
         "Survivalist Badge", "Happy Camper Badge", "First Aid Badge", "Clutch Badge",
-        "Emergency Preparedness Badge", "Ascender Badge", "Bookworm Badge", "Resourcefulness Badge",
+        "Emergency Preparedness Badge", "Bookworm Badge", "Resourcefulness Badge",
         "Ultimate Badge", "Peak Badge", "High Altitude Badge"
     ]
     
@@ -112,12 +112,11 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Shelf Shroom", "Acquire Bounce Shroom", "Acquire Trail Mix",
         "Acquire Granola Bar", "Acquire Scout Cookies", "Acquire Airline Food", "Acquire Energy Drink",
         "Acquire Sports Drink", "Acquire Big Lollipop", "Acquire Button Shroom", "Acquire Bugle Shroom",
-        "Acquire Cluster Shroom", "Acquire Chubby Shroom", "Acquire Conch", "Acquire Berrynana Peel",
+        "Acquire Cluster Shroom", "Acquire Chubby Shroom", "Acquire Conch",
         "Acquire Dynamite", "Acquire Bing Bong", "Acquire Red Crispberry", "Acquire Green Crispberry",
-        "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Brown Berrynana",
-        "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", "Acquire Yellow Winterberry",
+        "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Yellow Winterberry",
         "Acquire Strange Gem", "Acquire Egg", "Acquire Cooked Bird", "Acquire Honeycomb", "Acquire Beehive", "Acquire Big Egg",
-        "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk", "Acquire Cloud Fungus"
+        "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk", "Acquire Cloud Fungus", "Acquire Scoutmaster's Bugle"
     ]
     
     for acquire_name in acquire_locations:
@@ -140,7 +139,7 @@ def apply_rules(world: "PeakWorld"):
     
     # Alpine-locked items require Alpine Access
     alpine_locked_items = [
-        "Acquire Orange Winterberry"
+        "Acquire Orange Winterberry", "Acquire Napberry"
     ]
     
     for alpine_item in alpine_locked_items:
@@ -160,6 +159,21 @@ def apply_rules(world: "PeakWorld"):
         try:
             set_rule(world.get_location(roots_item), 
                     lambda state: state.has("Roots Access", player))
+        except KeyError:
+            pass
+
+    # Tropics-locked items require Tropics Access
+    tropics_locked_items = [
+        "Acquire Red Clusterberry", "Acquire Yellow Clusterberry", "Acquire Black Clusterberry",
+        "Acquire Purple Kingberry", "Acquire Yellow Kingberry", "Acquire Green Kingberry",
+        "Acquire Brown Berrynana", "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", 
+        "Acquire Berrynana Peel",
+    ]
+
+    for tropics_item in tropics_locked_items:
+        try:
+            set_rule(world.get_location(tropics_item), 
+                    lambda state: state.has("Tropics Access", player))
         except KeyError:
             pass
     

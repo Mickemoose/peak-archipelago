@@ -34,8 +34,6 @@ namespace Peak.AP
         private ConfigEntry<int> cfgPort;
         private ConfigEntry<string> cfgSlot;
         private ConfigEntry<string> cfgPassword;
-        private ConfigEntry<string> cfgGameId;
-        private ConfigEntry<bool> cfgAutoReconnect;
         private ConfigEntry<int> cfgGoalType;
         private ConfigEntry<int> cfgRequiredBadges;
         private ConfigEntry<int> cfgRequiredAscent;
@@ -141,8 +139,6 @@ namespace Peak.AP
                 cfgPort = Config.Bind("Connection", "Port", 38281, "Port (ignored if Server already contains :port)");
                 cfgSlot = Config.Bind("Connection", "Slot", "Player", "Your AP slot name");
                 cfgPassword = Config.Bind("Connection", "Password", "", "Room password (optional)");
-                cfgGameId = Config.Bind("Connection", "GameId", "PEAK", "Game ID (must match the room)");
-                cfgAutoReconnect = Config.Bind("Connection", "AutoReconnect", true, "Try to reconnect when socket closes");
                 cfgGoalType = Config.Bind("Goal", "Type", 0, "Goal type: 0=Reach Peak, 1=All Badges, 2=24 Karat Badge");
                 cfgRequiredBadges = Config.Bind("Goal", "BadgeCount", 20, "Number of badges required for Complete All Badges goal");
                 cfgRequiredAscent = Config.Bind("Goal", "RequiredAscent", 4, "Ascent level required for Reach Peak goal (0-7)");
@@ -163,6 +159,10 @@ namespace Peak.AP
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
                 PokemonTriviaTrapEffect.Initialize(_log, this);
+                DropEverythingTrapEffect.Initialize(_log);
+                ZoomTrapEffect.Initialize(_log, this);
+                PixelTrapEffect.Initialize(_log, this);
+                ScreenFlipTrapEffect.Initialize(_log, this);
                 BlackoutTrapEffect.Initialize(_log, this);
                 CampfireModelSpawner.Initialize(_log);
                 FearTrapEffect.Initialize(_log, this);
@@ -301,11 +301,73 @@ namespace Peak.AP
                     }
                     
                     _log.LogInfo($"[PeakPelago] Sent AP Links config to {newPlayer.NickName}");
+
+                    if (_session != null)
+                    {
+                        int enduranceCount = _session.Items.AllItemsReceived.Count(item =>
+                        {
+                            string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                            return itemName?.Equals("Progressive Endurance", StringComparison.OrdinalIgnoreCase) ?? false;
+                        });
+                        
+                        enduranceCount = Math.Min(enduranceCount, 4);
+                        
+                        if (enduranceCount > 0)
+                        {
+                            float multiplier = 1.0f - (enduranceCount * 0.1f);
+                            _photonView.RPC("SyncEnduranceUpgrade", newPlayer, enduranceCount, multiplier);
+                            _log.LogInfo($"[PeakPelago] Sent endurance config to {newPlayer.NickName}: {enduranceCount} upgrades");
+                        }
+                        int backpackCount = _session.Items.AllItemsReceived.Count(item =>
+                        {
+                            string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                            return itemName?.Equals("Progressive Backpack", StringComparison.OrdinalIgnoreCase) ?? false;
+                        });
+                        
+                        backpackCount = Math.Min(backpackCount, 10);
+                        
+                        if (backpackCount > 0)
+                        {
+                            int totalSlots = 4 + (backpackCount * 4);
+                            float weightMultiplier = 1.0f - (backpackCount * 0.1f);
+                            _photonView.RPC("SyncBackpackUpgrade", newPlayer, backpackCount, totalSlots, weightMultiplier);
+                            _log.LogInfo($"[PeakPelago] Sent backpack config to {newPlayer.NickName}: {backpackCount} upgrades");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in OnPlayerEnteredRoom: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        public void StartDropEverythingTrapRPC()
+        {
+            DropEverythingTrapEffect.ApplyDropEverythingTrapLocal(_log);
+        }
+        [PunRPC]
+        private void StartScreenFlipTrapRPC()
+        {
+            try
+            {
+                ScreenFlipTrapEffect.ApplyScreenFlipTrapLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartScreenFlipTrapRPC: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        private void StartZoomTrapRPC()
+        {
+            try
+            {
+                ZoomTrapEffect.ApplyZoomTrapLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartZoomTrapRPC: {ex.Message}");
             }
         }
         [PunRPC]
@@ -1042,7 +1104,6 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.MentorshipBadge, "Mentorship Badge" },
                 { ACHIEVEMENTTYPE.KnotTyingBadge, "Knot Tying Badge" },
                 { ACHIEVEMENTTYPE.EmergencyPreparednessBadge, "Emergency Preparedness Badge" },
-                { ACHIEVEMENTTYPE.AscenderBadge, "Ascender Badge" },
                 { ACHIEVEMENTTYPE.PlundererBadge, "Plunderer Badge" },
                 { ACHIEVEMENTTYPE.BookwormBadge, "Bookworm Badge" },
                 { ACHIEVEMENTTYPE.EnduranceBadge, "Endurance Badge" },
@@ -1135,7 +1196,7 @@ namespace Peak.AP
                     {
                         try
                         {
-                            id = _session.Locations.GetLocationIdFromName(cfgGameId.Value, locationName);
+                            id = _session.Locations.GetLocationIdFromName("PEAK", locationName);
                             // Cache it for offline use
                             _locationCache[locationName] = id;
                         }
@@ -1493,6 +1554,19 @@ namespace Peak.AP
                 { 159, "Acquire Green Shroomberry" },
                 { 162, "Acquire Yellow Shroomberry" },
                 { 160, "Acquire Purple Shroomberry" },
+
+                { 40, "Acquire Purple Kingberry" },
+                { 41, "Acquire Yellow Kingberry" },
+                { 56, "Acquire Green Kingberry" },
+
+                { 110, "Acquire Napberry" },
+
+                { 19, "Acquire Black Clusterberry"},
+                { 20, "Acquire Red Clusterberry" },
+                { 21, "Acquire Yellow Clusterberry" },
+
+                { 77, "Acquire Scoutmaster's Bugle"}
+
             };
 
             _log.LogInfo("[PeakPelago] Initialized item ID mapping with " + _itemIdToLocationMapping.Count + " items");
@@ -1588,22 +1662,19 @@ namespace Peak.AP
                 { "Blue Shroomberry", () => SpawnPhysicalItem("Shroomberry_Blue") },
                 { "Yellow Shroomberry", () => SpawnPhysicalItem("Shroomberry_Yellow") },
                 { "Purple Shroomberry", () => SpawnPhysicalItem("Shroomberry_Purple") },
-
-                //Item Bundles
-                { "Bundle: Glizzy Gobbler", () => SpawnPhysicalItems("Glizzy", 3) },
-                { "Bundle: Marshmallow Muncher", () => SpawnPhysicalItems("Marshmallow", 3) },
-                { "Bundle: Trailblazer Snacks", () => {
-                    SpawnPhysicalItems("Granola Bar", 2);
-                    SpawnPhysicalItems("TrailMix", 2);
-                }},
-                { "Bundle: Lovely Bunch", () => SpawnPhysicalItems("Item_Coconut", 3) },
-                { "Bundle: Bear Favorite", () => SpawnPhysicalItems("Item_Honeycomb", 6) },
-                { "Bundle: Rainy Day", () => SpawnPhysicalItems("Parasol", 4) },
-                { "Bundle: Turkey Day", () => SpawnPhysicalItems("EggTurkey", 3) },
-
+                { "Purple Kingberry", () => SpawnPhysicalItem("Kingberry Purple") },
+                { "Yellow Kingberry", () => SpawnPhysicalItem("Kingberry Yellow") },
+                { "Green Kingberry", () => SpawnPhysicalItem("Kingberry Green") },
+                { "Napberry", () => SpawnPhysicalItem("Napberry") },
+                { "Black Clusterberry", () => SpawnPhysicalItem("Clusterberry Black") },
+                { "Red Clusterberry", () => SpawnPhysicalItem("Clusterberry Red") },
+                { "Yellow Clusterberry", () => SpawnPhysicalItem("Clusterberry Yellow") },
+                { "Scoutmaster's Bugle", () => SpawnPhysicalItem("Bugle_Scoutmaster Variant") },
 
                 // Progression Items (76019-76025) - Unlock ascents
                 { "Progressive Ascent", () => UnlockAscent() },
+                { "Progressive Endurance", () => ApplyProgressiveEndurance() },
+                { "Progressive Backpack", () => ApplyProgressiveBackpack() },
                 //{ "Ascent 2 Unlock", () => UnlockAscent(2) },
                 //{ "Ascent 3 Unlock", () => UnlockAscent(3) },
                 //{ "Ascent 4 Unlock", () => UnlockAscent(4) },
@@ -1622,6 +1693,7 @@ namespace Peak.AP
                 { "Deadly Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.95f, CharacterAfflictions.STATUSTYPE.Poison) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
                 { "Pokemon Trivia Trap", () => PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },
+                { "Drop Everything Trap", () => DropEverythingTrapEffect.ApplyDropEverythingTrap(_log) },
                 { "Swap Trap", () => SwapTrapEffect.ApplyPositionSwapTrap(_log) },
                 { "Nap Time Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Drowsy) },
                 { "Hungry Hungry Camper Trap", () => HungryHungryCamperTrapEffect.ApplyHungerTrap(_log) },
@@ -1641,6 +1713,9 @@ namespace Peak.AP
                 { "Tumbleweed Trap", () => TumbleweedTrapEffect.ApplyTumbleweedTrap(_log) },
                 { "Items to Bombs", () => ItemToBombTrapEffect.ApplyItemToBombTrap(_log) },
                 { "Zombie Horde Trap", () => ZombieHordeTrapEffect.ApplyZombieHordeTrap(_log) },
+                { "Zoom Trap", () => ZoomTrapEffect.ApplyZoomTrap(_log) },
+                { "Pixel Trap", () => PixelTrapEffect.ApplyPixelTrap(_log) },
+                { "Screen Flip Trap", () => ScreenFlipTrapEffect.ApplyScreenFlipTrap(_log) },
                 { "Gust Trap", () => GustTrapEffect.ApplyGustTrap(_log) },
                 { "Mandrake Trap", () => ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "Mandrake") },
                 { "Blackout Trap", () => BlackoutTrapEffect.ApplyBlackoutTrap(_log) },
@@ -1871,6 +1946,282 @@ namespace Peak.AP
             }
         }
 
+        private void ApplyProgressiveBackpack()
+        {
+            try
+            {
+                if (_session == null) return;
+                
+                // Count how many Progressive Backpack items we've received
+                int backpackCount = _session.Items.AllItemsReceived.Count(item =>
+                {
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    return itemName?.Equals("Progressive Backpack", StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+                
+                // Cap at 10 upgrades
+                backpackCount = Math.Min(backpackCount, 10);
+                
+                _log.LogInfo($"[PeakPelago] Applied Progressive Backpack: {backpackCount}/10 upgrades received");
+                
+                // Calculate backpack properties
+                int totalSlots = 4 + (backpackCount * 4);
+                float weightMultiplier = 1.0f - (backpackCount * 0.1f);
+                
+                // Update existing backpacks in the world
+                UpdateAllBackpackSlots(totalSlots);
+                
+                // Broadcast to all clients
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("SyncBackpackUpgrade", RpcTarget.All, backpackCount, totalSlots, weightMultiplier);
+                }
+                else
+                {
+                    SetBackpackProperties(totalSlots, weightMultiplier);
+                }
+                
+                _notifications.ShowSimpleMessage($"Backpack Upgrade {backpackCount}/10! Slots: {totalSlots}, Weight: {weightMultiplier * 100:F0}%");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error applying Progressive Backpack: {ex.Message}");
+            }
+        }
+
+        private void UpdateAllBackpackSlots(int newSlotCount)
+        {
+            try
+            {
+                // Update player's equipped backpack
+                if (Character.localCharacter != null && Character.localCharacter.player != null)
+                {
+                    var backpackSlot = Character.localCharacter.player.backpackSlot;
+                    if (!backpackSlot.IsEmpty() && backpackSlot.data != null)
+                    {
+                        if (backpackSlot.data.TryGetDataEntry<BackpackData>(DataEntryKey.BackpackData, out var backpackData))
+                        {
+                            ResizeItemSlots(backpackData, newSlotCount);
+                            _log.LogInfo($"[PeakPelago] Updated equipped backpack to {newSlotCount} slots");
+                        }
+                    }
+                }
+                
+                // Update all backpack items in the world
+                var allBackpacks = FindObjectsByType<Backpack>(FindObjectsSortMode.None);
+                foreach (var backpack in allBackpacks)
+                {
+                    if (backpack.data != null)
+                    {
+                        if (backpack.data.TryGetDataEntry<BackpackData>(DataEntryKey.BackpackData, out var backpackData))
+                        {
+                            ResizeItemSlots(backpackData, newSlotCount);
+                            _log.LogInfo($"[PeakPelago] Updated backpack item to {newSlotCount} slots");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error updating backpack slots: {ex.Message}");
+            }
+        }
+
+        private void ResizeItemSlots(BackpackData backpackData, int newSlotCount)
+        {
+            if (backpackData.itemSlots == null || backpackData.itemSlots.Length == newSlotCount)
+            {
+                return;
+            }
+            
+            int oldLength = backpackData.itemSlots.Length;
+            ItemSlot[] newSlots = new ItemSlot[newSlotCount];
+            
+            // Copy existing slots
+            for (int i = 0; i < Math.Min(oldLength, newSlotCount); i++)
+            {
+                newSlots[i] = backpackData.itemSlots[i];
+            }
+            
+            // Initialize new slots
+            for (int i = oldLength; i < newSlotCount; i++)
+            {
+                newSlots[i] = new ItemSlot((byte)i);
+            }
+            
+            backpackData.itemSlots = newSlots;
+        }
+
+        [PunRPC]
+        private void SyncBackpackUpgrade(int totalUpgrades, int totalSlots, float weightMultiplier)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] Syncing backpack: {totalUpgrades} upgrades, {totalSlots} slots, {weightMultiplier}x weight");
+                SetBackpackProperties(totalSlots, weightMultiplier);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in SyncBackpackUpgrade: {ex.Message}");
+            }
+        }
+
+        private void SetBackpackProperties(int slots, float weightMultiplier)
+        {
+            try
+            {
+                // Store in Photon custom properties
+                if (PhotonNetwork.LocalPlayer != null)
+                {
+                    Hashtable props = new Hashtable();
+                    props["AP_BackpackSlots"] = slots;
+                    props["AP_BackpackWeightMultiplier"] = weightMultiplier;
+                    PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+                    
+                    _log.LogInfo($"[PeakPelago] Set backpack properties: {slots} slots, {weightMultiplier}x weight");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error setting backpack properties: {ex.Message}");
+            }
+        }
+        private void RecoverBackpackUpgrades()
+        {
+            try
+            {
+                if (_session == null) return;
+                
+                // Count how many Progressive Backpack items we've received
+                int backpackCount = _session.Items.AllItemsReceived.Count(item =>
+                {
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    return itemName?.Equals("Progressive Backpack", StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+                
+                backpackCount = Math.Min(backpackCount, 10);
+                
+                if (backpackCount > 0)
+                {
+                    int totalSlots = 4 + (backpackCount * 4);
+                    float weightMultiplier = 1.0f - (backpackCount * 0.1f);
+                    
+                    SetBackpackProperties(totalSlots, weightMultiplier);
+                    
+                    _log.LogInfo($"[PeakPelago] Recovered {backpackCount} backpack upgrades (slots: {totalSlots}, weight: {weightMultiplier})");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error recovering backpack upgrades: {ex.Message}");
+            }
+        }
+        private void RecoverEnduranceUpgrades()
+        {
+            try
+            {
+                if (_session == null) return;
+                
+                int enduranceCount = _session.Items.AllItemsReceived.Count(item =>
+                {
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    return itemName?.Equals("Progressive Endurance", StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+                
+                enduranceCount = Math.Min(enduranceCount, 4);
+                
+                if (enduranceCount > 0)
+                {
+                    float multiplier = 1.0f - (enduranceCount * 0.1f);
+                    SetStaminaUsageMultiplier(multiplier);
+                    
+                    _log.LogInfo($"[PeakPelago] Recovered {enduranceCount} endurance upgrades (multiplier: {multiplier})");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error recovering endurance upgrades: {ex.Message}");
+            }
+        }
+
+        private void ApplyProgressiveEndurance()
+        {
+            try
+            {
+                if (_session == null) return;
+                
+                // Count how many Progressive Endurance items we've received
+                int enduranceCount = _session.Items.AllItemsReceived.Count(item =>
+                {
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    return itemName?.Equals("Progressive Endurance", StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+                
+                // Cap upgrades
+                enduranceCount = Math.Min(enduranceCount, 8);
+                
+                _log.LogInfo($"[PeakPelago] Applied Progressive Endurance: {enduranceCount}/4 upgrades received");
+                
+                // Calculate stamina usage multiplier
+                // member that each upgrade reduces usage by 10%: 100% -> 90% -> 80% -> 70% -> 60%
+                float staminaUsageMultiplier = 1.0f - (enduranceCount * 0.1f);
+                
+                // Broadcast to all clients
+                if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("SyncEnduranceUpgrade", RpcTarget.All, enduranceCount, staminaUsageMultiplier);
+                }
+                else
+                {
+                    SetStaminaUsageMultiplier(staminaUsageMultiplier);
+                }
+                
+                _notifications.ShowSimpleMessage($"Endurance Upgrade {enduranceCount}/4! Stamina usage: {staminaUsageMultiplier * 100:F0}%");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error applying Progressive Endurance: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        public void StartPixelTrapRPC()
+        {
+            PixelTrapEffect.ApplyPixelTrapLocal(_log);
+        }
+
+        [PunRPC]
+        private void SyncEnduranceUpgrade(int totalUpgrades, float multiplier)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] Syncing endurance: {totalUpgrades} upgrades, {multiplier}x multiplier");
+                SetStaminaUsageMultiplier(multiplier);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in SyncEnduranceUpgrade: {ex.Message}");
+            }
+        }
+
+        private void SetStaminaUsageMultiplier(float multiplier)
+        {
+            try
+            {
+                // Store in Photon custom properties
+                if (PhotonNetwork.LocalPlayer != null)
+                {
+                    Hashtable props = new Hashtable();
+                    props["AP_EnduranceMultiplier"] = multiplier;
+                    PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+                    
+                    _log.LogInfo($"[PeakPelago] Set stamina usage multiplier to {multiplier}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error setting stamina usage multiplier: {ex.Message}");
+            }
+        }
         private void ApplyProgressiveStamina()
         {
             try
@@ -1941,15 +2292,6 @@ namespace Peak.AP
             catch (Exception ex)
             {
                 _log.LogError("[PeakPelago] Error in ApplyProgressiveStamina: " + ex.Message);
-            }
-        }
-        
-        private void SpawnPhysicalItems(string itemName, int quantity)
-        {
-            for (int i = 0; i < quantity; i++)
-            {
-                System.Threading.Thread.Sleep(500);
-                SpawnPhysicalItem(itemName);
             }
         }
 
@@ -2477,6 +2819,211 @@ namespace Peak.AP
         }
 
         // ===== Harmony Patches =====
+        [HarmonyPatch(typeof(BackpackWheel), "InitWheel")]
+        public static class BackpackWheelInitWheelPatch
+        {
+            private static void Prefix(BackpackWheel __instance, ref BackpackReference bp)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    
+                    // Get the backpack data
+                    BackpackData backpackData = bp.GetData();
+                    if (backpackData == null || backpackData.itemSlots == null) return;
+                    
+                    int capacity = backpackData.itemSlots.Length;
+                    int requiredSlices = capacity + 1;
+                    int currentSlices = __instance.slices.Length;
+                    
+                    // Resize slices array if needed
+                    if (currentSlices < requiredSlices)
+                    {
+                        BackpackWheelSlice template = __instance.slices[1];
+                        List<BackpackWheelSlice> sliceList = [.. __instance.slices];
+                        
+                        while (sliceList.Count < requiredSlices)
+                        {
+                            BackpackWheelSlice newSlice = Instantiate(template, template.transform.parent);
+                            sliceList.Add(newSlice);
+                        }
+                        
+                        __instance.slices = sliceList.ToArray();
+                    }
+                    else if (currentSlices > requiredSlices)
+                    {
+                        // Need to remove excess slices
+                        for (int i = requiredSlices; i < currentSlices; i++)
+                        {
+                            Destroy(__instance.slices[i].gameObject);
+                        }
+                        
+                        List<BackpackWheelSlice> sliceList = [.. __instance.slices.Take(requiredSlices)];
+                        __instance.slices = sliceList.ToArray();
+                    }
+                    
+                    // Reposition all slices in a circle
+                    int totalSlices = __instance.slices.Length;
+                    float radius = (totalSlices - 4) * 26f;
+                    Transform parent = __instance.slices[0].transform.parent;
+                    
+                    parent.position = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
+                    parent.rotation = Quaternion.Euler(0f, 0f, 0f);
+                    
+                    for (int i = 0; i < totalSlices; i++)
+                    {
+                        BackpackWheelSlice slice = __instance.slices[i];
+                        float angle = 360f / totalSlices * i + 158f;
+                        float radians = (angle + 112f) * Mathf.Deg2Rad;
+                        
+                        slice.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+                        slice.transform.localPosition = new Vector3(
+                            Mathf.Cos(radians) * radius,
+                            Mathf.Sin(radians) * radius,
+                            0f
+                        );
+                    }
+                    
+                    _instance._log.LogInfo($"[PeakPelago] Configured backpack wheel with {capacity} slots ({totalSlices} slices total)");
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] BackpackWheel InitWheel patch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
+                    }
+                }
+            }
+        }
+        [HarmonyPatch(typeof(CharacterAfflictions), "UpdateWeight")]
+        public static class CharacterAfflictionsUpdateWeightPatch
+        {
+            static void Postfix(CharacterAfflictions __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    if (__instance.character == null) return;
+                    
+                    // Get weight multiplier from Photon custom properties
+                    float weightMultiplier = 1.0f; // Default
+                    
+                    if (__instance.character.photonView != null && 
+                        __instance.character.photonView.Owner != null)
+                    {
+                        var props = __instance.character.photonView.Owner.CustomProperties;
+                        if (props.ContainsKey("AP_BackpackWeightMultiplier"))
+                        {
+                            weightMultiplier = (float)props["AP_BackpackWeightMultiplier"];
+                        }
+                    }
+                    
+                    // Only modify backpack weight, not total weight
+                    float currentWeight = __instance.GetCurrentStatus(CharacterAfflictions.STATUSTYPE.Weight);
+                    
+                    if (weightMultiplier < 1.0f)
+                    {
+                        // Calculate how much weight is from backpack
+                        BackpackSlot backpackSlot = __instance.character.player.backpackSlot;
+                        int backpackWeight = 0;
+                        
+                        if (!backpackSlot.IsEmpty() && 
+                            backpackSlot.data.TryGetDataEntry<BackpackData>(DataEntryKey.BackpackData, out var backpackData))
+                        {
+                            for (int i = 0; i < backpackData.itemSlots.Length; i++)
+                            {
+                                ItemSlot itemSlot = backpackData.itemSlots[i];
+                                if (!itemSlot.IsEmpty())
+                                {
+                                    backpackWeight += itemSlot.prefab.CarryWeight;
+                                }
+                            }
+                        }
+                        
+                        // Reduce only the backpack weight
+                        float reducedBackpackWeight = backpackWeight * weightMultiplier;
+                        float weightReduction = backpackWeight - reducedBackpackWeight;
+                        
+                        // Apply the reduction
+                        float newWeight = currentWeight - (weightReduction * 0.025f);
+                        __instance.SetStatus(CharacterAfflictions.STATUSTYPE.Weight, Mathf.Max(0f, newWeight), pushStatus: false);
+                        
+                        _instance._log.LogDebug($"[PeakPelago] Reduced backpack weight by {weightReduction} (multiplier: {weightMultiplier})");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] UpdateWeight patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
+        [HarmonyPatch(typeof(BackpackData), "Init")]
+        public static class BackpackDataInitPatch
+        {
+            static void Prefix(BackpackData __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    
+                    // Get backpack slots from Photon custom properties
+                    int slots = 4; // Default
+                    
+                    if (Character.localCharacter != null && 
+                        Character.localCharacter.photonView != null && 
+                        Character.localCharacter.photonView.Owner != null)
+                    {
+                        var props = Character.localCharacter.photonView.Owner.CustomProperties;
+                        if (props.ContainsKey("AP_BackpackSlots"))
+                        {
+                            slots = (int)props["AP_BackpackSlots"];
+                        }
+                    }
+                    
+                    __instance.itemSlots = new ItemSlot[slots];
+                    
+                    _instance._log.LogInfo($"[PeakPelago] Initialized backpack with {slots} slots");
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] BackpackData Init patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
+        [HarmonyPatch(typeof(Character), "UseStamina")]
+        public static class CharacterUseStaminaPatch
+        {
+            static void Prefix(Character __instance, ref float usage)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    if (__instance.photonView != null && __instance.photonView.Owner != null)
+                    {
+                        var props = __instance.photonView.Owner.CustomProperties;
+                        if (props.ContainsKey("AP_EnduranceMultiplier"))
+                        {
+                            float multiplier = (float)props["AP_EnduranceMultiplier"];
+                            usage *= multiplier;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] UseStamina patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
         [HarmonyPatch(typeof(RunManager), "StartRun")]
         public static class RunManagerStartRunPatch
         {
@@ -2865,7 +3412,7 @@ namespace Peak.AP
                     if (badgeMapping.ContainsKey(achievementType))
                     {
                         string locationName = badgeMapping[achievementType];
-                        long locationId = _instance._session.Locations.GetLocationIdFromName(_instance.cfgGameId.Value, locationName);
+                        long locationId = _instance._session.Locations.GetLocationIdFromName("PEAK", locationName);
 
                         // Check if this location is checked in Archipelago
                         bool isCheckedInAP = _instance._session.Locations.AllLocationsChecked.Contains(locationId);
@@ -2996,7 +3543,7 @@ namespace Peak.AP
                 string host = cfgServer.Value;
                 string url = host.Contains(":") ? host : (host + ":" + cfgPort.Value);
                 //LoadState();
-                _log.LogInfo("[PeakPelago] Connecting to " + url + " as " + cfgSlot.Value + " (game=" + cfgGameId.Value + ")");
+                _log.LogInfo("[PeakPelago] Connecting to " + url + " as " + cfgSlot.Value + " (game=PEAK)");
 
                 _session = ArchipelagoSessionFactory.CreateSession(url);
 
@@ -3016,7 +3563,7 @@ namespace Peak.AP
 
                 // Use TryConnectAndLogin instead of ConnectAsync/LoginAsync
                 var result = _session.TryConnectAndLogin(
-                    cfgGameId.Value,
+                    "PEAK",
                     cfgSlot.Value,
                     ItemsHandlingFlags.AllItems,
                     null,
@@ -3036,7 +3583,7 @@ namespace Peak.AP
                 }
 
                 // Ask for datapackage for our game so helper name<->id lookups work
-                _session.Socket.SendPacket(new GetDataPackagePacket { Games = new[] { cfgGameId.Value } });
+                _session.Socket.SendPacket(new GetDataPackagePacket { Games = new[] { "PEAK" } });
                 _deathLinkService = _session.CreateDeathLinkService();
                 _log.LogInfo("[PeakPelago] Death Link service created");
                 _deathLinkService.OnDeathLinkReceived += (deathLink) =>
@@ -3346,9 +3893,9 @@ namespace Peak.AP
                     _reconnectAttempts = 0;
                     _wantReconnect = false;
 
-
-
                     RecoverAscentUnlocks();
+                    RecoverEnduranceUpgrades();
+                    RecoverBackpackUpgrades();
                     _log.LogInfo($"[PeakPelago] Initializing stamina manager with progressive={progressiveEnabled}, additional={additionalEnabled}");
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
                     
@@ -3412,7 +3959,7 @@ namespace Peak.AP
                         
                         try
                         {
-                            locationName = _session.Locations.GetLocationNameFromId(checkId, cfgGameId.Value);
+                            locationName = _session.Locations.GetLocationNameFromId(checkId, "PEAK");
                         }
                         catch (Exception ex)
                         {
@@ -3563,7 +4110,11 @@ namespace Peak.AP
                 { "mandrake_trap", "Mandrake Trap" },
                 { "fungal_infection_trap", "Fungal Infection Trap" },
                 { "fear_trap", "Fear Trap" },
-                { "scoutmaster_trap", "Scoutmaster Trap" }
+                { "scoutmaster_trap", "Scoutmaster Trap" },
+                { "zoom_trap", "Zoom Trap" },
+                { "screen_flip_trap", "Screen Flip Trap" },
+                { "drop_everything_trap", "Drop Everything Trap"},
+                { "pixel_trap", "Pixel Trap" },
             };
             
             return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;
@@ -3710,7 +4261,7 @@ namespace Peak.AP
 
             bool isInLevel = currentScene.StartsWith("Level_");
             bool isInAirport = currentScene.Contains("Airport");
-            bool isProgressionItem = itemName.Contains("Progressive Stamina") || itemName.Contains("Unlock") || itemName.Contains("Badge");
+            bool isProgressionItem = itemName.Contains("Progressive") || itemName.Contains("Unlock") || itemName.Contains("Badge");
 
             // Progression items work in BOTH Airport AND Levels
             // Regular items ONLY work in Levels
@@ -3985,6 +4536,11 @@ namespace Peak.AP
         {
             try
             {
+                if (!PhotonNetwork.IsMasterClient)
+                {
+                    _log.LogDebug("[PeakPelago] Skipping state save - is not master client");
+                    return;
+                }
                 if (_session == null || _session.Socket == null || !_session.Socket.Connected)
                 {
                     _log.LogDebug("[PeakPelago] Skipping state save - not connected to AP");
@@ -4114,7 +4670,7 @@ namespace Peak.AP
                         string locationName = "Unknown";
                         try
                         {
-                            locationName = _session.Locations.GetLocationNameFromId(checkId, cfgGameId.Value);
+                            locationName = _session.Locations.GetLocationNameFromId(checkId, "PEAK");
                         }
                         catch { }
                         

@@ -70,6 +70,10 @@ namespace Peak.AP
                 { "Blackout Trap", "Confuse Trap"},
                 { "Fear Trap", "Fear Trap"},
                 { "Scoutmaster Trap", "My Turn! Trap"},
+                { "Zoom Trap", "Zoom Trap"},
+                { "Screen Flip Trap", "Screen Flip Trap"},
+                { "Drop Everything Trap", "Empty Item Box Trap"},
+                { "Pixel Trap", "144p Trap"},
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -128,7 +132,12 @@ namespace Peak.AP
                 { "My Turn! Trap", "Scoutmaster Trap"},
                 { "Fishin' Boo Trap", "Scoutmaster Trap"},
                 { "Disable Tag Trap", "Scoutmaster Trap"},
-                { "Empty Item Box Trap", "Yeet Trap"}
+                { "Zoom Trap", "Zoom Trap"},
+                { "Screen Flip Trap", "Screen Flip Trap"},
+                { "Empty Item Box Trap", "Drop Everything Trap"},
+                { "Trivia Trap", "Pokemon Trivia Trap" },
+                { "144p Trap", "Pixel Trap"},
+                { "Pixellation Trap", "Pixel Trap"},
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");

@@ -107,7 +107,6 @@ LOCATION_TABLE: Dict[str, int] = {
     "First Aid Badge": 76199,
     "Clutch Badge": 76400,
     "Emergency Preparedness Badge": 76401,
-    "Ascender Badge": 76402,
     "Bookworm Badge": 76403,
     "Resourcefulness Badge": 76404,
     "Ultimate Badge": 76405,
@@ -200,6 +199,14 @@ LOCATION_TABLE: Dict[str, int] = {
     "Acquire Rescue Claw": 76284,
     "Acquire Fortified Milk": 76285,
     "Acquire Cloud Fungus": 76286,
+    "Acquire Purple Kingberry": 76287,
+    "Acquire Yellow Kingberry": 76288,
+    "Acquire Green Kingberry": 76289,
+    "Acquire Napberry": 76290,  # [Locked behind Alpine]
+    "Acquire Black Clusterberry": 76291,
+    "Acquire Red Clusterberry": 76292,
+    "Acquire Yellow Clusterberry": 76293,
+    "Acquire Scoutmaster's Bugle": 76294,
     
     # Peak Badge
     "Peak Badge": 76305,

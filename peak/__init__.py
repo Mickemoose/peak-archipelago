@@ -39,6 +39,7 @@ class PeakWorld(World):
         "Mesa Access",
         "Alpine Access",
         "Roots Access",
+        "Tropics Access",
         "Idol Dunked",
         "All Badges Collected"
 
@@ -104,7 +105,21 @@ class PeakWorld(World):
             total_locations -= (excluded_ascent_count * locations_per_ascent)
             
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {excluded_ascent_count} ascent levels, removing {excluded_ascent_count * locations_per_ascent} locations")
+        if self.options.disable_multiplayer_badges.value:
+            multiplayer_badge_count = 9
+            total_locations -= multiplayer_badge_count
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {multiplayer_badge_count} multiplayer badges")
         
+        if self.options.disable_hard_badges.value:
+            hard_badge_count = 5
+            total_locations -= hard_badge_count
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {hard_badge_count} hard badges")
+
+        if self.options.disable_biome_badges.value:
+            biome_badge_count = 10
+            total_locations -= biome_badge_count
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {biome_badge_count} biome specific badges")
+    
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total locations after exclusions: {total_locations}")
         
         item_pool = []
@@ -119,7 +134,15 @@ class PeakWorld(World):
                 item_pool.append(self.create_item("Progressive Ascent"))
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 7 Progressive Ascent items (non-Reach Peak goal)")
         
-        
+        for _ in range(8):
+            item_pool.append(self.create_item("Progressive Endurance"))
+        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 8 Progressive Endurance items")
+
+        for _ in range(10):
+            item_pool.append(self.create_item("Progressive Backpack"))
+        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 10 Progressive Backpack items")
+    
+
         # Add progressive stamina items if enabled
         if self.options.progressive_stamina.value:
             max_stamina_upgrades = 4
@@ -169,6 +192,10 @@ class PeakWorld(World):
         trap_weights += (["Fungal Infection Trap"] * self.options.fungal_infection_trap_weight.value)
         trap_weights += (["Fear Trap"] * self.options.fear_trap_weight.value)
         trap_weights += (["Scoutmaster Trap"] * self.options.scoutmaster_trap_weight.value)
+        trap_weights += (["Zoom Trap"] * self.options.zoom_trap_weight.value)
+        trap_weights += (["Screen Flip Trap"] * self.options.screen_flip_trap_weight.value)
+        trap_weights += (["Drop Everything Trap"] * self.options.drop_everything_trap_weight.value)
+        trap_weights += (["Pixel Trap"] * self.options.pixel_trap_weight.value)
         
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -224,6 +251,10 @@ class PeakWorld(World):
         trap_data["fungal_infection_trap"] = self.options.fungal_infection_trap_weight.value
         trap_data["fear_trap"] = self.options.fear_trap_weight.value
         trap_data["scoutmaster_trap"] = self.options.scoutmaster_trap_weight.value
+        trap_data["zoom_trap"] = self.options.zoom_trap_weight.value
+        trap_data["screen_flip_trap"] = self.options.screen_flip_trap_weight.value
+        trap_data["drop_everything_trap"] = self.options.drop_everything_trap_weight.value
+        trap_data["pixel_trap"] = self.options.pixel_trap_weight.value
 
         return trap_data
 
@@ -275,10 +306,20 @@ class PeakWorld(World):
     def fill_slot_data(self):
         """Return slot data for this player."""
         session_id = f"{self.multiworld.seed_name}_{self.player}"
+        
+        # Calculate actual badge count from locations that exist in this seed
+        badge_locations = [loc for loc in self.multiworld.get_locations(self.player) 
+                        if loc.name.endswith(" Badge") and loc.address is not None]
+        max_badges_available = len(badge_locations)
+        
+        # Respect the option but clamp to what's actually available
+        requested_badge_count = self.options.badge_count.value
+        actual_badge_count = min(requested_badge_count, max_badges_available)
+        
         slot_data = {
             "goal": self.options.goal.value,
             "ascent_count": self.options.ascent_count.value,
-            "badge_count": self.options.badge_count.value,
+            "badge_count": actual_badge_count,
             "progressive_stamina": self.options.progressive_stamina.value,
             "additional_stamina_bars": self.options.additional_stamina_bars.value,
             "trap_percentage": self.options.trap_percentage.value,
@@ -295,6 +336,8 @@ class PeakWorld(World):
         
         # Log what we're sending
         logging.info(f"[Player {self.multiworld.player_name[self.player]}] Slot data being sent: {slot_data}")
+        if requested_badge_count > max_badges_available:
+            logging.warning(f"[Player {self.multiworld.player_name[self.player]}] Requested {requested_badge_count} badges but only {max_badges_available} available in seed. Clamped to {actual_badge_count}")
         
         return slot_data
 

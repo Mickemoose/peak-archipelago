@@ -138,143 +138,163 @@ class InstantDeathTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which instantly kills a player
     """
-    display_name = "InstantDeathTrap Weight"
+    display_name = "Instant Death Trap Weight"
 class ItemsToBombsWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which drops the currently held item and replaces it with Dynamite
     """
-    display_name = "ItemsToBombs Weight"
+    display_name = "Items To Bombs Weight"
 class PokemonTriviaTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which quizzes the player with Pokemon trivia
     """
-    display_name = "PokemonTriviaTrap Weight"
+    display_name = "Pokemon Trivia Trap Weight"
 class BlackoutTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which blacks out the player's screen temporarily
     """
-    display_name = "BlackoutTrap Weight"
+    display_name = "Blackout Trap Weight"
 class SpawnBeeSwarmWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which spawns a swarm of bees
     """
-    display_name = "SpawnBeeSwarm Weight"
+    display_name = "Spawn Bee Swarm Weight"
 class BananaPeelTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which spawns a berrynana peel in front of a player
     """
-    display_name = "BananaPeelTrap Weight"
+    display_name = "Berrynana Peel Trap Weight"
 class MinorPoisonTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a weak Poison Affliction to a player
     """
-    display_name = "MinorPoisonTrap Weight"
+    display_name = "Minor Poison Trap Weight"
 class PoisonTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a Poison Affliction to a player
     """
-    display_name = "PoisonTrap Weight"
+    display_name = "Poison Trap Weight"
 class DeadlyPoisonTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a strong Poison Affliction to a player
     """
-    display_name = "DeadlyPoisonTrap Weight"   
+    display_name = "Deadly Poison Trap Weight"   
 class TornadoTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which spawns a tornado on a player
     """
-    display_name = "TornadoTrap Weight"
+    display_name = "Tornado Trap Weight"
 class SwapTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which swaps the position of all players
     """
-    display_name = "SwapTrap Weight"
+    display_name = "Swap Trap Weight"
 class NapTimeTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a Drowsy Affliction to a player
     """
-    display_name = "NapTimeTrap Weight"
+    display_name = "Nap Time Trap Weight"
 class HungryHungryCamperTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a Hunger Affliction to a player
     """
-    display_name = "HungryHungryCamperTrap Weight"
+    display_name = "Hungry Hungry Camper Trap Weight"
 class BalloonTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which ties a bundle of balloons to a player
     """
-    display_name = "BalloonTrap Weight"
+    display_name = "Balloon Trap Weight"
 class SlipTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which makes a player slip and fall
     """
-    display_name = "SlipTrap Weight"
+    display_name = "Slip Trap Weight"
 class FreezeTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a Cold Affliction to a player
     """
-    display_name = "FreezeTrap Weight"
+    display_name = "Freeze Trap Weight"
 class ColdTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a mild Cold Affliction to a player
     """
-    display_name = "ColdTrap Weight"
+    display_name = "Cold Trap Weight"
 class HotTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a Hot Affliction to a player
     """
-    display_name = "HotTrap Weight"
+    display_name = "Hot Trap Weight"
 class InjuryTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies an Injury Affliction to a player
     """
-    display_name = "InjuryTrap Weight"
+    display_name = "Injury Trap Weight"
 class CactusBallTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which replaces a players currently held item with a Cactus Ball
     """
-    display_name = "CactusBallTrap Weight"
+    display_name = "Cactus Ball Trap Weight"
 class YeetTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which causes a player to throw their currently held item at max force
     """
-    display_name = "YeetTrap Weight"
+    display_name = "Yeet Trap Weight"
 class TumbleweedTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which spawns a tumbleweed that chases a player
     """
-    display_name = "TumbleweedTrap Weight"
+    display_name = "Tumbleweed Trap Weight"
 class ZombieHordeTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which spawns a horde of mushroom zombies
     """
-    display_name = "ZombieHordeTrap Weight"
+    display_name = "Zombie Horde Trap Weight"
 class GustTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which spawns a wind storm that pushes players around
     """
-    display_name = "GustTrap Weight"
+    display_name = "Gust Trap Weight"
 class MandrakeTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which replaces a player's currently held item with a Mandrake
     """
-    display_name = "MandrakeTrap Weight"
+    display_name = "Mandrake Trap Weight"
 class FungalInfectionTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which applies a Spores Affliction over time to a player
     """
-    display_name = "FungalInfectionTrap Weight"
+    display_name = "Fungal Infection Trap Weight"
 class FearTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a spooky trap
     """
-    display_name = "FearTrap Weight"
+    display_name = "Fear Trap Weight"
 
 class ScoutmasterTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a trap which summons the Scoutmaster to hinder a player
     """
-    display_name = "ScoutmasterTrap Weight"
+    display_name = "Scoutmaster Trap Weight"
+class ZoomTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which drastically changes a player's camera zoom level
+    """
+    display_name = "Zoom Trap Weight"
+class ScreenFlipTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which flips a player's screen upside-down temporarily
+    """
+    display_name = "Screen Flip Trap Weight"
+class DropEverythingTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which forces a player to drop all currently held items
+    """
+    display_name = "Drop Everything Trap Weight"
+class PixelTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which reduces a player's screen resolution to pixelated graphics temporarily
+    """
+    display_name = "Pixel Trap Weight"
 
 class TrapPercentage(Range):
     """
@@ -284,6 +304,22 @@ class TrapPercentage(Range):
     range_start = 0
     range_end = 100
     default = 10
+
+class DisableMultiplayerBadges(Toggle):
+    """
+    Exclude multiplayer-only badge checks
+    """
+    display_name = "Disable Multiplayer Badges"
+class DisableHardBadges(Toggle):
+    """
+    Exclude somewhat hard badge checks
+    """
+    display_name = "Disable Hard Badges"
+class DisableBiomeBadges(Toggle):
+    """
+    Exclude biome exclusive badge checks
+    """
+    display_name = "Disable Biome Specific Badges"
 
 
 # Option Groups for better organization in the web UI
@@ -336,6 +372,15 @@ peak_option_groups = [
         FungalInfectionTrapWeight,
         FearTrapWeight,
         ScoutmasterTrapWeight,
+        ZoomTrapWeight,
+        ScreenFlipTrapWeight,
+        DropEverythingTrapWeight,
+        PixelTrapWeight,
+    ]),
+    OptionGroup("Badge Settings", [
+        DisableMultiplayerBadges,
+        DisableHardBadges,
+        DisableBiomeBadges,
     ]),
 ]
 
@@ -385,3 +430,11 @@ class PeakOptions(PerGameCommonOptions):
     fungal_infection_trap_weight: FungalInfectionTrapWeight
     fear_trap_weight: FearTrapWeight
     scoutmaster_trap_weight: ScoutmasterTrapWeight
+    zoom_trap_weight: ZoomTrapWeight
+    screen_flip_trap_weight: ScreenFlipTrapWeight
+    drop_everything_trap_weight: DropEverythingTrapWeight
+    pixel_trap_weight: PixelTrapWeight
+
+    disable_multiplayer_badges: DisableMultiplayerBadges
+    disable_hard_badges: DisableHardBadges
+    disable_biome_badges: DisableBiomeBadges

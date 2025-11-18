@@ -281,7 +281,11 @@ namespace Peak.AP
         public void LoadState(string stateData)
         {
             if (string.IsNullOrEmpty(stateData)) return;
-
+            if (!PhotonNetwork.IsMasterClient)
+            {
+                _log.LogDebug("[PeakPelago] Skipping load save - is not master client");
+                return;
+            }
             try
             {
                 var parts = stateData.Split(',');

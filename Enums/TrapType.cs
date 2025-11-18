@@ -35,6 +35,10 @@ namespace Peak.AP
         BlackoutTrap,
         FearTrap,
         ScoutmasterTrap,
+        ZoomTrap,
+        ScreenFlipTrap,
+        DropEverythingTrap,
+        PixelTrap,
     }
 
     public static class TrapTypeExtensions
@@ -69,6 +73,10 @@ namespace Peak.AP
             { TrapType.BlackoutTrap, "Blackout Trap" },
             { TrapType.FearTrap, "Fear Trap" },
             { TrapType.ScoutmasterTrap, "Scoutmaster Trap" },
+            { TrapType.ZoomTrap, "Zoom Trap" },
+            { TrapType.ScreenFlipTrap, "Screen Flip Trap" },
+            { TrapType.DropEverythingTrap, "Drop Everything Trap" },
+            { TrapType.PixelTrap, "Pixel Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
