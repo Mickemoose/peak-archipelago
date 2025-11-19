@@ -614,7 +614,7 @@ namespace Peak.AP
         /// <summary>Handle incoming death link from Archipelago</summary>
         private void HandleDeathLinkReceived(string cause, string source)
         {
-            if (_deathLinkService == null)
+            if (_deathLinkService == null || !_deathLinkEnabled)
             {
                 _log.LogDebug("[PeakPelago] Death link received but disabled");
                 return;
@@ -1701,7 +1701,7 @@ namespace Peak.AP
                 { "Zoom Trap", () => ZoomTrapEffect.ApplyZoomTrap(_log) },
                 { "Pixel Trap", () => PixelTrapEffect.ApplyPixelTrap(_log) },
                 { "Screen Flip Trap", () => ScreenFlipTrapEffect.ApplyScreenFlipTrap(_log) },
-                { "Gust Trap", () => BlizzardTrapEffect.ApplyBlizzardTrap(_log) },
+                { "Gust Trap", () => GustTrapEffect.ApplyGustTrap(_log) },
                 { "Mandrake Trap", () => ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "Mandrake") },
                 { "Blackout Trap", () => BlackoutTrapEffect.ApplyBlackoutTrap(_log) },
                 { "Eruption Trap", () => EruptionTrapEffect.ApplyEruptionTrap(_log) },
@@ -1792,13 +1792,6 @@ namespace Peak.AP
         {
             _log.LogInfo("[PeakPelago] RPC received: Start Gust Trap");
             GustTrapEffect.ActivateGustLocal(_log);
-        }
-
-        [PunRPC]
-        public void StartBlizzardTrapRPC()
-        {
-            _log.LogInfo("[PeakPelago] RPC received: Start Blizzard Trap");
-            BlizzardTrapEffect.ActivateBlizzardLocal(_log);
         }
 
         [PunRPC]
