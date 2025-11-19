@@ -18,6 +18,7 @@ class PeakItem(Item):
 progression_table = {
     "Progressive Ascent": ItemData(76019, ItemClassification.progression),
     "Progressive Endurance": ItemData(76026, ItemClassification.progression),
+    "Progressive Mountain": ItemData(76050, ItemClassification.progression),
     #"Ascent 2 Unlock": ItemData(76020, ItemClassification.progression),
     #"Ascent 3 Unlock": ItemData(76021, ItemClassification.progression),
     #"Ascent 4 Unlock": ItemData(76022, ItemClassification.progression),

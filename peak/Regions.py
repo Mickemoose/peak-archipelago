@@ -125,6 +125,8 @@ def create_peak_regions(world: "PeakWorld"):
         ("Roots Access", "Roots Access"),
         ("Tropics Access", "Tropics Access"),
         ("Alpine Access", "Alpine Access"),
+        ("Caldera Access", "Caldera Access"),
+        ("Kiln Access", "Kiln Access"),
     ]
     
     for loc_name, item_name in event_locations:

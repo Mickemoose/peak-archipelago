@@ -112,7 +112,7 @@ namespace Peak.AP
 
                 if (addMessageMethod != null)
                 {
-                    addMessageMethod.Invoke(_connectionLog, new object[] { message });
+                    addMessageMethod.Invoke(_connectionLog, [message]);
 
                     // Play sound only if receiving an item (not sending)
                     if (toIsMe && _connectionLog.sfxJoin != null)
@@ -241,7 +241,7 @@ namespace Peak.AP
                     string colorTag = GetColorTag(_connectionLog.leftColor);
                     string formattedMessage = colorTag + message + "</color>";
 
-                    addMessageMethod.Invoke(_connectionLog, new object[] { formattedMessage });
+                    addMessageMethod.Invoke(_connectionLog, [formattedMessage]);
                 }
             }
             catch (Exception ex)

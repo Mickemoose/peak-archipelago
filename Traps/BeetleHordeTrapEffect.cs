@@ -9,8 +9,6 @@ namespace Peak.AP
 {
     public static class BeetleHordeTrapEffect
     {
-        private static GameObject beetlePrefab = null;
-
         public static void ApplyBeetleHordeTrap(ManualLogSource log)
         {
             try
@@ -57,38 +55,8 @@ namespace Peak.AP
             }
         }
 
-        private static GameObject FindBeetlePrefab(ManualLogSource log)
-        {
-            if (beetlePrefab != null)
-                return beetlePrefab;
-
-            var allObjects = Resources.FindObjectsOfTypeAll<GameObject>();
-            foreach (var obj in allObjects)
-            {
-                if (obj.name == "Beetle" && obj.GetComponent<Beetle>() != null)
-                {
-                    if (obj.scene.name == null || obj.scene.name == "")
-                    {
-                        beetlePrefab = obj;
-                        log.LogInfo("[PeakPelago] Found Beetle prefab!");
-                        return beetlePrefab;
-                    }
-                }
-            }
-
-            log.LogError("[PeakPelago] Could not find Beetle prefab!");
-            return null;
-        }
-
         private static IEnumerator SpawnBeetleHorde(Vector3 centerPosition, string characterName, ManualLogSource log)
         {
-            GameObject prefab = FindBeetlePrefab(log);
-            if (prefab == null)
-            {
-                log.LogError("[PeakPelago] Cannot spawn beetles - prefab not found");
-                yield break;
-            }
-
             int beetlesSpawned = 0;
             float radius = 5f;
             
@@ -106,35 +74,14 @@ namespace Peak.AP
                 Vector3 spawnPosition = centerPosition + offset;
                 spawnPosition.y += 2f;
 
-                GameObject beetle = null;
-                
-                // Spawn the beetle
-                beetle = UnityEngine.Object.Instantiate(prefab, spawnPosition, Quaternion.identity);
+                // Use PhotonNetwork.Instantiate with the prefab path
+                GameObject beetle = PhotonNetwork.Instantiate("0_Items/Beetle", spawnPosition, Quaternion.identity);
                 
                 if (beetle != null)
                 {
-                    // Get PhotonView and allocate a proper view ID
-                    PhotonView pv = beetle.GetComponent<PhotonView>();
-                    if (pv != null)
-                    {
-                        // Allocate a new view ID for this beetle
-                        int viewID = PhotonNetwork.AllocateViewID(PhotonNetwork.LocalPlayer.ActorNumber);
-                        pv.ViewID = viewID;
-                        pv.OwnershipTransfer = OwnershipOption.Takeover;
-                        
-                        log.LogInfo($"[PeakPelago] Allocated ViewID {viewID} for beetle {i + 1}/5");
-                    }
-                    else
-                    {
-                        log.LogWarning($"[PeakPelago] Beetle {i + 1}/5 has no PhotonView!");
-                    }
+                    log.LogInfo($"[PeakPelago] Spawned networked beetle {i + 1}/5 at {spawnPosition}");
                     
-                    yield return null;
-                    
-                    if (pv != null)
-                    {
-                        log.LogInfo($"[PeakPelago] Beetle {i + 1}/5 - PhotonView.IsMine: {pv.IsMine}, ViewID: {pv.ViewID}, Owner: {pv.Owner?.NickName ?? "none"}");
-                    }
+                    yield return null; // Wait a frame for network sync
                     
                     Beetle beetleComp = beetle.GetComponent<Beetle>();
                     if (beetleComp != null)
@@ -146,23 +93,18 @@ namespace Peak.AP
                             mobStateField.SetValue(beetleComp, 1); // 1 = MobState.Walking
                             log.LogInfo($"[PeakPelago] Set beetle {i + 1}/5 to Walking state");
                         }
-                        else
-                        {
-                            log.LogWarning($"[PeakPelago] Could not find _mobState field for beetle {i + 1}/5");
-                        }
                         
                         beetleComp.sleeping = false;
                         beetleComp.UpdateSleeping();
                         
-                        log.LogInfo($"[PeakPelago] Beetle {i + 1}/5 final state - mobState: {beetleComp.mobState}, sleeping: {beetleComp.sleeping}, aggroDistance: {beetleComp.aggroDistance}");
-                    }
-                    else
-                    {
-                        log.LogWarning($"[PeakPelago] Beetle {i + 1}/5 has no Beetle component!");
+                        PhotonView pv = beetle.GetComponent<PhotonView>();
+                        if (pv != null)
+                        {
+                            log.LogInfo($"[PeakPelago] Beetle {i + 1}/5 - ViewID: {pv.ViewID}, IsMine: {pv.IsMine}");
+                        }
                     }
                     
                     beetlesSpawned++;
-                    log.LogInfo($"[PeakPelago] Spawned beetle {i + 1}/5 at {spawnPosition}");
                 }
                 else
                 {

@@ -19,10 +19,11 @@ using Newtonsoft.Json.Linq;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
+using Zorro.Core;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.3")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.4")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -97,6 +98,7 @@ namespace Peak.AP
         private int _slotRequiredAscent = 0;
         private int _slotRequiredBadges = 20;
         private HashSet<int> _unlockedAscents = new HashSet<int>(); // Track which ascents are unlocked via AP items
+        private int _progressiveMountainCount = 0;
 
         // ===== AP Link Management =====
         private RingLinkService _ringLinkService;
@@ -1659,6 +1661,7 @@ namespace Peak.AP
                 // Progression Items (76019-76025) - Unlock ascents
                 { "Progressive Ascent", () => UnlockAscent() },
                 { "Progressive Endurance", () => ApplyProgressiveEndurance() },
+                { "Progressive Mountain", () => ApplyProgressiveMountain() },
                 //{ "Ascent 2 Unlock", () => UnlockAscent(2) },
                 //{ "Ascent 3 Unlock", () => UnlockAscent(3) },
                 //{ "Ascent 4 Unlock", () => UnlockAscent(4) },
@@ -1942,6 +1945,78 @@ namespace Peak.AP
             }
         }
 
+        private void ApplyProgressiveMountain()
+        {
+            try
+            {
+                if (_session == null) return;
+                
+                // Count how many Progressive Mountain items we've received
+                int mountainCount = _session.Items.AllItemsReceived.Count(item =>
+                {
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    return itemName?.Equals("Progressive Mountain", StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+                
+                mountainCount = Math.Min(mountainCount, 4); // Cap at 4
+                _progressiveMountainCount = mountainCount;
+                
+                _log.LogInfo($"[PeakPelago] Applied Progressive Mountain: {mountainCount}/4 received");
+                
+                // Report the access checks as we unlock them
+                if (mountainCount >= 1)
+                {
+                    ReportCheckByName("Tropics Access");
+                    ReportCheckByName("Roots Access");
+                }
+                
+                if (mountainCount >= 2)
+                {
+                    ReportCheckByName("Alpine Access");
+                    ReportCheckByName("Mesa Access");
+                }
+                
+                if (mountainCount >= 3)
+                {
+                    ReportCheckByName("Caldera Access");
+                }
+                
+                if (mountainCount >= 4)
+                {
+                    ReportCheckByName("Kiln Access");
+                }
+                
+                _notifications.ShowSimpleMessage($"Mountain Progress {mountainCount}/4!");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error applying Progressive Mountain: {ex.Message}");
+            }
+        }
+
+        private void RecoverProgressiveMountain()
+        {
+            try
+            {
+                if (_session == null) return;
+                
+                int mountainCount = _session.Items.AllItemsReceived.Count(item =>
+                {
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    return itemName?.Equals("Progressive Mountain", StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+                
+                mountainCount = Math.Min(mountainCount, 4);
+                _progressiveMountainCount = mountainCount;
+                
+                _log.LogInfo($"[PeakPelago] Recovered {mountainCount} Progressive Mountain items");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error recovering Progressive Mountain: {ex.Message}");
+            }
+        }
+
         private void ApplyProgressiveEndurance()
         {
             try
@@ -1958,7 +2033,7 @@ namespace Peak.AP
                 // Cap upgrades
                 enduranceCount = Math.Min(enduranceCount, 8);
                 
-                _log.LogInfo($"[PeakPelago] Applied Progressive Endurance: {enduranceCount}/4 upgrades received");
+                _log.LogInfo($"[PeakPelago] Applied Progressive Endurance: {enduranceCount} upgrades received");
                 
                 // Calculate stamina usage multiplier
                 // member that each upgrade reduces usage by 10%: 100% -> 90% -> 80% -> 70% -> 60%
@@ -1974,7 +2049,7 @@ namespace Peak.AP
                     SetStaminaUsageMultiplier(staminaUsageMultiplier);
                 }
                 
-                _notifications.ShowSimpleMessage($"Endurance Upgrade {enduranceCount}/4! Stamina usage: {staminaUsageMultiplier * 100:F0}%");
+                _notifications.ShowSimpleMessage($"Endurance Upgrade {enduranceCount}! Stamina usage: {staminaUsageMultiplier * 100:F0}%");
             }
             catch (Exception ex)
             {
@@ -2423,45 +2498,58 @@ namespace Peak.AP
                 int currentAscent = GetCurrentAscentLevel();
 
                 // Award ascent-specific badges based on peak and ascent level
-                string badgeLocation = GetAscentBadgeLocation(peakName, currentAscent);
-                if (!string.IsNullOrEmpty(badgeLocation))
+                // Award ALL previous badges for this peak too
+                for (int i = 0; i <= currentAscent; i++)
                 {
-                    string badgeKey = badgeLocation + "_" + currentAscent;
-                    
-                    if (!_awardedAscentBadges.Contains(badgeKey))
+                    string badgeLocation = GetAscentBadgeLocation(peakName, i);
+                    if (!string.IsNullOrEmpty(badgeLocation))
                     {
-                        ReportCheckByName(badgeLocation);
-                        _awardedAscentBadges.Add(badgeKey);
+                        string badgeKey = badgeLocation + "_" + i;
+                        
+                        if (!_awardedAscentBadges.Contains(badgeKey))
+                        {
+                            ReportCheckByName(badgeLocation);
+                            _awardedAscentBadges.Add(badgeKey);
+                            _log.LogInfo($"[PeakPelago] Awarded badge: {badgeLocation}");
+                        }
                     }
-                    else
-                    {
-                        _log.LogInfo("[PeakPelago] Badge already awarded for key: " + badgeKey);
-                    }
-                }
-                else
-                {
-                    _log.LogWarning("[PeakPelago] No badge location found for peak: " + peakName);
                 }
 
-                // Award scout sash only when reaching the final peak (PEAK) - this means escaping/completing the ascent
+                // Award scout sash only when reaching the final peak (PEAK)
                 if (peakName.ToUpper() == "PEAK")
                 {
-                    string sashLocation = GetScoutSashLocation(currentAscent);
-
-                    if (!string.IsNullOrEmpty(sashLocation))
+                    // Award ALL previous sashes too
+                    for (int i = 1; i <= currentAscent; i++)
                     {
-                        string sashKey = sashLocation + "_" + currentAscent;
+                        string sashLocation = GetScoutSashLocation(i);
 
-                        if (!_awardedAscentBadges.Contains(sashKey))
+                        if (!string.IsNullOrEmpty(sashLocation))
                         {
-                            ReportCheckByName(sashLocation);
-                            _awardedAscentBadges.Add(sashKey);
-                        }
-                        else
-                        {
-                            _log.LogInfo("[PeakPelago] Sash already awarded for key: " + sashKey);
+                            string sashKey = sashLocation + "_" + i;
+
+                            if (!_awardedAscentBadges.Contains(sashKey))
+                            {
+                                ReportCheckByName(sashLocation);
+                                _awardedAscentBadges.Add(sashKey);
+                                _log.LogInfo($"[PeakPelago] Awarded sash: {sashLocation}");
+                            }
                         }
                     }
+                    
+                    // Award ALL previous ascent completion checks too just in case lol
+                    for (int i = 0; i <= currentAscent; i++)
+                    {
+                        string completionLocation = $"Ascent {i} Completed";
+                        string completionKey = completionLocation + "_" + i;
+                        
+                        if (!_awardedAscentBadges.Contains(completionKey))
+                        {
+                            ReportCheckByName(completionLocation);
+                            _awardedAscentBadges.Add(completionKey);
+                            _log.LogInfo($"[PeakPelago] Awarded completion: {completionLocation}");
+                        }
+                    }
+                    
                     CheckReachPeakGoal(currentAscent);
                 }
                 else
@@ -2615,186 +2703,278 @@ namespace Peak.AP
                 _log.LogWarning("[PeakPelago] CLIENT: Character or stamina manager is null, couldn't update");
             }
         }
+        private static class CampfireHelper
+        {
+            public static int GetRequiredProgressiveMountain(string biomeName)
+            {
+                switch (biomeName)
+                {
+                    case "SHORE":
+                    case "BEACH":
+                        return 1;
+                    case "TROPICS":
+                    case "ROOTS":
+                        return 2;
+                    case "ALPINE":
+                    case "MESA":
+                        return 3;
+                    case "CALDERA":
+                        return 4;
+                    default:
+                        return 0;
+                }
+            }
+        }
 
         // ===== Harmony Patches =====
-        [HarmonyPatch(typeof(BackpackWheel), "InitWheel")]
-        public static class BackpackWheelInitWheelPatch
+        [HarmonyPatch(typeof(Campfire), "GetInteractionText")]
+        public static class CampfireGetInteractionTextPatch
         {
-            private static void Prefix(BackpackWheel __instance, ref BackpackReference bp)
+            static void Postfix(Campfire __instance, ref string __result)
             {
                 try
                 {
                     if (_instance == null) return;
                     
-                    // Get the backpack data
-                    BackpackData backpackData = bp.GetData();
-                    if (backpackData == null || backpackData.itemSlots == null) return;
-                    
-                    int capacity = backpackData.itemSlots.Length;
-                    int requiredSlices = capacity + 1;
-                    int currentSlices = __instance.slices.Length;
-                    
-                    // Resize slices array if needed
-                    if (currentSlices < requiredSlices)
+                    if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
                     {
-                        BackpackWheelSlice template = __instance.slices[1];
-                        List<BackpackWheelSlice> sliceList = [.. __instance.slices];
+                        if (Singleton<MapHandler>.Instance == null) return;
                         
-                        while (sliceList.Count < requiredSlices)
+                        int currentSegmentIndex = (int)Singleton<MapHandler>.Instance.GetCurrentSegment();
+                        
+                        if (currentSegmentIndex < (int)__instance.advanceToSegment)
                         {
-                            BackpackWheelSlice newSlice = Instantiate(template, template.transform.parent);
-                            sliceList.Add(newSlice);
+                            __result = "RELIGHT";
                         }
-                        
-                        __instance.slices = sliceList.ToArray();
                     }
-                    else if (currentSlices > requiredSlices)
-                    {
-                        // Need to remove excess slices
-                        for (int i = requiredSlices; i < currentSlices; i++)
-                        {
-                            Destroy(__instance.slices[i].gameObject);
-                        }
-                        
-                        List<BackpackWheelSlice> sliceList = [.. __instance.slices.Take(requiredSlices)];
-                        __instance.slices = sliceList.ToArray();
-                    }
-                    
-                    // Reposition all slices in a circle
-                    int totalSlices = __instance.slices.Length;
-                    float radius = (totalSlices - 4) * 26f;
-                    Transform parent = __instance.slices[0].transform.parent;
-                    
-                    parent.position = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
-                    parent.rotation = Quaternion.Euler(0f, 0f, 0f);
-                    
-                    for (int i = 0; i < totalSlices; i++)
-                    {
-                        BackpackWheelSlice slice = __instance.slices[i];
-                        float angle = 360f / totalSlices * i + 158f;
-                        float radians = (angle + 112f) * Mathf.Deg2Rad;
-                        
-                        slice.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
-                        slice.transform.localPosition = new Vector3(
-                            Mathf.Cos(radians) * radius,
-                            Mathf.Sin(radians) * radius,
-                            0f
-                        );
-                    }
-                    
-                    _instance._log.LogInfo($"[PeakPelago] Configured backpack wheel with {capacity} slots ({totalSlices} slices total)");
                 }
                 catch (Exception ex)
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError($"[PeakPelago] BackpackWheel InitWheel patch error: {ex.Message}");
-                        _instance._log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
+                        _instance._log.LogError($"[PeakPelago] GetInteractionText patch error: {ex.Message}");
                     }
                 }
             }
         }
-        [HarmonyPatch(typeof(CharacterAfflictions), "UpdateWeight")]
-        public static class CharacterAfflictionsUpdateWeightPatch
+
+        [HarmonyPatch(typeof(Campfire), "IsInteractible")]
+        public static class CampfireIsInteractiblePatch
         {
-            static void Postfix(CharacterAfflictions __instance)
+            static void Postfix(Campfire __instance, Character interactor, ref bool __result)
             {
                 try
                 {
                     if (_instance == null) return;
-                    if (__instance.character == null) return;
                     
-                    // Get weight multiplier from Photon custom properties
-                    float weightMultiplier = 1.0f; // Default
-                    
-                    if (__instance.character.photonView != null && 
-                        __instance.character.photonView.Owner != null)
+                    if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
                     {
-                        var props = __instance.character.photonView.Owner.CustomProperties;
-                        if (props.ContainsKey("AP_BackpackWeightMultiplier"))
+                        if (Singleton<MapHandler>.Instance == null) return;
+                        
+                        int currentSegmentIndex = (int)Singleton<MapHandler>.Instance.GetCurrentSegment();
+                        
+                        if (currentSegmentIndex < (int)__instance.advanceToSegment)
                         {
-                            weightMultiplier = (float)props["AP_BackpackWeightMultiplier"];
+                            __result = true;
                         }
                     }
-                    
-                    // Only modify backpack weight, not total weight
-                    float currentWeight = __instance.GetCurrentStatus(CharacterAfflictions.STATUSTYPE.Weight);
-                    
-                    if (weightMultiplier < 1.0f)
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
                     {
-                        // Calculate how much weight is from backpack
-                        BackpackSlot backpackSlot = __instance.character.player.backpackSlot;
-                        int backpackWeight = 0;
+                        _instance._log.LogError($"[PeakPelago] IsInteractible patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(Campfire), "IsConstantlyInteractable")]
+        public static class CampfireIsConstantlyInteractablePatch
+        {
+            static void Postfix(Campfire __instance, Character interactor, ref bool __result)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    
+                    if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
+                    {
+                        if (Singleton<MapHandler>.Instance == null) return;
                         
-                        if (!backpackSlot.IsEmpty() && 
-                            backpackSlot.data.TryGetDataEntry<BackpackData>(DataEntryKey.BackpackData, out var backpackData))
+                        int currentSegmentIndex = (int)Singleton<MapHandler>.Instance.GetCurrentSegment();
+                        
+                        if (currentSegmentIndex < (int)__instance.advanceToSegment)
                         {
-                            for (int i = 0; i < backpackData.itemSlots.Length; i++)
+                            __result = true;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError($"[PeakPelago] IsConstantlyInteractable patch error: {ex.Message}");
+                    }
+                }
+            }
+        }
+        [HarmonyPatch(typeof(Campfire), "Interact_CastFinished")]
+        public static class CampfireInteractCastFinishedPatch
+        {
+            static bool Prefix(Campfire __instance, Character interactor)
+            {
+                try
+                {
+                    if (_instance == null) return true;
+                    
+                    // Only if campfire is SPENT and it's a transition campfire
+                    if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
+                    {
+                        var mapHandler = FindFirstObjectByType<MapHandler>();
+                        if (mapHandler == null) return true;
+                        
+                        int currentSegmentIndex = (int)mapHandler.GetCurrentSegment();
+                        
+                        // Check if we haven't advanced yet
+                        if (currentSegmentIndex < (int)__instance.advanceToSegment)
+                        {
+                            var currentSegment = mapHandler.segments[currentSegmentIndex];
+                            string currentBiomeName = currentSegment.biome.ToString().ToUpper();
+                            
+                            int requiredMountain = CampfireHelper.GetRequiredProgressiveMountain(currentBiomeName);
+                            
+                            // If we now have enough, trigger the advancement
+                            if (requiredMountain > 0 && _instance._progressiveMountainCount >= requiredMountain)
                             {
-                                ItemSlot itemSlot = backpackData.itemSlots[i];
-                                if (!itemSlot.IsEmpty())
+                                _instance._log.LogInfo($"[PeakPelago] Relighting campfire to advance from {currentBiomeName} with {_instance._progressiveMountainCount} Progressive Mountain");
+                                
+                                // Manually trigger the segment advancement
+                                if (Singleton<MapHandler>.Instance != null)
                                 {
-                                    backpackWeight += itemSlot.prefab.CarryWeight;
+                                    Singleton<MapHandler>.Instance.GoToSegment(__instance.advanceToSegment);
                                 }
+                                
+                                return false; // Skip original method
                             }
                         }
-                        
-                        // Reduce only the backpack weight
-                        float reducedBackpackWeight = backpackWeight * weightMultiplier;
-                        float weightReduction = backpackWeight - reducedBackpackWeight;
-                        
-                        // Apply the reduction
-                        float newWeight = currentWeight - (weightReduction * 0.025f);
-                        __instance.SetStatus(CharacterAfflictions.STATUSTYPE.Weight, Mathf.Max(0f, newWeight), pushStatus: false);
-                        
-                        _instance._log.LogDebug($"[PeakPelago] Reduced backpack weight by {weightReduction} (multiplier: {weightMultiplier})");
                     }
+                    
+                    return true; // Allow normal behavior
                 }
                 catch (Exception ex)
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError($"[PeakPelago] UpdateWeight patch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] Interact_CastFinished patch error: {ex.Message}");
                     }
+                    return true;
                 }
             }
         }
-        [HarmonyPatch(typeof(BackpackData), "Init")]
-        public static class BackpackDataInitPatch
+        [HarmonyPatch(typeof(Campfire), "Light_Rpc")]
+        public static class CampfireLightRpcPatch
         {
-            static void Prefix(BackpackData __instance)
+            static bool Prefix(Campfire __instance)
             {
                 try
                 {
-                    if (_instance == null) return;
+                    if (_instance == null) return true;
                     
-                    // Get backpack slots from Photon custom properties
-                    int slots = 4; // Default
+                    // Get the segment this campfire advances to
+                    var advanceToSegment = __instance.advanceToSegment;
+                    if (advanceToSegment == 0) return true; // No segment advancement
                     
-                    if (Character.localCharacter != null && 
-                        Character.localCharacter.photonView != null && 
-                        Character.localCharacter.photonView.Owner != null)
+                    // Get MapHandler to determine current biome
+                    var mapHandler = FindFirstObjectByType<MapHandler>();
+                    if (mapHandler == null) return true;
+                    
+                    // Get current segment to determine which biome we're leaving
+                    int currentSegmentIndex = (int)mapHandler.GetCurrentSegment();
+                    if (currentSegmentIndex < 0 || currentSegmentIndex >= mapHandler.segments.Length)
                     {
-                        var props = Character.localCharacter.photonView.Owner.CustomProperties;
-                        if (props.ContainsKey("AP_BackpackSlots"))
+                        return true;
+                    }
+                    
+                    var currentSegment = mapHandler.segments[currentSegmentIndex];
+                    string currentBiomeName = currentSegment.biome.ToString().ToUpper();
+                    
+                    _instance._log.LogInfo($"[PeakPelago] Lighting campfire in {currentBiomeName}, checking Progressive Mountain requirements");
+                    
+                    // Check Progressive Mountain requirements based on current biome
+                    int requiredMountain = GetRequiredProgressiveMountain(currentBiomeName);
+                    
+                    if (requiredMountain > 0)
+                    {
+                        if (_instance._progressiveMountainCount < requiredMountain)
                         {
-                            slots = (int)props["AP_BackpackSlots"];
+                            _instance._log.LogWarning($"[PeakPelago] Cannot advance from {currentBiomeName} - need {requiredMountain} Progressive Mountain, have {_instance._progressiveMountainCount}");
+                            
+                            // Show notification to player
+                            _instance._notifications?.ShowWarningMessage($"Need {requiredMountain} Mountain Progress to advance! (Have {_instance._progressiveMountainCount})");
+                            
+                            // Still allow the campfire to light, just don't advance the segment
+                            __instance.state = Campfire.FireState.Lit;
+                            
+                            // Call private method UpdateLit using reflection
+                            var updateLitMethod = typeof(Campfire).GetMethod("UpdateLit", 
+                                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                            updateLitMethod?.Invoke(__instance, null);
+                            
+                            __instance.smokeParticlesOff.Stop();
+                            __instance.smokeParticlesLit.Play();
+                            
+                            if (GUIManager.instance != null)
+                            {
+                                GUIManager.instance.RefreshInteractablePrompt();
+                            }
+                            
+                            return false;
+                        }
+                        else
+                        {
+                            _instance._log.LogInfo($"[PeakPelago] Progressive Mountain requirement met ({_instance._progressiveMountainCount}/{requiredMountain}) - allowing advancement from {currentBiomeName}");
                         }
                     }
                     
-                    __instance.itemSlots = new ItemSlot[slots];
-                    
-                    _instance._log.LogInfo($"[PeakPelago] Initialized backpack with {slots} slots");
+                    return true;
                 }
                 catch (Exception ex)
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError($"[PeakPelago] BackpackData Init patch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] Campfire Light_Rpc patch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
                     }
+                    return true; // On error, allow normal behavior
+                }
+            }
+            
+            private static int GetRequiredProgressiveMountain(string biomeName)
+            {
+                switch (biomeName)
+                {
+                    case "SHORE":
+                    case "BEACH":
+                        return 1; // Need 1 to leave beach
+                    
+                    case "TROPICS":
+                    case "ROOTS":
+                        return 2; // Need 2 to leave Tropics/Roots
+                    
+                    case "ALPINE":
+                    case "MESA":
+                        return 3; // Need 3 to leave Alpine/Mesa
+                    
+                    case "CALDERA":
+                        return 4; // Need 4 to leave Caldera
+                    
+                    default:
+                        return 0; // No requirement for other biomes
                 }
             }
         }
+      
         [HarmonyPatch(typeof(Character), "UseStamina")]
         public static class CharacterUseStaminaPatch
         {
@@ -3428,7 +3608,7 @@ namespace Peak.AP
 
                         if (helper.Index > _lastProcessedItemIndex)
                         {
-                            _notifications.ShowItemNotification(fromName, toName, itemName, classification);
+                            //_notifications.ShowItemNotification(fromName, toName, itemName, classification);
                             bool isTrap = IsTrapItem(itemName);
                             _itemQueue.AddLast((itemName, isTrap, helper.Index));
 
@@ -3692,6 +3872,7 @@ namespace Peak.AP
                     _wantReconnect = false;
 
                     RecoverAscentUnlocks();
+                    RecoverProgressiveMountain();
                     RecoverEnduranceUpgrades();
                     _log.LogInfo($"[PeakPelago] Initializing stamina manager with progressive={progressiveEnabled}, additional={additionalEnabled}");
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
@@ -3822,46 +4003,38 @@ namespace Peak.AP
             {
                 if (_session == null) return;
                 
-                // Check received items for ascent unlocks
-                var receivedItems = _session.Items.AllItemsReceived;
-                
-                int progressiveAscentCount = 0;
-                
-                foreach (var item in receivedItems)
+                // Count how many Progressive Ascent items we've actually received
+                int progressiveAscentCount = _session.Items.AllItemsReceived.Count(item =>
                 {
                     string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                    
-                    // Check if it's a Progressive Ascent item
-                    if (itemName != null && itemName.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase))
-                    {
-                        progressiveAscentCount++;
-                    }
-                }
+                    return itemName != null && itemName.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase);
+                });
                 
-                _log.LogInfo($"[PeakPelago] Recovery: Found {progressiveAscentCount} Progressive Ascent items, currently have {_unlockedAscents.Count} unlocked");
+                _log.LogInfo($"[PeakPelago] Recovery: Found {progressiveAscentCount} Progressive Ascent items in received items");
                 
-                // Unlock ascents based on the count of Progressive Ascent items received
+                // Clear the unlocked ascents set to rebuild it
+                _unlockedAscents.Clear();
+                
+                // Unlock ascents based on the actual count
                 for (int i = 1; i <= progressiveAscentCount && i <= 7; i++)
                 {
-                    if (!_unlockedAscents.Contains(i))
+                    _unlockedAscents.Add(i);
+                    
+                    // Use reflection to access the Ascents class and unlock the ascent
+                    var ascentsType = Type.GetType("Ascents");
+                    if (ascentsType == null)
                     {
-                        _unlockedAscents.Add(i);
-                        
-                        // Use reflection to access the Ascents class and unlock the ascent
-                        var ascentsType = Type.GetType("Ascents");
-                        if (ascentsType != null)
-                        {
-                            var unlockMethod = ascentsType.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                            if (unlockMethod != null)
-                            {
-                                unlockMethod.Invoke(null, new object[] { i });
-                                _log.LogInfo($"[PeakPelago] Recovered and unlocked ascent: {i}");
-                            }
-                        }
+                        ascentsType = typeof(Character).Assembly.GetType("Ascents");
                     }
-                    else
+                    
+                    if (ascentsType != null)
                     {
-                        _log.LogDebug($"[PeakPelago] Ascent {i} already in unlocked set, skipping");
+                        var unlockMethod = ascentsType.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        if (unlockMethod != null)
+                        {
+                            unlockMethod.Invoke(null, new object[] { i });
+                            _log.LogInfo($"[PeakPelago] Recovered and unlocked ascent: {i}");
+                        }
                     }
                 }
                 
@@ -3963,12 +4136,49 @@ namespace Peak.AP
         {
             try
             {
-                _log.LogInfo("[AP] " + msg.ToString());
-                // hide some messages that are spammy or not useful to show
-                if (msg.ToString().Contains("Cheat console:")) return;
+                // Type check for specific message types
+                switch (msg)
+                {
+                    case ItemSendLogMessage itemSendMsg:
+                        // Extract item details
+                        var sender = itemSendMsg.Sender;
+                        var receiver = itemSendMsg.Receiver;
+                        var item = itemSendMsg.Item;
+                        
+                        // Get proper names
+                        string senderName = sender.Name ?? $"Player {sender.Slot}";
+                        string receiverName = receiver.Name ?? $"Player {receiver.Slot}";
+                        string itemName = item.ItemName ?? $"Item {item.ItemId}";
+                        
+                        // Add game suffix for cross-game items
+                        if (item.ItemGame != "PEAK" && item.ItemGame != null)
+                        {
+                            itemName = $"{itemName} ({item.ItemGame})";
+                        }
+                        
+                        _notifications.ShowItemNotification(senderName, receiverName, itemName, item.Flags);
+                        
+                        _log.LogInfo($"[AP] {senderName} sent {itemName} to {receiverName}");
+                        
+                        return;
+                        
+                    default:
+                        string msgString = msg.ToString();
+                        
+                        // Skip spammy messages
+                        if (msgString.Contains("Cheat console:")) return;
+                        
+                        _log.LogInfo("[AP] " + msgString);
+                        _notifications.ShowSimpleMessage(msgString);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in OnApMessage: {ex.Message}");
+                // Fallback to showing the raw message
                 _notifications.ShowSimpleMessage(msg.ToString());
             }
-            catch { /* ignore formatting errors */ }
         }
 
         private void Update()

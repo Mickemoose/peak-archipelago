@@ -1,3 +1,18 @@
+### v0.5.4
+<ul>
+    <li>DeathLink would send out even if disabled</li>
+    <li>Gust Trap would change based on biome of the day</li>
+    <li>6 New Traps</li>
+    <li>Options to disable 3 different groups of Badges (Multiplayer, Difficult and Biome Specific)<br/>Difficult will not remove 24 Karat Badge and Biome will not remove the Nomad, Forestry, Alpinist or Trailblazer badges</li>
+    <li>State saving won't happen if you aren't the host</li>
+    <li>Progressive Endurance: Each one reduces the rate you use up Stamina, allowing you to climb more for less!</li>
+    <li>Progressive Mountain: Each one allows you to progress to the next biome. The campfire will not clear the fog if you don't have enough of these!</li>
+    <li>Fixed Nomad II and Forestry II checks</li>
+    <li>Checks for some missing items (Clusterberries, Kingberries, Napberry, Scoutmaster's Bugle, Tick, Cloud Fungus)</li>
+    <li>Getting Checks for an Ascent level will reward all previous level checks as well</li>
+    <li>Added progression logic for the Progression item</li>
+</ul>
+
 ### v0.5.3
 <ul>
     <li>hotfix for items sometimes not sending until the next run</li>

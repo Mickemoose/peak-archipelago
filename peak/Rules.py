@@ -5,6 +5,45 @@ from BaseClasses import Location, Entrance
 if TYPE_CHECKING:
     from . import PeakWorld
 
+CALDERA_LOCATIONS = [
+    "Acquire Big Egg", "Acquire Egg", "Acquire Cooked Bird", "Volcanology Badge", "Gourmand Badge",
+]
+
+KILN_LOCATIONS = [
+    "Acquire Strange Gem", "Peak Badge", "Speed Climber Badge", "Lone Wolf Badge",
+    "Survivalist Badge", "Naturalist Badge", "Leave No Trace Badge",
+]
+
+ROOTS_LOCATIONS = [
+    "Acquire Red Shroomberry", "Acquire Blue Shroomberry", "Acquire Yellow Shroomberry", 
+    "Acquire Green Shroomberry", "Acquire Purple Shroomberry",
+    "Acquire Mandrake", "Acquire Bounce Shroom", "Acquire Cloud Fungus", "Mycoacrobatics Badge",
+    "Tread Lightly Badge", "Forestry Badge", "Undead Encounter Badge",
+    "Web Security Badge", "Advanced Mycology Badge",
+]
+
+TROPICS_LOCATIONS = [
+    "Acquire Red Clusterberry", "Acquire Yellow Clusterberry", "Acquire Black Clusterberry",
+    "Acquire Purple Kingberry", "Acquire Yellow Kingberry", "Acquire Green Kingberry",
+    "Acquire Brown Berrynana", "Acquire Blue Berrynana", "Acquire Pink Berrynana", 
+    "Acquire Yellow Berrynana", "Acquire Berrynana Peel", "Acquire Honeycomb", 
+    "Acquire Beehive", "Arborist Badge", "Foraging Badge", "Trailblazer Badge",
+    "Acquire Magic Bean", "Acquire Tick",
+]
+
+MESA_LOCATIONS = [
+    "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol", 
+    "Acquire Red Prickleberry", "Acquire Gold Prickleberry", "Acquire Scorpion", "Acquire Torch",
+    "Megaentomology Badge", "Cool Cucumber Badge", "24 Karat Badge", "Astronomy Badge", 
+    "Nomad Badge", "Daredevil Badge", "Needlepoint Badge", "Acquire Parasol","Acquire Dynamite", 
+]
+
+ALPINE_LOCATIONS = [
+    "Acquire Orange Winterberry", "Acquire Napberry", "Bundled Up Badge", "Acquire Yellow Winterberry",
+    "Alpinist Badge", "Animal Serenading Badge", "Acquire Heat Pack",
+]
+
+
 def set_rule(spot: Location | Entrance, rule):
     spot.access_rule = rule
 
@@ -25,23 +64,39 @@ def apply_rules(world: "PeakWorld"):
     player = world.player
     required_ascent = world.options.ascent_count.value
     goal_type = world.options.goal.value
+
+    try:
+        # Roots and Tropics require 1 Progressive Mountain
+        set_rule(world.get_location("Roots Access"),
+                lambda state: state.has("Progressive Mountain", player, 1))
+        set_rule(world.get_location("Tropics Access"),
+                lambda state: state.has("Progressive Mountain", player, 1))
+        
+        # Mesa and Alpine require 2 Progressive Mountain
+        set_rule(world.get_location("Mesa Access"),
+                lambda state: state.has("Progressive Mountain", player, 2))
+        set_rule(world.get_location("Alpine Access"),
+                lambda state: state.has("Progressive Mountain", player, 2))
+        
+        set_rule(world.get_location("Caldera Access"),
+                lambda state: state.has("Progressive Mountain", player, 3))
+        set_rule(world.get_location("Kiln Access"),
+                lambda state: state.has("Progressive Mountain", player, 4))
+    except KeyError:
+        pass
     
     # All regular badge locations are always accessible
     regular_badges = [
-        "Astronomy Badge", "24 Karat Badge", "Gourmand Badge", "Daredevil Badge",
-        "Mycology Badge", "Megaentomology Badge", "Speed Climber Badge",
-        "Balloon Badge", "Nomad Badge", "Animal Serenading Badge", "Arborist Badge",
-        "Endurance Badge", "Toxicology Badge", "Foraging Badge", "Bouldering Badge",
-        "Bing Bong Badge", "Cooking Badge", "Plunderer Badge", "Lone Wolf Badge",
-        "Volcanology Badge", "Alpinist Badge", "Esoterica Badge", "Trailblazer Badge",
-        "Beachcomber Badge", "Mentorship Badge", "Cool Cucumber Badge", "Naturalist Badge",
-        "Aeronautics Badge", "Leave No Trace Badge", "Needlepoint Badge", "Knot Tying Badge",
-        "Bundled Up Badge", "Forestry Badge", "Disaster Response Badge", "Competitive Eating Badge",
-        "Tread Lightly Badge", "Cryptogastronomy Badge", "Calcium Intake Badge", "Advanced Mycology Badge",
-        "Applied Esoterica Badge", "Undead Encounter Badge", "Web Security Badge", "Mycoacrobatics Badge",
-        "Survivalist Badge", "Happy Camper Badge", "First Aid Badge", "Clutch Badge",
+        "Mycology Badge", "Balloon Badge",
+        "Endurance Badge", "Toxicology Badge", "Bouldering Badge",
+        "Bing Bong Badge", "Cooking Badge", "Plunderer Badge",
+        "Esoterica Badge", "Beachcomber Badge", "Mentorship Badge",
+        "Aeronautics Badge",  "Knot Tying Badge",
+        "Disaster Response Badge", "Competitive Eating Badge",
+        "Cryptogastronomy Badge", "Calcium Intake Badge", "Applied Esoterica Badge",  
+        "Happy Camper Badge", "First Aid Badge", "Clutch Badge",
         "Emergency Preparedness Badge", "Bookworm Badge", "Resourcefulness Badge",
-        "Ultimate Badge", "Peak Badge", "High Altitude Badge"
+        "Ultimate Badge", "High Altitude Badge", 
     ]
     
     for badge_name in regular_badges:
@@ -65,12 +120,40 @@ def apply_rules(world: "PeakWorld"):
     
     # Ascent locations require their corresponding Ascent Completed events
     roman_numerals = ["II", "III", "IV", "V", "VI", "VII", "VIII"]
-
+    
     max_relevant_ascent = 7
-    if goal_type == 0: # Peak Goal
+    if goal_type == 0:  # Peak Goal
         max_relevant_ascent = required_ascent
     
-    for ascent_num in range(1, max_relevant_ascent + 1):  # Only set rules for relevant ascents
+    # Event locations for ascent completion
+    for ascent_num in range(1, max_relevant_ascent + 1):
+        try:
+            if ascent_num in [1, 2]:
+                # Ascents 1-2 only require Progressive Ascent
+                set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                        lambda state, asc=ascent_num: 
+                            state.has("Kiln Access", player) and
+                            state.has("Progressive Ascent", player, asc))
+            elif ascent_num in [3, 4, 5]:
+                # Ascents 3-5 require Progressive Ascent + 3 stamina bars
+                set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                        lambda state, asc=ascent_num: 
+                            state.has("Kiln Access", player) and
+                            state.has("Progressive Ascent", player, asc) and
+                            state.has("Progressive Stamina Bar", player, 3))
+            elif ascent_num in [6, 7]:
+                # Ascents 6-7 require Progressive Ascent + 3 stamina + 4 endurance
+                set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                        lambda state, asc=ascent_num: 
+                            state.has("Kiln Access", player) and
+                            state.has("Progressive Ascent", player, asc) and
+                            state.has("Progressive Stamina Bar", player, 3) and
+                            state.has("Progressive Endurance", player, 4))
+        except KeyError:
+            pass
+    
+    # Ascent badge locations also require Progressive Ascent to unlock that ascent
+    for ascent_num in range(1, max_relevant_ascent + 1):
         roman_num = roman_numerals[ascent_num - 1]
         ascent_locations = [
             f"Beachcomber {roman_num} Badge (Ascent {ascent_num})", 
@@ -83,40 +166,91 @@ def apply_rules(world: "PeakWorld"):
         
         for ascent_name in ascent_locations:
             try:
-                # Require 'ascent_num' Progressive Ascent items to access this ascent's locations
-                set_rule(world.get_location(ascent_name), 
-                        lambda state, asc=ascent_num: state.has("Progressive Ascent", player, asc))
+                # Same requirements as completing the ascent
+                if ascent_num in [1, 2]:
+                    set_rule(world.get_location(ascent_name), 
+                            lambda state, asc=ascent_num: 
+                                state.has("Kiln Access", player) and
+                                state.has("Progressive Ascent", player, asc))
+                elif ascent_num in [3, 4, 5]:
+                    set_rule(world.get_location(ascent_name), 
+                            lambda state, asc=ascent_num: 
+                                state.has("Kiln Access", player) and
+                                state.has("Progressive Ascent", player, asc) and
+                                state.has("Progressive Stamina Bar", player, 3))
+                elif ascent_num in [6, 7]:
+                    set_rule(world.get_location(ascent_name), 
+                            lambda state, asc=ascent_num: 
+                                state.has("Kiln Access", player) and
+                                state.has("Progressive Ascent", player, asc) and
+                                state.has("Progressive Stamina Bar", player, 3) and
+                                state.has("Progressive Endurance", player, 4))
             except KeyError:
                 pass
     
-    # Event locations require Progressive Ascent items
-    for ascent_num in range(1, max_relevant_ascent + 1):
+    # Scout sashes require completion of ALL previous ascents
+    scout_sashe_requirements = {
+        "Rabbit Scout sashe (Ascent 1)": ["Kiln Access"],
+        "Raccoon Scout sashe (Ascent 2)": ["Ascent 1 Completed","Kiln Access"],
+        "Mule Scout sashe (Ascent 3)": ["Ascent 1 Completed", "Ascent 2 Completed","Kiln Access"],
+        "Kangaroo Scout sashe (Ascent 4)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed","Kiln Access"],
+        "Owl Scout sashe (Ascent 5)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed", "Ascent 4 Completed","Kiln Access"],
+        "Wolf Scout sashe (Ascent 6)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed", "Ascent 4 Completed", "Ascent 5 Completed","Kiln Access"],
+        "Goat Scout sashe (Ascent 7)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed", "Ascent 4 Completed", "Ascent 5 Completed", "Ascent 6 Completed","Kiln Access"]
+    }
+    
+    for scout_name, required_ascents in scout_sashe_requirements.items():
         try:
-            # Require 'ascent_num' Progressive Ascent items to complete that ascent
-            set_rule(world.get_location(f"Ascent {ascent_num} Completed"), 
-                    lambda state, asc=ascent_num: state.has("Progressive Ascent", player, asc))
+            if scout_name == "Rabbit Scout sashe (Ascent 1)":
+                # Rabbit sashe just requires ability to attempt Ascent 1
+                set_rule(world.get_location(scout_name), 
+                        lambda state: state.has("Progressive Ascent", player, 1))
+            else:
+                # Extract ascent number from name
+                import re
+                match = re.search(r'\(Ascent (\d+)\)', scout_name)
+                if match:
+                    scout_ascent = int(match.group(1))
+                    # Scout sashes require previous completions AND ability to attempt current ascent
+                    if scout_ascent in [1, 2]:
+                        set_rule(world.get_location(scout_name), 
+                                lambda state, reqs=required_ascents, asc=scout_ascent: 
+                                    all(state.has(ascent, player) for ascent in reqs) and
+                                    state.has("Progressive Ascent", player, asc))
+                    elif scout_ascent in [3, 4, 5]:
+                        set_rule(world.get_location(scout_name), 
+                                lambda state, reqs=required_ascents, asc=scout_ascent: 
+                                    all(state.has(ascent, player) for ascent in reqs) and
+                                    state.has("Progressive Ascent", player, asc) and
+                                    state.has("Progressive Stamina Bar", player, 3))
+                    elif scout_ascent in [6, 7]:
+                        set_rule(world.get_location(scout_name), 
+                                lambda state, reqs=required_ascents, asc=scout_ascent: 
+                                    all(state.has(ascent, player) for ascent in reqs) and
+                                    state.has("Progressive Ascent", player, asc) and
+                                    state.has("Progressive Stamina Bar", player, 3) and
+                                    state.has("Progressive Endurance", player, 4))
         except KeyError:
             pass
     
     # Acquire locations - most are always accessible
     acquire_locations = [
         "Acquire Rope Spool", "Acquire Rope Cannon", "Acquire Anti-Rope Spool", "Acquire Anti-Rope Cannon",
-        "Acquire Chain Launcher", "Acquire Piton", "Acquire Magic Bean", "Acquire Parasol",
+        "Acquire Chain Launcher", "Acquire Piton",
         "Acquire Balloon", "Acquire Balloon Bunch", "Acquire Scout Cannon", "Acquire Portable Stove",
-        "Acquire Checkpoint Flag", "Acquire Lantern", "Acquire Flare", "Acquire Torch",
+        "Acquire Checkpoint Flag", "Acquire Lantern", "Acquire Flare",
         "Acquire Compass", "Acquire Pirate's Compass", "Acquire Binoculars", "Acquire Flying Disc",
-        "Acquire Bandages", "Acquire First-Aid Kit", "Acquire Antidote", "Acquire Heat Pack",
+        "Acquire Bandages", "Acquire First-Aid Kit", "Acquire Antidote",
         "Acquire Cure-All", "Acquire Faerie Lantern", "Acquire Scout Effigy",
         "Acquire Cursed Skull", "Acquire Pandora's Lunchbox", "Acquire Bugle of Friendship",
         "Acquire Bugle", "Acquire Remedy Fungus", "Acquire Medicinal Root", "Acquire Guidebook",
-        "Acquire Shelf Shroom", "Acquire Bounce Shroom", "Acquire Trail Mix",
+        "Acquire Shelf Shroom",  "Acquire Trail Mix",
         "Acquire Granola Bar", "Acquire Scout Cookies", "Acquire Airline Food", "Acquire Energy Drink",
         "Acquire Sports Drink", "Acquire Big Lollipop", "Acquire Button Shroom", "Acquire Bugle Shroom",
-        "Acquire Cluster Shroom", "Acquire Chubby Shroom", "Acquire Conch", "Acquire Tick",
-        "Acquire Dynamite", "Acquire Bing Bong", "Acquire Red Crispberry", "Acquire Green Crispberry",
-        "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Yellow Winterberry",
-        "Acquire Strange Gem", "Acquire Egg", "Acquire Cooked Bird", "Acquire Honeycomb", "Acquire Beehive", "Acquire Big Egg",
-        "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk", "Acquire Cloud Fungus", "Acquire Scoutmaster's Bugle"
+        "Acquire Cluster Shroom", "Acquire Chubby Shroom", "Acquire Conch",
+        "Acquire Bing Bong", "Acquire Red Crispberry", "Acquire Green Crispberry",
+        "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half",
+        "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk", "Acquire Scoutmaster's Bugle"
     ]
     
     for acquire_name in acquire_locations:
@@ -125,75 +259,44 @@ def apply_rules(world: "PeakWorld"):
         except KeyError:
             pass
     
-    # Mesa-locked items require Mesa Access
-    mesa_locked_items = [
-        "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol", "Acquire Red Prickleberry", "Acquire Gold Prickleberry", "Acquire Scorpion"
-    ]
-    
-    for mesa_item in mesa_locked_items:
+    for mesa_item in MESA_LOCATIONS:
         try:
             set_rule(world.get_location(mesa_item), 
                     lambda state: state.has("Mesa Access", player))
         except KeyError:
             pass
-    
-    # Alpine-locked items require Alpine Access
-    alpine_locked_items = [
-        "Acquire Orange Winterberry", "Acquire Napberry"
-    ]
-    
-    for alpine_item in alpine_locked_items:
+
+    for alpine_item in ALPINE_LOCATIONS:
         try:
             set_rule(world.get_location(alpine_item), 
                     lambda state: state.has("Alpine Access", player))
         except KeyError:
             pass
 
-    # Roots-locked items require Roots Access
-    roots_locked_items = [
-        "Acquire Red Shroomberry", "Acquire Blue Shroomberry", "Acquire Yellow Shroomberry", "Acquire Green Shroomberry", "Acquire Purple Shroomberry",
-        "Acquire Mandrake"
-    ]
-
-    for roots_item in roots_locked_items:
+    for roots_item in ROOTS_LOCATIONS:
         try:
             set_rule(world.get_location(roots_item), 
                     lambda state: state.has("Roots Access", player))
         except KeyError:
             pass
 
-    # Tropics-locked items require Tropics Access
-    tropics_locked_items = [
-        "Acquire Red Clusterberry", "Acquire Yellow Clusterberry", "Acquire Black Clusterberry",
-        "Acquire Purple Kingberry", "Acquire Yellow Kingberry", "Acquire Green Kingberry",
-        "Acquire Brown Berrynana", "Acquire Blue Berrynana", "Acquire Pink Berrynana", "Acquire Yellow Berrynana", 
-        "Acquire Berrynana Peel",
-    ]
-
-    for tropics_item in tropics_locked_items:
+    for tropics_item in TROPICS_LOCATIONS:
         try:
             set_rule(world.get_location(tropics_item), 
                     lambda state: state.has("Tropics Access", player))
         except KeyError:
             pass
-    
-    # Scout sashe locations require all previous ascents to be completed
-    scout_sashe_requirements = {
-        "Rabbit Scout sashe (Ascent 1)": [],  # No requirements
-        "Raccoon Scout sashe (Ascent 2)": ["Ascent 1 Completed"],
-        "Mule Scout sashe (Ascent 3)": ["Ascent 1 Completed", "Ascent 2 Completed"],
-        "Kangaroo Scout sashe (Ascent 4)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed"],
-        "Owl Scout sashe (Ascent 5)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed", "Ascent 4 Completed"],
-        "Wolf Scout sashe (Ascent 6)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed", "Ascent 4 Completed", "Ascent 5 Completed"],
-        "Goat Scout sashe (Ascent 7)": ["Ascent 1 Completed", "Ascent 2 Completed", "Ascent 3 Completed", "Ascent 4 Completed", "Ascent 5 Completed", "Ascent 6 Completed"]
-    }
-    
-    for scout_name, required_ascents in scout_sashe_requirements.items():
+
+    for caldera_item in CALDERA_LOCATIONS:
         try:
-            if not required_ascents:  # Rabbit Scout sashe (Ascent 1) has no requirements
-                set_rule(world.get_location(scout_name), lambda state: True)
-            else:
-                set_rule(world.get_location(scout_name), 
-                        lambda state, reqs=required_ascents: all(state.has(ascent, player) for ascent in reqs))
+            set_rule(world.get_location(caldera_item), 
+                    lambda state: state.has("Caldera Access", player))
+        except KeyError:
+            pass
+
+    for kiln_item in KILN_LOCATIONS:
+        try:
+            set_rule(world.get_location(kiln_item), 
+                    lambda state: state.has("Kiln Access", player))
         except KeyError:
             pass
