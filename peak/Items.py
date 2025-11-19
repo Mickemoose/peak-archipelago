@@ -18,7 +18,6 @@ class PeakItem(Item):
 progression_table = {
     "Progressive Ascent": ItemData(76019, ItemClassification.progression),
     "Progressive Endurance": ItemData(76026, ItemClassification.progression),
-    "Progressive Backpack": ItemData(76070, ItemClassification.progression),
     #"Ascent 2 Unlock": ItemData(76020, ItemClassification.progression),
     #"Ascent 3 Unlock": ItemData(76021, ItemClassification.progression),
     #"Ascent 4 Unlock": ItemData(76022, ItemClassification.progression),
@@ -166,6 +165,7 @@ trap_table = {
     "Drop Everything Trap":       ItemData(77102, ItemClassification.trap),
     "Pixel Trap":                 ItemData(77103, ItemClassification.trap),
     "Eruption Trap":              ItemData(77104, ItemClassification.trap),
+    "Beetle Horde Trap":          ItemData(77105, ItemClassification.trap),
 }
 
 item_table = {

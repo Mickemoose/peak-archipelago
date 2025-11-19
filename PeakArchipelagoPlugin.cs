@@ -313,21 +313,6 @@ namespace Peak.AP
                             _photonView.RPC("SyncEnduranceUpgrade", newPlayer, enduranceCount, multiplier);
                             _log.LogInfo($"[PeakPelago] Sent endurance config to {newPlayer.NickName}: {enduranceCount} upgrades");
                         }
-                        int backpackCount = _session.Items.AllItemsReceived.Count(item =>
-                        {
-                            string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                            return itemName?.Equals("Progressive Backpack", StringComparison.OrdinalIgnoreCase) ?? false;
-                        });
-                        
-                        backpackCount = Math.Min(backpackCount, 10);
-                        
-                        if (backpackCount > 0)
-                        {
-                            int totalSlots = 4 + (backpackCount * 4);
-                            float weightMultiplier = 1.0f - (backpackCount * 0.1f);
-                            _photonView.RPC("SyncBackpackUpgrade", newPlayer, backpackCount, totalSlots, weightMultiplier);
-                            _log.LogInfo($"[PeakPelago] Sent backpack config to {newPlayer.NickName}: {backpackCount} upgrades");
-                        }
                     }
                 }
             }
@@ -1673,7 +1658,6 @@ namespace Peak.AP
                 // Progression Items (76019-76025) - Unlock ascents
                 { "Progressive Ascent", () => UnlockAscent() },
                 { "Progressive Endurance", () => ApplyProgressiveEndurance() },
-                { "Progressive Backpack", () => ApplyProgressiveBackpack() },
                 //{ "Ascent 2 Unlock", () => UnlockAscent(2) },
                 //{ "Ascent 3 Unlock", () => UnlockAscent(3) },
                 //{ "Ascent 4 Unlock", () => UnlockAscent(4) },
@@ -1712,6 +1696,7 @@ namespace Peak.AP
                 { "Tumbleweed Trap", () => TumbleweedTrapEffect.ApplyTumbleweedTrap(_log) },
                 { "Items to Bombs", () => ItemToBombTrapEffect.ApplyItemToBombTrap(_log) },
                 { "Zombie Horde Trap", () => ZombieHordeTrapEffect.ApplyZombieHordeTrap(_log) },
+                { "Beetle Horde Trap", () => BeetleHordeTrapEffect.ApplyBeetleHordeTrap(_log) },
                 { "Zoom Trap", () => ZoomTrapEffect.ApplyZoomTrap(_log) },
                 { "Pixel Trap", () => PixelTrapEffect.ApplyPixelTrap(_log) },
                 { "Screen Flip Trap", () => ScreenFlipTrapEffect.ApplyScreenFlipTrap(_log) },
@@ -1933,177 +1918,6 @@ namespace Peak.AP
                     _photonView.RPC("SyncStaminaUpgrade", RpcTarget.Others, totalUpgrades);
                     _log.LogInfo($"[PeakPelago] Synced {totalUpgrades} stamina upgrades to new player");
                 }
-            }
-        }
-
-        private void ApplyProgressiveBackpack()
-        {
-            try
-            {
-                if (_session == null) return;
-                
-                // Count how many Progressive Backpack items we've received
-                int backpackCount = _session.Items.AllItemsReceived.Count(item =>
-                {
-                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                    return itemName?.Equals("Progressive Backpack", StringComparison.OrdinalIgnoreCase) ?? false;
-                });
-                
-                // Cap at 10 upgrades
-                backpackCount = Math.Min(backpackCount, 10);
-                
-                _log.LogInfo($"[PeakPelago] Applied Progressive Backpack: {backpackCount}/10 upgrades received");
-                
-                // Calculate backpack properties
-                int totalSlots = 4 + (backpackCount * 4);
-                float weightMultiplier = 1.0f - (backpackCount * 0.1f);
-                
-                // Update existing backpacks in the world
-                UpdateAllBackpackSlots(totalSlots);
-                
-                // Broadcast to all clients
-                if (_photonView != null && PhotonNetwork.IsConnected)
-                {
-                    _photonView.RPC("SyncBackpackUpgrade", RpcTarget.All, backpackCount, totalSlots, weightMultiplier);
-                }
-                else
-                {
-                    SetBackpackProperties(totalSlots, weightMultiplier);
-                }
-                
-                _notifications.ShowSimpleMessage($"Backpack Upgrade {backpackCount}/10! Slots: {totalSlots}, Weight: {weightMultiplier * 100:F0}%");
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error applying Progressive Backpack: {ex.Message}");
-            }
-        }
-
-        private void UpdateAllBackpackSlots(int newSlotCount)
-        {
-            try
-            {
-                // Update player's equipped backpack
-                if (Character.localCharacter != null && Character.localCharacter.player != null)
-                {
-                    var backpackSlot = Character.localCharacter.player.backpackSlot;
-                    if (!backpackSlot.IsEmpty() && backpackSlot.data != null)
-                    {
-                        if (backpackSlot.data.TryGetDataEntry<BackpackData>(DataEntryKey.BackpackData, out var backpackData))
-                        {
-                            ResizeItemSlots(backpackData, newSlotCount);
-                            _log.LogInfo($"[PeakPelago] Updated equipped backpack to {newSlotCount} slots");
-                        }
-                    }
-                }
-                
-                // Update all backpack items in the world
-                var allBackpacks = FindObjectsByType<Backpack>(FindObjectsSortMode.None);
-                foreach (var backpack in allBackpacks)
-                {
-                    if (backpack.data != null)
-                    {
-                        if (backpack.data.TryGetDataEntry<BackpackData>(DataEntryKey.BackpackData, out var backpackData))
-                        {
-                            ResizeItemSlots(backpackData, newSlotCount);
-                            _log.LogInfo($"[PeakPelago] Updated backpack item to {newSlotCount} slots");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error updating backpack slots: {ex.Message}");
-            }
-        }
-
-        private void ResizeItemSlots(BackpackData backpackData, int newSlotCount)
-        {
-            if (backpackData.itemSlots == null || backpackData.itemSlots.Length == newSlotCount)
-            {
-                return;
-            }
-            
-            int oldLength = backpackData.itemSlots.Length;
-            ItemSlot[] newSlots = new ItemSlot[newSlotCount];
-            
-            // Copy existing slots
-            for (int i = 0; i < Math.Min(oldLength, newSlotCount); i++)
-            {
-                newSlots[i] = backpackData.itemSlots[i];
-            }
-            
-            // Initialize new slots
-            for (int i = oldLength; i < newSlotCount; i++)
-            {
-                newSlots[i] = new ItemSlot((byte)i);
-            }
-            
-            backpackData.itemSlots = newSlots;
-        }
-
-        [PunRPC]
-        private void SyncBackpackUpgrade(int totalUpgrades, int totalSlots, float weightMultiplier)
-        {
-            try
-            {
-                _log.LogInfo($"[PeakPelago] Syncing backpack: {totalUpgrades} upgrades, {totalSlots} slots, {weightMultiplier}x weight");
-                SetBackpackProperties(totalSlots, weightMultiplier);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error in SyncBackpackUpgrade: {ex.Message}");
-            }
-        }
-
-        private void SetBackpackProperties(int slots, float weightMultiplier)
-        {
-            try
-            {
-                // Store in Photon custom properties
-                if (PhotonNetwork.LocalPlayer != null)
-                {
-                    Hashtable props = new Hashtable();
-                    props["AP_BackpackSlots"] = slots;
-                    props["AP_BackpackWeightMultiplier"] = weightMultiplier;
-                    PhotonNetwork.LocalPlayer.SetCustomProperties(props);
-                    
-                    _log.LogInfo($"[PeakPelago] Set backpack properties: {slots} slots, {weightMultiplier}x weight");
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error setting backpack properties: {ex.Message}");
-            }
-        }
-        private void RecoverBackpackUpgrades()
-        {
-            try
-            {
-                if (_session == null) return;
-                
-                // Count how many Progressive Backpack items we've received
-                int backpackCount = _session.Items.AllItemsReceived.Count(item =>
-                {
-                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                    return itemName?.Equals("Progressive Backpack", StringComparison.OrdinalIgnoreCase) ?? false;
-                });
-                
-                backpackCount = Math.Min(backpackCount, 10);
-                
-                if (backpackCount > 0)
-                {
-                    int totalSlots = 4 + (backpackCount * 4);
-                    float weightMultiplier = 1.0f - (backpackCount * 0.1f);
-                    
-                    SetBackpackProperties(totalSlots, weightMultiplier);
-                    
-                    _log.LogInfo($"[PeakPelago] Recovered {backpackCount} backpack upgrades (slots: {totalSlots}, weight: {weightMultiplier})");
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error recovering backpack upgrades: {ex.Message}");
             }
         }
         private void RecoverEnduranceUpgrades()
@@ -3872,7 +3686,6 @@ namespace Peak.AP
 
                     RecoverAscentUnlocks();
                     RecoverEnduranceUpgrades();
-                    RecoverBackpackUpgrades();
                     _log.LogInfo($"[PeakPelago] Initializing stamina manager with progressive={progressiveEnabled}, additional={additionalEnabled}");
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
                     
@@ -4092,7 +3905,8 @@ namespace Peak.AP
                 { "screen_flip_trap", "Screen Flip Trap" },
                 { "drop_everything_trap", "Drop Everything Trap"},
                 { "pixel_trap", "Pixel Trap" },
-                { "eruption_trap", "Eruption Trap" }
+                { "eruption_trap", "Eruption Trap" },
+                { "beetle_horde_trap", "Beetle Horde Trap" },
             };
             
             return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;

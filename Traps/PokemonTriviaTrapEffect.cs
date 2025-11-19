@@ -58,6 +58,9 @@ namespace Peak.AP
             swinub,
             politoed,
             ledyba,
+            larvitar,
+            corsola,
+            entei,
 
             terriermon,
             wizardmon,
@@ -105,6 +108,9 @@ namespace Peak.AP
             { Pokemon.swinub, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.politoed, CharacterAfflictions.STATUSTYPE.Poison },
             { Pokemon.ledyba, CharacterAfflictions.STATUSTYPE.Web },
+            { Pokemon.larvitar, CharacterAfflictions.STATUSTYPE.Injury },
+            { Pokemon.corsola, CharacterAfflictions.STATUSTYPE.Cold },
+            { Pokemon.entei, CharacterAfflictions.STATUSTYPE.Hot },
 
             { Pokemon.terriermon, CharacterAfflictions.STATUSTYPE.Curse },
             { Pokemon.wizardmon, CharacterAfflictions.STATUSTYPE.Curse },
@@ -658,6 +664,7 @@ namespace Peak.AP
             new PokemonTriviaQuestion("Which Psychic/Flying type Pokemon is known for its small size and big eyes?", Pokemon.natu),
             new PokemonTriviaQuestion("Which of these Pokemon has a regional form that evolves into Clodsire?", Pokemon.wooper),
             new PokemonTriviaQuestion("Which of these evolves from Poliwhirl?", Pokemon.politoed),
+            new PokemonTriviaQuestion("Which Pokemon is caught on Mount Silver?", Pokemon.larvitar),
 
 
         };

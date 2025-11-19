@@ -300,6 +300,11 @@ class EruptionTrapWeight(BaseTrapWeight):
     Likelihood of receiving a trap which creates a fiery eruption at a player's location
     """
     display_name = "Eruption Trap Weight"
+class BeetleHordeTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a horde of beetles to chase a player
+    """
+    display_name = "Beetle Horde Trap Weight"
 
 class TrapPercentage(Range):
     """
@@ -382,6 +387,7 @@ peak_option_groups = [
         DropEverythingTrapWeight,
         PixelTrapWeight,
         EruptionTrapWeight,
+        BeetleHordeTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,
@@ -441,6 +447,7 @@ class PeakOptions(PerGameCommonOptions):
     drop_everything_trap_weight: DropEverythingTrapWeight
     pixel_trap_weight: PixelTrapWeight
     eruption_trap_weight: EruptionTrapWeight
+    beetle_horde_trap_weight: BeetleHordeTrapWeight
 
     disable_multiplayer_badges: DisableMultiplayerBadges
     disable_hard_badges: DisableHardBadges

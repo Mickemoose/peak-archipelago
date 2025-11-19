@@ -137,10 +137,6 @@ class PeakWorld(World):
         for _ in range(8):
             item_pool.append(self.create_item("Progressive Endurance"))
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 8 Progressive Endurance items")
-
-        for _ in range(10):
-            item_pool.append(self.create_item("Progressive Backpack"))
-        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 10 Progressive Backpack items")
     
 
         # Add progressive stamina items if enabled
@@ -197,6 +193,7 @@ class PeakWorld(World):
         trap_weights += (["Drop Everything Trap"] * self.options.drop_everything_trap_weight.value)
         trap_weights += (["Pixel Trap"] * self.options.pixel_trap_weight.value)
         trap_weights += (["Eruption Trap"] * self.options.eruption_trap_weight.value)
+        trap_weights += (["Beetle Horde Trap"] * self.options.beetle_horde_trap_weight.value)
         
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -257,6 +254,7 @@ class PeakWorld(World):
         trap_data["drop_everything_trap"] = self.options.drop_everything_trap_weight.value
         trap_data["pixel_trap"] = self.options.pixel_trap_weight.value
         trap_data["eruption_trap"] = self.options.eruption_trap_weight.value
+        trap_data["beetle_horde_trap"] = self.options.beetle_horde_trap_weight.value
 
         return trap_data
 

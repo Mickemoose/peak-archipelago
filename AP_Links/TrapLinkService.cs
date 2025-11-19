@@ -19,7 +19,7 @@ namespace Peak.AP
         private string _priorityTrap = null;
         private float _lastTrapActivation = 0f;
         private const float TRAP_ACTIVATION_COOLDOWN = 5f;
-        private System.Action<string, bool> _applyTrapEffect;
+        private Action<string, bool> _applyTrapEffect;
         private Dictionary<string, string> _peakToStandardMapping;
         private Dictionary<string, string> _standardToPeakMapping;
         private HashSet<string> _enabledTraps;
@@ -74,7 +74,8 @@ namespace Peak.AP
                 { "Screen Flip Trap", "Screen Flip Trap"},
                 { "Drop Everything Trap", "Empty Item Box Trap"},
                 { "Pixel Trap", "144p Trap"},
-                { "Eruption Trap", "Light Up Path Trap"}
+                { "Eruption Trap", "Light Up Path Trap"},
+                { "Beetle Horde Trap", "Buyon Trap" },
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -141,7 +142,10 @@ namespace Peak.AP
                 { "Pixellation Trap", "Pixel Trap"},
                 { "Pixelate Trap", "Pixel Trap"},
                 { "W I D E Trap", "Zoom Trap"},
-                { "Light Up Path Trap", "Eruption Trap"}
+                { "Light Up Path Trap", "Eruption Trap"},
+                { "Gadget Shuffle Trap", "Drop Everything Trap"},
+                { "Sticky Hands Trap", "Cactus Ball Trap"},
+                { "Buyon Trap", "Beetle Horde Trap"},
             };
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
