@@ -108,6 +108,7 @@ namespace Peak.AP
         private bool _hardRingLinkEnabled = false;
         private bool _trapLinkEnabled = false;
         public bool energyLinkEnabled = false;
+        private bool _deathLinkEnabled = false;
         private HashSet<string> _enabledTraps = new HashSet<string>();
         private string _energyLinkTeamName = "0";
         private int _deathLinkBehavior = 0;
@@ -3040,6 +3041,67 @@ namespace Peak.AP
         /// <summary>
         /// PATCH ZOMBIFYING TOO BECAUSE IT DOESNT CALL DEATH FUNCTIONS >:[ THANKS ROOTS UPDATE
         /// </summary>
+        [HarmonyPatch(typeof(Character), "RPCA_Die")]
+        public static class CharacterRPCADiePatch
+        {
+            static void Postfix(Character __instance)
+            {
+                try
+                {
+                    if (_instance == null) return;
+                    if (_instance._deathLinkService == null) return;
+                    
+                    // Check if Death Link is enabled
+                    if (!_instance._deathLinkEnabled)
+                    {
+                        _instance._log.LogDebug("[PeakPelago] Death Link is disabled, not sending death link");
+                        return;
+                    }
+
+                    if (_instance._isDyingFromDeathLink)
+                    {
+                        _instance._log.LogInfo("[PeakPelago] Death was caused by DeathLink, not sending another DeathLink");
+                        return;
+                    }
+            
+                    _instance._log.LogInfo($"[PeakPelago] Character died: {__instance.characterName}");
+                    
+                    // Send when any player dies
+                    if (_instance._deathLinkSendBehavior == 0)
+                    {
+                        _instance._log.LogInfo("[PeakPelago] Sending Death Link (any player dies mode)");
+                        _instance.SendDeathLink($"{_instance.cfgSlot.Value} died");
+                    }
+                    // Check if all players are dead
+                    else if (_instance._deathLinkSendBehavior == 1)
+                    {
+                        bool allDead = true;
+                        foreach (var character in Character.AllCharacters)
+                        {
+                            if (!character.data.dead)
+                            {
+                                allDead = false;
+                                break;
+                            }
+                        }
+                        
+                        if (allDead)
+                        {
+                            _instance._log.LogInfo("[PeakPelago] Sending Death Link (all players dead mode)");
+                            _instance.SendDeathLink("Everyone died");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError("[PeakPelago] RPCA_Die patch error: " + ex.Message);
+                    }
+                }
+            }
+        }
+
         [HarmonyPatch(typeof(Character), "FinishZombifying")]
         public static class CharacterFinishZombifyingPatch
         {
@@ -3049,6 +3111,13 @@ namespace Peak.AP
                 {
                     if (_instance == null) return;
                     if (_instance._deathLinkService == null) return;
+                    
+                    // Check if Death Link is enabled
+                    if (!_instance._deathLinkEnabled)
+                    {
+                        _instance._log.LogDebug("[PeakPelago] Death Link is disabled, not sending death link");
+                        return;
+                    }
 
                     if (_instance._isDyingFromDeathLink)
                     {
@@ -3086,61 +3155,6 @@ namespace Peak.AP
                     if (_instance != null)
                     {
                         _instance._log.LogError("[PeakPelago] FinishZombifying patch error: " + ex.Message);
-                    }
-                }
-            }
-        }
-
-        [HarmonyPatch(typeof(Character), "RPCA_Die")]
-        public static class CharacterRPCADiePatch
-        {
-            static void Postfix(Character __instance)
-            {
-                try
-                {
-                    if (_instance == null) return;
-                    if (_instance._deathLinkService == null) return;
-
-                    if (_instance._isDyingFromDeathLink)
-                    {
-                        _instance._log.LogInfo("[PeakPelago] Death was caused by DeathLink, not sending another DeathLink");
-                        return;
-                    }
-            
-                    
-                    _instance._log.LogInfo($"[PeakPelago] Character died: {__instance.characterName}");
-                    
-                    // Send when any player dies
-                    if (_instance._deathLinkSendBehavior == 0)
-                    {
-                        _instance._log.LogInfo("[PeakPelago] Sending Death Link (any player dies mode)");
-                        _instance.SendDeathLink($"{_instance.cfgSlot.Value} died");
-                    }
-                    // Check if all players are dead
-                    else if (_instance._deathLinkSendBehavior == 1)
-                    {
-                        bool allDead = true;
-                        foreach (var character in Character.AllCharacters)
-                        {
-                            if (!character.data.dead)
-                            {
-                                allDead = false;
-                                break;
-                            }
-                        }
-                        
-                        if (allDead)
-                        {
-                            _instance._log.LogInfo("[PeakPelago] Sending Death Link (all players dead mode)");
-                            _instance.SendDeathLink("Everyone died");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    if (_instance != null)
-                    {
-                        _instance._log.LogError("[PeakPelago] RPCA_Die patch error: " + ex.Message);
                     }
                 }
             }
@@ -3468,7 +3482,6 @@ namespace Peak.AP
 
                     bool progressiveEnabled = false;
                     bool additionalEnabled = false;
-                    bool deathLinkEnabled = false;
 
                     List<string> tags = new List<string>();
 
@@ -3542,12 +3555,13 @@ namespace Peak.AP
                     if (loginResult.SlotData.ContainsKey("death_link"))
                     {
                         var value = loginResult.SlotData["death_link"];
-                        deathLinkEnabled = Convert.ToInt32(value) != 0;
+                        _deathLinkEnabled = Convert.ToInt32(value) != 0;
                         //_log.LogInfo($"[PeakPelago] Death Link from slot data: {deathLinkEnabled}");
 
-                        if (deathLinkEnabled)
+                        if (_deathLinkEnabled)
                         {
                             tags.Add("DeathLink");
+                            _deathLinkService.EnableDeathLink();
                         }
                     }
 
