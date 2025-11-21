@@ -23,7 +23,7 @@ using Zorro.Core;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.4")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.5")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -274,6 +274,8 @@ namespace Peak.AP
 
                     // Send stamina config
                     _photonView.RPC("SyncStaminaConfiguration", newPlayer, progressiveEnabled, totalUpgrades);
+
+                    _photonView.RPC("SyncProgressiveMountain", newPlayer, _progressiveMountainCount);
                     
                     // Send AP Links config
                     bool energyLinkEnabled = _energyLinkService?.IsEnabled() ?? false;
@@ -322,6 +324,19 @@ namespace Peak.AP
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in OnPlayerEnteredRoom: {ex.Message}");
+            }
+        }
+        [PunRPC]
+        private void SyncProgressiveMountain(int mountainCount)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] CLIENT: Received Progressive Mountain count: {mountainCount}");
+                _progressiveMountainCount = mountainCount;
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in SyncProgressiveMountain: {ex.Message}");
             }
         }
         [PunRPC]
@@ -491,6 +506,30 @@ namespace Peak.AP
             }
         }
         [PunRPC]
+        private void SyncSegmentAdvancement(int targetSegment)
+        {
+            try
+            {
+                _log.LogInfo($"[PeakPelago] CLIENT: Received segment advancement to {targetSegment}");
+                
+                var mapHandler = Singleton<MapHandler>.Instance;
+                if (mapHandler == null)
+                {
+                    _log.LogError("[PeakPelago] CLIENT: MapHandler is null!");
+                    return;
+                }
+                
+                Segment segment = (Segment)targetSegment;
+                mapHandler.GoToSegment(segment);
+                _log.LogInfo($"[PeakPelago] CLIENT: Advanced to segment {segment}");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] CLIENT: Error in SyncSegmentAdvancement: {ex.Message}");
+                _log.LogError($"[PeakPelago] CLIENT: Stack trace: {ex.StackTrace}");
+            }
+        }
+        [PunRPC]
         private void SyncStaminaConfiguration(bool progressiveEnabled, int totalUpgrades)
         {
             try
@@ -503,13 +542,20 @@ namespace Peak.AP
                     return;
                 }
                 
+                // Reset stamina manager completely before syncing
                 _staminaManager.Initialize(progressiveEnabled, true);
-                _log.LogInfo($"[PeakPelago] CLIENT: Initialized stamina manager");
+                _staminaManager._localStaminaUpgrades = 0; // Reset upgrades counter
+                _staminaManager._localBaseMaxStamina = 0.25f; // Reset to base value
+                
+                _log.LogInfo($"[PeakPelago] CLIENT: Reset stamina manager");
+                
+                // Now apply the correct number of upgrades
                 for (int i = 0; i < totalUpgrades; i++)
                 {
                     _staminaManager.ApplyStaminaUpgrade();
                     _log.LogInfo($"[PeakPelago] CLIENT: Applied upgrade {i + 1}/{totalUpgrades}");
                 }
+                
                 _log.LogInfo($"[PeakPelago] CLIENT: Final base max stamina: {_staminaManager.GetBaseMaxStamina()}");
                 StartCoroutine(ForceStaminaUIUpdate());
                 
@@ -2828,31 +2874,41 @@ namespace Peak.AP
                 {
                     if (_instance == null) return true;
                     
+                    // Only host processes the logic
+                    if (!PhotonNetwork.IsMasterClient) return true;
+                    
                     // Only if campfire is SPENT and it's a transition campfire
                     if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
                     {
-                        var mapHandler = FindFirstObjectByType<MapHandler>();
+                        var mapHandler = Singleton<MapHandler>.Instance;
                         if (mapHandler == null) return true;
                         
-                        int currentSegmentIndex = (int)mapHandler.GetCurrentSegment();
+                        Segment currentSegment = mapHandler.GetCurrentSegment();
                         
                         // Check if we haven't advanced yet
-                        if (currentSegmentIndex < (int)__instance.advanceToSegment)
+                        if ((int)currentSegment < (int)__instance.advanceToSegment)
                         {
-                            var currentSegment = mapHandler.segments[currentSegmentIndex];
-                            string currentBiomeName = currentSegment.biome.ToString().ToUpper();
+                            var currentSegmentData = mapHandler.segments[(int)currentSegment];
+                            string currentBiomeName = currentSegmentData.biome.ToString().ToUpper();
                             
                             int requiredMountain = CampfireHelper.GetRequiredProgressiveMountain(currentBiomeName);
                             
                             // If we now have enough, trigger the advancement
                             if (requiredMountain > 0 && _instance._progressiveMountainCount >= requiredMountain)
                             {
-                                _instance._log.LogInfo($"[PeakPelago] Relighting campfire to advance from {currentBiomeName} with {_instance._progressiveMountainCount} Progressive Mountain");
+                                _instance._log.LogInfo($"[PeakPelago] HOST: Relighting campfire to advance from {currentBiomeName} with {_instance._progressiveMountainCount} Progressive Mountain");
                                 
-                                // Manually trigger the segment advancement
-                                if (Singleton<MapHandler>.Instance != null)
+                                // Advance segment on all clients using RPC
+                                if (_instance._photonView != null && PhotonNetwork.IsConnected)
                                 {
-                                    Singleton<MapHandler>.Instance.GoToSegment(__instance.advanceToSegment);
+                                    int targetSegmentInt = (int)__instance.advanceToSegment;
+                                    _instance._photonView.RPC("SyncSegmentAdvancement", RpcTarget.All, targetSegmentInt);
+                                    _instance._log.LogInfo($"[PeakPelago] HOST: Sent segment advancement RPC to all clients for segment {__instance.advanceToSegment}");
+                                }
+                                else
+                                {
+                                    // Fallback for single player
+                                    mapHandler.GoToSegment(__instance.advanceToSegment);
                                 }
                                 
                                 return false; // Skip original method

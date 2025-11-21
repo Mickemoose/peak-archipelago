@@ -1,3 +1,9 @@
+## v0.5.5
+<ul>
+    <li>fixed Progressive Mountain not syncing to joined player(s)</li>
+    <li>fixed Progressive Stamina not resyncing properly on joined player(s)</li>
+</ul>
+
 ### v0.5.4
 <ul>
     <li>DeathLink would send out even if disabled</li>
