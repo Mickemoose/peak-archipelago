@@ -74,28 +74,28 @@ The AP Connection UI will update to show that it's connected via the host
 
 If someone joining the Host has their AP connection set to their own slot, anything connected to AP will likely only affect the Host's AP slot.
 
-### Links
+# Links
 
 ## DeathLink
 
 Death Link has a few behaviors to choose from.
 
-Receiving Behavior:
-# Kill Random Player: A random player in your lobby will be killed
-# Reset to Last Checkpoint: All players will be teleported to the last checkpoint/campfire
+### Receiving Behavior:
+Kill Random Player: A random player in your lobby will be killed
+Reset to Last Checkpoint: All players will be teleported to the last checkpoint/campfire
 
-Sending Behvaior:
-# Any Player Dies: Send Death Link whenever any player in your game dies
-# All Players Dead: Send Death Link only when all players are dead (game over)
+### Sending Behvaior:
+Any Player Dies: Send Death Link whenever any player in your game dies
+All Players Dead: Send Death Link only when all players are dead (game over)
 
 
 ## RingLink/HardRingLink
 
-# RingLink
+### RingLink
 With RingLink enabled, your stamina bars are conditionally linked to other RingLink games.
 Consuming food will send Rings to other players with Ring Link enabled. Poisonous food will send negative rings.
 Positive and Negative rings recieved will affect your Extra Stamina first, then your regular Stamina.
-# HardRingLink
+### HardRingLink
 With HardRingLink enabled, your stamina bars are conditionally linked to other HardRingLink games.
 While rings received is largely unchanged, the rings you send out only happens on specific events.
 Wrecking food while cooking, Causing the Scoutmaster to appear, Reaching the ends of Biomes, Dying and/or Zombifying will send out negative rings.
