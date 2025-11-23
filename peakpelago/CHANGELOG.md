@@ -1,7 +1,7 @@
 ## v0.5.6
 <ul>
     <li>Fixed checks for Tick, Airline Food, Pirate's Compass</li>
-    <li>High Altitudem, Speed Climber and Participation Badges were checking internal names which were different for these 3 only</li>
+    <li>High Altitude, Speed Climber and Participation Badges were checking internal names which were different for these 3 only</li>
     <li>Item pickup check sending performance improved</li>
     <li>Item spawning performance improved</li>
     <li>Berrynana Peel checks</li>
@@ -11,6 +11,7 @@
     <li>More Open X Luggage checks</li>
     <li>Fix for Calcium Intake Badge not working</li>
     <li>Fix for Toxicology Badge not working</li>
+    <li>New goal for Reaching # Ascent AND Collecting # Badges</li>
 </ul>
 
 ## v0.5.5
