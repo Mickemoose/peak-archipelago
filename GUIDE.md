@@ -74,3 +74,39 @@ The AP Connection UI will update to show that it's connected via the host
 
 If someone joining the Host has their AP connection set to their own slot, anything connected to AP will likely only affect the Host's AP slot.
 
+### Links
+
+## DeathLink
+
+Death Link has a few behaviors to choose from.
+
+Receiving Behavior:
+# Kill Random Player: A random player in your lobby will be killed
+# Reset to Last Checkpoint: All players will be teleported to the last checkpoint/campfire
+
+Sending Behvaior:
+# Any Player Dies: Send Death Link whenever any player in your game dies
+# All Players Dead: Send Death Link only when all players are dead (game over)
+
+
+## RingLink/HardRingLink
+
+# RingLink
+With RingLink enabled, your stamina bars are conditionally linked to other RingLink games.
+Consuming food will send Rings to other players with Ring Link enabled. Poisonous food will send negative rings.
+Positive and Negative rings recieved will affect your Extra Stamina first, then your regular Stamina.
+# HardRingLink
+With HardRingLink enabled, your stamina bars are conditionally linked to other HardRingLink games.
+While rings received is largely unchanged, the rings you send out only happens on specific events.
+Wrecking food while cooking, Causing the Scoutmaster to appear, Reaching the ends of Biomes, Dying and/or Zombifying will send out negative rings.
+
+## EnergyLink
+
+With EnergyLink enabled, an EnergyLink Vendor will appear at each campfire. Each one will have 1 randomized Item bundle inside that you can spend energy on to receive.
+Any items you pick up will now have another interaction called Convert which will convert the item into energy, destroying it in the process.
+Most items are 100J of energy, while some have unique values.
+
+## TrapLink
+
+With TrapLink enabled, any Traps you receive or find will send out to TrapLinked games that are able to accept them. When linked games do the same, you
+will recieve a linked trap as well based on the type of trap.

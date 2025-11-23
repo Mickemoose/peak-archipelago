@@ -72,7 +72,7 @@ This mod consists of two main components:
 
 When generating an Archipelago game, the following PEAK-specific options are available:
 
-- **Goal**: Choose between "Reach Peak", "Complete All Badges" or "24 Karat Badge"
+- **Goal**: Choose between "Reach Peak", "Complete All Badges", "24 Karat Badge" or "Reach Peak and Complete All Badges"
 - **Required Ascent Count**: Number of ascents needed to complete (0-7, default: 4)
 - **Required Badge Count**: Number of badges needed for badge completion goal (10-50, default: 20)
 - **Progressive Stamina**: Start with 25% Stamina and require finding Progressive Stamina Bars to reach 100%
@@ -165,7 +165,7 @@ The Python world code follows Archipelago's world API:
 
 ## Version
 
-Current Version: **0.5.5**
+Current Version: **0.5.6**
 
 ## Links
 

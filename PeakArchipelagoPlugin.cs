@@ -20,10 +20,11 @@ using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using Zorro.Core;
+using static CharacterAfflictions;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.5")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.6")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -90,7 +91,13 @@ namespace Peak.AP
         private bool _hasRebuiltBadges = false;
         private int _totalItemsCooked = 0;
         private int _pitonsPlaced = 0;
+        private float _damageBlockedByMilk = 0f;
+        private float _poisonHealed = 0f;
         private int _glizzysGobbled = 0;
+        private float _lastStateSave = 0f;
+        private const float STATE_SAVE_INTERVAL = 5f;
+        private bool _stateDirty = false;
+        private bool _isSaving = false;
 
         // ===== Ascent Management =====
         private int _originalMaxAscent = 0;
@@ -1020,7 +1027,7 @@ namespace Peak.AP
                             var isUnlockedMethod = achievementManager.GetType().GetMethod("IsAchievementUnlocked");
                             if (isUnlockedMethod != null)
                             {
-                                bool isUnlocked = (bool)isUnlockedMethod.Invoke(achievementManager, new object[] { badgeType });
+                                bool isUnlocked = (bool)isUnlockedMethod.Invoke(achievementManager, [badgeType]);
                                 if (isUnlocked)
                                 {
                                     _originalUnlockedBadges.Add(badgeType);
@@ -1122,6 +1129,8 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.BalloonBadge, "Balloon Badge" },
                 { ACHIEVEMENTTYPE.LeaveNoTraceBadge, "Leave No Trace Badge" },
                 { ACHIEVEMENTTYPE.SpeedClimberBadge, "Speed Climber Badge" },
+                { ACHIEVEMENTTYPE.TriedYourBestBadge, "Participation Badge" },
+                { ACHIEVEMENTTYPE.AscenderBadge, "High Altitude Badge" },
                 { ACHIEVEMENTTYPE.BingBongBadge, "Bing Bong Badge" },
                 { ACHIEVEMENTTYPE.NaturalistBadge, "Naturalist Badge" },
                 { ACHIEVEMENTTYPE.GourmandBadge, "Gourmand Badge" },
@@ -1171,8 +1180,15 @@ namespace Peak.AP
             {
                 // Check total luggage achievements
                 CheckAndReportAchievement("Open 1 luggage", 1, _totalLuggageOpened);
+                CheckAndReportAchievement("Open 5 luggage", 5, _totalLuggageOpened);
                 CheckAndReportAchievement("Open 10 luggage", 10, _totalLuggageOpened);
+                CheckAndReportAchievement("Open 15 luggage", 15, _totalLuggageOpened);
+                CheckAndReportAchievement("Open 20 luggage", 20, _totalLuggageOpened);
                 CheckAndReportAchievement("Open 25 luggage", 25, _totalLuggageOpened);
+                CheckAndReportAchievement("Open 30 luggage", 30, _totalLuggageOpened);
+                CheckAndReportAchievement("Open 35 luggage", 35, _totalLuggageOpened);
+                CheckAndReportAchievement("Open 40 luggage", 40, _totalLuggageOpened);
+                CheckAndReportAchievement("Open 45 luggage", 45, _totalLuggageOpened);
                 CheckAndReportAchievement("Open 50 luggage", 50, _totalLuggageOpened);
 
                 // Check single run achievements
@@ -1199,6 +1215,8 @@ namespace Peak.AP
         /// <summary>Report a check by its AP location name (defined in the apworld).</summary>
         public void ReportCheckByName(string locationName)
         {
+            _log.LogInfo($"[PeakPelago] === ReportCheckByName START: '{locationName}' ===");
+            
             try
             {
                 if (!PhotonNetwork.IsMasterClient)
@@ -1215,10 +1233,15 @@ namespace Peak.AP
                     return;
                 }
 
+                _log.LogInfo($"[PeakPelago] Processing as master client...");
+
                 // Host processing
                 try
                 {
                     long id = -1;
+                    
+                    _log.LogInfo($"[PeakPelago] Session null? {_session == null}");
+                    _log.LogInfo($"[PeakPelago] Session.Locations null? {_session?.Locations == null}");
                     
                     // Try to get location ID
                     if (_session != null && _session.Locations != null)
@@ -1226,6 +1249,7 @@ namespace Peak.AP
                         try
                         {
                             id = _session.Locations.GetLocationIdFromName("PEAK", locationName);
+                            _log.LogInfo($"[PeakPelago] GetLocationIdFromName returned: {id}");
                             // Cache it for offline use
                             _locationCache[locationName] = id;
                         }
@@ -1244,7 +1268,7 @@ namespace Peak.AP
 
                     if (id <= 0)
                     {
-                        _log.LogWarning($"[PeakPelago] Location '{locationName}' not found in session or cache");
+                        _log.LogWarning($"[PeakPelago] Location '{locationName}' not found in session or cache (id={id})");
                         return;
                     }
 
@@ -1255,17 +1279,20 @@ namespace Peak.AP
                         return;
                     }
 
+                    _log.LogInfo($"[PeakPelago] About to report check ID {id}...");
+                    _log.LogInfo($"[PeakPelago] Socket connected? {_session?.Socket?.Connected}");
+
                     // If connected, report immediately
                     if (_session != null && _session.Socket != null && _session.Socket.Connected)
                     {
                         try
                         {
-                            _session.Locations.CompleteLocationChecks(new long[] { id });
+                            _session.Locations.CompleteLocationChecks([id]);
                             _reportedChecks.Add(id);
                             _log.LogInfo($"[PeakPelago] ✓ Reported NEW check: {locationName} (ID: {id})");
                             
                             BroadcastCheckCompleted(locationName, id);
-                            SaveState();
+                            _stateDirty = true;
                         }
                         catch (Exception ex)
                         {
@@ -1285,12 +1312,16 @@ namespace Peak.AP
                 catch (Exception ex)
                 {
                     _log.LogError("[PeakPelago] ReportCheckByName failed: " + ex.Message);
+                    _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
                 }
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in ReportCheckByName wrapper: {ex.Message}");
+                _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
             }
+            
+            _log.LogInfo($"[PeakPelago] === ReportCheckByName END: '{locationName}' ===");
         }
         /// <summary>Broadcast to all clients that a check was completed</summary>
         private void BroadcastCheckCompleted(string locationName, long locationId)
@@ -1347,6 +1378,20 @@ namespace Peak.AP
                 {
                     _log.LogInfo($"[PeakPelago] Peak reached but on Ascent {currentAscent}, need Ascent {_slotRequiredAscent} for goal");
                 }
+            } else if (_slotGoalType == 3)
+            {
+                // Custom goal type: Reach specified ascent and collect specified badges
+                if (currentAscent >= _slotRequiredAscent && _collectedBadges.Count >= _slotRequiredBadges)
+                {
+                    _log.LogInfo($"[PeakPelago] PEAK reached on Ascent {currentAscent} with {_collectedBadges.Count} badges - goal complete!");
+                    SendGoalComplete();
+                    string completionLocation = $"Ascent {currentAscent} with {_collectedBadges.Count} Badges Completed";
+                    ReportCheckByName(completionLocation);
+                }
+                else
+                {
+                    _log.LogInfo($"[PeakPelago] Progress: Ascent {currentAscent}/{_slotRequiredAscent}, Badges {_collectedBadges.Count}/{_slotRequiredBadges}");
+                }
             }
         }
 
@@ -1377,6 +1422,27 @@ namespace Peak.AP
                     {
                         _log.LogInfo("[PeakPelago] 24 Karat Badge earned - goal complete!");
                         SendGoalComplete();
+                    }
+                    break;
+                case 3: // Custom Ascent + Badges goal
+                    // Check if we have enough badges AND have already completed the required ascent
+                    if (_collectedBadges.Count >= _slotRequiredBadges)
+                    {
+                        // Check if we've already completed the required ascent
+                        string completionKey = $"Ascent {_slotRequiredAscent} Completed_{_slotRequiredAscent}";
+                        if (_awardedAscentBadges.Contains(completionKey))
+                        {
+                            _log.LogInfo($"[PeakPelago] Badge requirement met ({_collectedBadges.Count}/{_slotRequiredBadges}) and Ascent {_slotRequiredAscent} already completed - goal complete!");
+                            SendGoalComplete();
+                        }
+                        else
+                        {
+                            _log.LogInfo($"[PeakPelago] Badge requirement met ({_collectedBadges.Count}/{_slotRequiredBadges}), but still need to complete Ascent {_slotRequiredAscent}");
+                        }
+                    }
+                    else
+                    {
+                        _log.LogInfo($"[PeakPelago] Progress: {_collectedBadges.Count}/{_slotRequiredBadges} badges collected");
                     }
                     break;
 
@@ -1501,10 +1567,11 @@ namespace Peak.AP
                 { 32, "Acquire Flare" },
                 { 109, "Acquire Torch" },
                 { 43, "Acquire Faerie Lantern" },
+                { 70, "Acquire Blowgun" },
                 
                 { 48, "Acquire Cactus" },
                 { 23, "Acquire Compass" },
-                { 61, "Acquire Pirate Compass" },
+                { 61, "Acquire Pirate's Compass" },
                 { 14, "Acquire Binoculars" },
                 { 7, "Acquire Bandages" },
                 { 29, "Acquire First-Aid Kit" },
@@ -1555,10 +1622,14 @@ namespace Peak.AP
                 { 38, "Acquire Honeycomb" },
                 { 8, "Acquire Beehive" },
                 { 111, "Acquire Scorpion" },
+                { 95, "Acquire Tick" },
                 
                 // Miscellaneous items
                 { 69, "Acquire Conch" },
-                { 94, "Acquire Berrynana Peel" },
+                { 39, "Acquire Pink Berrynana Peel" },
+                { 91, "Acquire Blue Berrynana Peel" },
+                { 92, "Acquire Brown Berrynana Peel" },
+                { 94, "Acquire Yellow Berrynana Peel" },
                 { 106, "Acquire Dynamite" },
                 { 13, "Acquire Bing Bong" },
                 { 155, "Acquire Mandrake" },
@@ -1640,6 +1711,7 @@ namespace Peak.AP
                 { "Medicinal Root", () => SpawnPhysicalItem("MedicinalRoot") },
                 { "Guidebook", () => SpawnPhysicalItem("Guidebook") },
                 { "Aloe Vera", () => SpawnPhysicalItem("AloeVera") },
+                { "Blowgun", () => SpawnPhysicalItem("HealingDart Variant") },
                 { "Marshmallow", () => SpawnPhysicalItem("Marshmallow") },
                 { "Glizzy", () => SpawnPhysicalItem("Glizzy") },
                 { "Fortified Milk", () => SpawnPhysicalItem("FortifiedMilk") },
@@ -1665,7 +1737,7 @@ namespace Peak.AP
                 { "Trail Mix", () => SpawnPhysicalItem("TrailMix") },
                 { "Granola Bar", () => SpawnPhysicalItem("Granola Bar") },
                 { "Scout Cookies", () => SpawnPhysicalItem("ScoutCookies") },
-                { "Airline Food", () => SpawnPhysicalItem("Airline Food") },
+                { "Airline Food", () => SpawnPhysicalItem("Airplane Food") },
                 { "Energy Drink", () => SpawnPhysicalItem("Energy Drink") },
                 { "Sports Drink", () => SpawnPhysicalItem("Sports Drink") },
                 { "Big Lollipop", () => SpawnPhysicalItem("Lollipop") },
@@ -2218,34 +2290,15 @@ namespace Peak.AP
         {
             try
             {
-                Item itemToSpawn = null;
-
-                /* DEBUG: Log all available items in the database
-                _log.LogInfo("[PeakPelago] === AVAILABLE ITEMS IN DATABASE ===");
-                for (ushort itemID = 1; itemID < 300; itemID++)
+                if (!ItemIdMappings.TryGetId(itemName, out ushort itemId))
                 {
-                    if (ItemDatabase.TryGetItem(itemID, out Item item))
-                    {
-                        _log.LogInfo("[PeakPelago] Item ID " + itemID + ": " + item.name);
-                    }
+                    _log.LogWarning($"[PeakPelago] No ID mapping for item: {itemName}");
+                    return;
                 }
-                _log.LogInfo("[PeakPelago] === END OF AVAILABLE ITEMS ===");
-                */
-                for (ushort itemID = 1; itemID < 1000; itemID++)
+                
+                if (!ItemDatabase.TryGetItem(itemId, out Item itemToSpawn))
                 {
-                    if (ItemDatabase.TryGetItem(itemID, out Item item))
-                    {
-                        if (item.name.Equals(itemName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            itemToSpawn = item;
-                            break;
-                        }
-                    }
-                }
-
-                if (itemToSpawn == null)
-                {
-                    _log.LogWarning("[PeakPelago] Could not find item in database: " + itemName);
+                    _log.LogWarning($"[PeakPelago] Item ID {itemId} not in database: {itemName}");
                     return;
                 }
 
@@ -2256,7 +2309,6 @@ namespace Peak.AP
                     return;
                 }
 
-                // Filter to only active, alive characters
                 var validCharacters = Character.AllCharacters.Where(c =>
                     c != null &&
                     c.gameObject.activeInHierarchy &&
@@ -2269,17 +2321,13 @@ namespace Peak.AP
                     return;
                 }
 
-                _log.LogInfo($"[PeakPelago] Spawning {itemName} for {validCharacters.Count} players");
+                _log.LogInfo($"[PeakPelago] Spawning {itemName} (ID: {itemId}) for {validCharacters.Count} players");
 
-                // Spawn item for each valid character
                 foreach (var character in validCharacters)
                 {
                     try
                     {
-                        Vector3 spawnPosition = character.Center + character.transform.forward * 2f;
-                        spawnPosition += Vector3.up * 0.5f; // Slightly above ground
-
-                        // Spawn the item prefab
+                        Vector3 spawnPosition = character.Center + character.transform.forward * 2f + Vector3.up * 0.5f;
                         GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
                         
                         string characterName = character == Character.localCharacter ? "local player" : character.characterName;
@@ -2293,53 +2341,36 @@ namespace Peak.AP
             }
             catch (Exception ex)
             {
-                _log.LogError("[PeakPelago] Error spawning physical item " + itemName + ": " + ex.Message);
+                _log.LogError($"[PeakPelago] Error spawning physical item {itemName}: {ex.Message}");
             }
         }
-
         private void UnlockAscent()
         {
             try
             {
-                // Count how many Progressive Ascent items we've received
-                // The next ascent to unlock is count + 1
-                int nextAscentLevel = _unlockedAscents.Count + 1;
+                if (_session == null) return;
                 
-                if (nextAscentLevel > 7)
+                int progressiveAscentCount = _session.Items.AllItemsReceived.Count(item =>
                 {
-                    _log.LogWarning($"[PeakPelago] Already unlocked all 7 ascents, ignoring extra Progressive Ascent item");
-                    return;
+                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                    return itemName?.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase) ?? false;
+                });
+                
+                progressiveAscentCount = Math.Min(progressiveAscentCount, 7);
+                
+                _log.LogInfo($"[PeakPelago] UnlockAscent: {progressiveAscentCount} Progressive Ascent items received");
+                
+                _unlockedAscents.Clear();
+                for (int i = 1; i <= progressiveAscentCount; i++)
+                {
+                    _unlockedAscents.Add(i);
+                    
+                    var ascentsType = Type.GetType("Ascents") ?? typeof(Character).Assembly.GetType("Ascents");
+                    var unlockMethod = ascentsType?.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                    unlockMethod?.Invoke(null, [i]);
                 }
                 
-                _log.LogInfo($"[PeakPelago] Unlocking ascent {nextAscentLevel} from Progressive Ascent");
-                
-                // Track the unlocked ascent
-                _unlockedAscents.Add(nextAscentLevel);
-
-                // Use reflection to access the Ascents class and unlock the ascent
-                var ascentsType = Type.GetType("Ascents");
-                if (ascentsType != null)
-                {
-                    var unlockMethod = ascentsType.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                    if (unlockMethod != null)
-                    {
-                        unlockMethod.Invoke(null, new object[] { nextAscentLevel });
-                        _log.LogInfo($"[PeakPelago] Successfully unlocked Ascent {nextAscentLevel}");
-                        
-                        // Log all currently unlocked ascents
-                        var sortedAscents = _unlockedAscents.OrderBy(x => x).ToList();
-                        _log.LogInfo($"[PeakPelago] Total unlocked ascents: {string.Join(", ", sortedAscents)}");
-                    }
-                    else
-                    {
-                        _log.LogWarning("[PeakPelago] Could not find UnlockAscent method");
-                    }
-                }
-                else
-                {
-                    _log.LogWarning("[PeakPelago] Could not find Ascents class");
-                }
-                
+                _log.LogInfo($"[PeakPelago] Unlocked ascents: {string.Join(", ", _unlockedAscents.OrderBy(x => x))}");
                 SaveState();
             }
             catch (Exception ex)
@@ -2496,12 +2527,6 @@ namespace Peak.AP
         private void TrackItemAcquisition(string itemName, ushort itemId = 0)
         {
             _log.LogInfo($"[PeakPelago] TrackItemAcquisition: '{itemName}' (ID: {itemId})");
-            
-            if (itemId == 0)
-            {
-                _log.LogWarning("[PeakPelago] Item ID is 0, skipping");
-                return;
-            }
 
             // Update last acquired item info
             _lastAcquiredItemName = itemName;
@@ -2671,6 +2696,7 @@ namespace Peak.AP
                 case "ALPINE":
                     return "Alpinist " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "CALDERA":
+                    return "Volcanology " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "THE KILN":
                     return "Volcanology " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
                 case "ROOTS":
@@ -2764,7 +2790,7 @@ namespace Peak.AP
                     case "ALPINE":
                     case "MESA":
                         return 3;
-                    case "CALDERA":
+                    case "VOLCANO":
                         return 4;
                     default:
                         return 0;
@@ -2773,6 +2799,59 @@ namespace Peak.AP
         }
 
         // ===== Harmony Patches =====
+        // Add this field near your other tracking fields
+
+        [HarmonyPatch(typeof(CharacterAfflictions), "SubtractStatus")]
+        public static class CharacterAfflictionsSubtractStatusPatch
+        {
+            static void Postfix(CharacterAfflictions __instance, STATUSTYPE statusType, float amount, bool fromRPC, bool decreasedNaturally)
+            {
+                try
+                {
+                    if (_instance == null || _instance._session == null) return;
+                    if (!__instance.character.IsLocal) return;
+                    if (statusType != STATUSTYPE.Poison) return;
+                    if (decreasedNaturally) return; // Only count intentional healing
+                    
+                    _instance._poisonHealed += amount;
+                    _instance._log.LogInfo($"[PeakPelago] Poison healed: {amount}, Total: {_instance._poisonHealed}");
+                    
+                    if (_instance._poisonHealed >= 2.0f && !_instance._collectedBadges.Contains(ACHIEVEMENTTYPE.ToxicologyBadge))
+                    {
+                        _instance._log.LogInfo($"[PeakPelago] Toxicology Badge earned!");
+                        _instance.ReportCheckByName("Toxicology Badge");
+                        _instance._collectedBadges.Add(ACHIEVEMENTTYPE.ToxicologyBadge);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _instance?._log.LogError($"[PeakPelago] SubtractStatus patch error: {ex.Message}");
+                }
+            }
+        }
+        [HarmonyPatch(typeof(AchievementManager), nameof(AchievementManager.AddStatusBlockedByMilk), MethodType.Normal)]
+        public static class AchievementManagerAddStatusBlockedByMilkPatch
+        {
+            static void Postfix(float amount)
+            {
+                if (_instance == null) return;
+                if (_instance._session == null) return;
+                if (!PhotonNetwork.IsMasterClient) return;
+                
+                _instance._damageBlockedByMilk += amount;
+                
+                if (_instance._damageBlockedByMilk >= 0.1f && !_instance._collectedBadges.Contains(ACHIEVEMENTTYPE.CalciumIntakeBadge))
+                {
+                    var badgeMapping = _instance.GetBadgeToLocationMapping();
+                    if (badgeMapping.TryGetValue(ACHIEVEMENTTYPE.CalciumIntakeBadge, out string locationName))
+                    {
+                        _instance._log.LogInfo($"[PeakPelago] Calcium Intake Badge earned! Reporting: {locationName}");
+                        _instance.ReportCheckByName("Calcium Intake Badge");
+                        _instance._collectedBadges.Add(ACHIEVEMENTTYPE.CalciumIntakeBadge);
+                    }
+                }
+            }
+        }
         [HarmonyPatch(typeof(Campfire), "GetInteractionText")]
         public static class CampfireGetInteractionTextPatch
         {
@@ -3022,7 +3101,7 @@ namespace Peak.AP
                     case "MESA":
                         return 3; // Need 3 to leave Alpine/Mesa
                     
-                    case "CALDERA":
+                    case "VOLCANO":
                         return 4; // Need 4 to leave Caldera
                     
                     default:
@@ -3234,35 +3313,54 @@ namespace Peak.AP
             }
         }
 
-        [HarmonyPatch(typeof(Item), "RequestPickup")]
-        public static class ItemRequestPickupPatch
+        [HarmonyPatch(typeof(Player), "AddItem")]
+        public static class PlayerAddItemPatch
         {
-            static void Postfix(Item __instance, PhotonView characterView)
+            static void Postfix(Player __instance, ushort itemID, ItemInstanceData instanceData, ref ItemSlot slot, bool __result)
             {
                 try
                 {
+                    if (!__result) return; // Item wasn't actually added
                     if (_instance == null) return;
                     if (!PhotonNetwork.IsMasterClient) return;
 
-                    // Get the character who picked up the item
-                    Character character = characterView.GetComponent<Character>();
-                    if (character == null) return;
+                    // Quick check - skip if no AP location for this item
+                    if (!_instance._itemIdToLocationMapping.ContainsKey(itemID)) return;
 
-                    // Get item name
-                    string itemName = __instance.UIData.itemName;
-                    ushort itemId = __instance.itemID;
-
-                    _instance._log.LogDebug($"[PeakPelago] HOST: Player {character.characterName} (Actor: {characterView.Owner.ActorNumber}) picked up item: {itemName} (ID: {itemId})");
-
-                    _instance.TrackItemAcquisition(itemName, itemId);
-                }
-                catch (Exception ex)
-                {
-                    if (_instance != null)
+                    // Check if already reported
+                    if (_instance._itemIdToLocationMapping.TryGetValue(itemID, out string locationName))
                     {
-                        _instance._log.LogError("[PeakPelago] RequestPickup patch error: " + ex.Message);
-                        _instance._log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
+                        if (_instance._locationCache.TryGetValue(locationName, out long cachedId) 
+                            && _instance._reportedChecks.Contains(cachedId))
+                        {
+                            return;
+                        }
                     }
+
+                    string itemName = "Unknown";
+                    if (ItemDatabase.TryGetItem(itemID, out Item item))
+                    {
+                        itemName = item.UIData?.itemName ?? "Unknown";
+                    }
+
+                    // Defer to next frames - let Photon fully settle
+                    _instance.StartCoroutine(DeferredTrackItem(itemName, itemID));
+                }
+                catch (Exception)
+                {
+                    // Silently ignore
+                }
+            }
+
+            private static System.Collections.IEnumerator DeferredTrackItem(string itemName, ushort itemId)
+            {
+                yield return null;
+                yield return null;
+                
+                if (_instance != null)
+                {
+                    _instance._log.LogDebug($"[PeakPelago] Tracking: {itemName} (ID: {itemId})");
+                    _instance.TrackItemAcquisition(itemName, itemId);
                 }
             }
         }
@@ -3700,6 +3798,15 @@ namespace Peak.AP
                 {
                     CheckAndHandleSessionChange(loginResult);
                     LoadState();
+                    if (_session != null && _session.Items != null)
+                    {
+                        int actualItemCount = _session.Items.AllItemsReceived.Count;
+                        if (_lastProcessedItemIndex > actualItemCount)
+                        {
+                            _log.LogWarning($"[PeakPelago] State file index ({_lastProcessedItemIndex}) exceeds actual items ({actualItemCount}) - resetting to {actualItemCount}");
+                            _lastProcessedItemIndex = actualItemCount;
+                        }
+                    }
                     _log.LogInfo("[PeakPelago] Received slot data with " + loginResult.SlotData.Count + " entries");
 
                     _log.LogInfo("[PeakPelago] ===== ALL SLOT DATA =====");
@@ -4284,6 +4391,12 @@ namespace Peak.AP
                         _hasRebuiltBadges = true;
                     }
                 }
+                if (_stateDirty && !_isSaving && Time.time - _lastStateSave > STATE_SAVE_INTERVAL)
+                {
+                    SaveState();
+                    _stateDirty = false;
+                    _lastStateSave = Time.time;
+                }
             }
             catch (Exception ex)
             {
@@ -4581,6 +4694,22 @@ namespace Peak.AP
                         _log.LogDebug($"[PeakPelago] Loaded glizzys gobbled: {glizzys}");
                     }
                 }
+                if (lines.Length >= 9)
+                {
+                    if (int.TryParse(lines[8].Trim(), out int damageBlocked))
+                    {
+                        _damageBlockedByMilk = damageBlocked;
+                        _log.LogDebug($"[PeakPelago] Loaded damage blocked by milk: {damageBlocked}");
+                    }
+                }
+                if (lines.Length >= 10)
+                {
+                    if (int.TryParse(lines[9].Trim(), out int poisonHealed))
+                    {
+                        _poisonHealed = poisonHealed;
+                        _log.LogDebug($"[PeakPelago] Loaded poison healed: {poisonHealed}");
+                    }
+                }
                 
                 _log.LogInfo($"[PeakPelago] State loaded successfully: {_reportedChecks.Count} checks, {_totalLuggageOpened} luggage, {_unlockedAscents.Count} ascents");
                 LoadOfflineChecks();
@@ -4599,45 +4728,49 @@ namespace Peak.AP
         }
         private void SaveState()
         {
-            try
-            {
-                if (!PhotonNetwork.IsMasterClient)
+            if (!PhotonNetwork.IsMasterClient) return;
+            if (_session == null || _session.Socket == null || !_session.Socket.Connected) return;
+            if (_isSaving) return; // Don't queue multiple saves
+            
+            _isSaving = true;
+            
+            // Capture all state on main thread (fast)
+            string line1 = _lastProcessedItemIndex.ToString();
+            string line2 = string.Join(",", _reportedChecks.Select(x => x.ToString()).ToArray());
+            string line3 = _totalLuggageOpened.ToString();
+            string line4 = string.Join(",", _unlockedAscents.Select(x => x.ToString()).ToArray());
+            string line5 = _staminaManager?.SaveState() ?? "0,1.00";
+            string line6 = _totalItemsCooked.ToString();
+            string line7 = _pitonsPlaced.ToString();
+            string line8 = _glizzysGobbled.ToString();
+            string line9 = _damageBlockedByMilk.ToString();
+            string line10 = _poisonHealed.ToString();
+            
+            string[] lines = [line1, line2, line3, line4, line5, line6, line7, line8, line9, line10];
+            string path = StateFilePath;
+            
+            // Write on background thread
+            System.Threading.Tasks.Task.Run(() => {
+                try 
                 {
-                    _log.LogDebug("[PeakPelago] Skipping state save - is not master client");
-                    return;
-                }
-                if (_session == null || _session.Socket == null || !_session.Socket.Connected)
+                    string tempPath = path + ".tmp";
+                    File.WriteAllLines(tempPath, lines);
+                    
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
+                    File.Move(tempPath, path);
+                } 
+                catch (Exception)
                 {
-                    _log.LogDebug("[PeakPelago] Skipping state save - not connected to AP");
-                    return;
+                    // Can't use _log from background thread safely, but the save failed gracefully
                 }
-                string line1 = _lastProcessedItemIndex.ToString();
-                string line2 = string.Join(",", _reportedChecks.Select(x => x.ToString()).ToArray());
-                string line3 = _totalLuggageOpened.ToString();
-                string line4 = string.Join(",", _unlockedAscents.Select(x => x.ToString()).ToArray()); // Save ascent unlocks
-                string line5 = _staminaManager?.SaveState() ?? "0,1.00";
-                string line6 = _totalItemsCooked.ToString();
-                string line7 = _pitonsPlaced.ToString();
-                string line8 = _glizzysGobbled.ToString();
-                
-                // Write to temp file first, then rename to try and stop corruption
-                string tempPath = StateFilePath + ".tmp";
-                File.WriteAllLines(tempPath, new[] { line1, line2, line3, line4, line5, line6, line7, line8 });
-                
-                if (File.Exists(StateFilePath))
+                finally
                 {
-                    File.Delete(StateFilePath);
+                    _isSaving = false;
                 }
-                File.Move(tempPath, StateFilePath);
-                
-                _log.LogDebug("[PeakPelago] Saved state to port-specific file: " + _currentPort);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError("[PeakPelago] Failed to save state file: " + ex.Message);
-                _log.LogError("[PeakPelago] Stack trace: " + ex.StackTrace);
-                // Don't crash the game just because we couldn't save >:[
-            }
+            });
         }
         private void SaveOfflineChecks()
         {
@@ -4786,7 +4919,7 @@ namespace Peak.AP
         {
             try
             {
-
+                _log.LogInfo($"[PeakPelago] DEBUG: OnAchievementThrown event received: {achievementType}");
                 // Get the badge to location mapping
                 var badgeMapping = GetBadgeToLocationMapping();
 

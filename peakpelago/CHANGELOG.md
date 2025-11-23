@@ -1,3 +1,18 @@
+## v0.5.6
+<ul>
+    <li>Fixed checks for Tick, Airline Food, Pirate's Compass</li>
+    <li>High Altitudem, Speed Climber and Participation Badges were checking internal names which were different for these 3 only</li>
+    <li>Item pickup check sending performance improved</li>
+    <li>Item spawning performance improved</li>
+    <li>Berrynana Peel checks</li>
+    <li>Logic fixes for some Badges</li>
+    <li>Redundancy check for Progressive Ascent to prevent accessing higher ascents than you should</li>
+    <li>Fix for Progressive Mountain ignoring the campfire before THE KILN</li>
+    <li>More Open X Luggage checks</li>
+    <li>Fix for Calcium Intake Badge not working</li>
+    <li>Fix for Toxicology Badge not working</li>
+</ul>
+
 ## v0.5.5
 <ul>
     <li>fixed Progressive Mountain not syncing to joined player(s)</li>

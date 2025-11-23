@@ -33,7 +33,7 @@ def create_peak_regions(world: "PeakWorld"):
         "Resourcefulness Badge",
         "Disaster Response Badge",
         "Applied Esoterica Badge",
-        "Needlepoint Badge"
+        "Needlepoint Badge",
     }
 
     biome_badges = {
@@ -61,7 +61,7 @@ def create_peak_regions(world: "PeakWorld"):
     
     # If goal is "Reach Peak" (0), exclude ascent badges above the required level
     excluded_ascent_levels = set()
-    if goal_type == 0:  # Reach Peak goal
+    if goal_type == 0 or goal_type == 3:  # Reach Peak goal or Peak and Badges goal
         for ascent_level in range(required_ascent + 1, 8):  # Ascents above required level
             excluded_ascent_levels.add(ascent_level)
     
@@ -90,7 +90,7 @@ def create_peak_regions(world: "PeakWorld"):
             excluded_location_count += 1
             logging.info(f"[Player {world.multiworld.player_name[world.player]}] SKIPPING HARD BADGE: {name}")
         
-        if goal_type == 0:  # Only skip if goal is Reach Peak
+        if goal_type == 0 or goal_type == 3:  # Only skip if goal is Reach Peak or Peak and Badges
             for level in excluded_ascent_levels:
                 if f"(Ascent {level})" in name:
                     should_skip = True
@@ -132,7 +132,7 @@ def create_peak_regions(world: "PeakWorld"):
     for loc_name, item_name in event_locations:
         # Skip creating event locations for excluded ascents
         should_skip_event = False
-        if goal_type == 0:
+        if goal_type == 0 or goal_type == 3:
             for level in excluded_ascent_levels:
                 if f"Ascent {level} Completed" == loc_name:
                     should_skip_event = True
