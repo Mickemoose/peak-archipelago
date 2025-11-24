@@ -17,7 +17,6 @@ namespace Peak.AP
         private static ManualLogSource _log;
         private static PeakArchipelagoPlugin _plugin;
         private static bool _isActive = false;
-
         public enum Pokemon
         {
             totodile,
@@ -112,6 +111,7 @@ namespace Peak.AP
             { Pokemon.corsola, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.entei, CharacterAfflictions.STATUSTYPE.Hot },
 
+            //hehe these arent pokemon dont choose them or u get cursed :O
             { Pokemon.terriermon, CharacterAfflictions.STATUSTYPE.Curse },
             { Pokemon.wizardmon, CharacterAfflictions.STATUSTYPE.Curse },
             { Pokemon.cheat, CharacterAfflictions.STATUSTYPE.Curse },
@@ -197,6 +197,7 @@ namespace Peak.AP
 
         private static IEnumerator PokemonTriviaCoroutine(ManualLogSource log)
         {
+            //a bunch of stuff happens here, UI setup, input handling, etc. it should be cleaned up later and commented better
             _isActive = true;
             var question = GetRandomQuestion();
             InputSpriteData inputSpriteData = SingletonAsset<InputSpriteData>.Instance;
@@ -243,7 +244,9 @@ namespace Peak.AP
             };
             var answerObjects = new List<GameObject>();
             var pokemonImages = new List<Image>();
+            // i forget what this was gonna be for but lets not delete it yet mightve been when i was experimenting with the first version of this trap
             var inputActions = new[] { "Move Up", "Move Left", "Move Right", "Move Down" };
+
             for (int i = 0; i < 4; i++)
             {
                 var pokemonObj = new GameObject($"Pokemon{i}");
@@ -521,6 +524,8 @@ namespace Peak.AP
             
             return null;
         }
+
+        // I should probably check out the code for SoFly since they use the font properly and i dont lmao
         private static Font LoadCustomFont()
         {
             try
