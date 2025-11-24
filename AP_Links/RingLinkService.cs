@@ -198,8 +198,10 @@ namespace Peak.AP
                 {
                     if (staminaValue > 0)
                     {
-                        // Positive: Add to extra stamina
-                        character.data.extraStamina += staminaValue;
+                        // Positive: Add to extra stamina, but cap at max (1.0)
+                        character.data.extraStamina = Mathf.Min(character.data.extraStamina + staminaValue, 1f);
+                        
+                        _log.LogInfo($"[PeakPelago] Ring Link added: {staminaValue} stamina (from {amount} rings), capped at 1.0");
                     }
                     else if (staminaValue < 0)
                     {
@@ -216,12 +218,14 @@ namespace Peak.AP
                         // If there's still penalty left, deduct from regular stamina
                         if (remainingPenalty > 0)
                         {
-                            character.data.staminaDelta = Mathf.Max(0f, character.data.staminaDelta - remainingPenalty);
+                            character.data.currentStamina = Mathf.Max(0f, character.data.currentStamina - remainingPenalty);
                         }
+                        
+                        _log.LogInfo($"[PeakPelago] Ring Link deducted: {Mathf.Abs(staminaValue)} stamina (from {amount} rings)");
                     }
                     
-                    string action = amount > 0 ? "added" : "deducted";
-                    _log.LogInfo($"[PeakPelago] Ring Link {action}: {Mathf.Abs(staminaValue)} stamina (from {amount} rings)");
+                    // Ensure extra stamina stays within bounds
+                    character.data.extraStamina = Mathf.Clamp(character.data.extraStamina, 0f, 1f);
                 }
 
                 _log.LogInfo($"[PeakPelago] Ring Link applied to {validCharacters.Count} character(s)");

@@ -36,6 +36,8 @@ namespace Peak.AP
         private ConfigEntry<int> cfgPort;
         private ConfigEntry<string> cfgSlot;
         private ConfigEntry<string> cfgPassword;
+        private ConfigEntry<string> cfgCustomTriviaFolder;
+        private ConfigEntry<bool> cfgIncludeStandardTrivia;
 
         // ===== Session =====
         private ArchipelagoSession _session;
@@ -146,6 +148,8 @@ namespace Peak.AP
                 cfgPort = Config.Bind("Connection", "Port", 38281, "Port (ignored if Server already contains :port)");
                 cfgSlot = Config.Bind("Connection", "Slot", "Player", "Your AP slot name");
                 cfgPassword = Config.Bind("Connection", "Password", "", "Room password (optional)");
+                cfgCustomTriviaFolder = Config.Bind("Custom Trivia", "CustomTriviaFolder", "plugins/PeakArchipelago-PEAKPELAGO/CustomTrivia", "Folder path for custom trivia questions (relative to BepInEx folder)");
+                cfgIncludeStandardTrivia = Config.Bind("Custom Trivia", "IncludeStandardTrivia", true, "Whether to include the standard trivia questions along with custom ones");
                 _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
@@ -163,6 +167,8 @@ namespace Peak.AP
                 SwapTrapEffect.Initialize(_log, this);
                 AfflictionTrapEffect.Initialize(_log);
                 PokemonTriviaTrapEffect.Initialize(_log, this);
+                TriviaUIHelper.Initialize(_log);
+                CustomTriviaTrapEffect.Initialize(_log, this);
                 DropEverythingTrapEffect.Initialize(_log);
                 ZoomTrapEffect.Initialize(_log, this);
                 PixelTrapEffect.Initialize(_log, this);
@@ -1797,7 +1803,7 @@ namespace Peak.AP
                 { "Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.53f, CharacterAfflictions.STATUSTYPE.Poison) },
                 { "Deadly Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.95f, CharacterAfflictions.STATUSTYPE.Poison) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
-                { "Pokemon Trivia Trap", () => PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },
+                { "Pokemon Trivia Trap", () => CustomTriviaTrapEffect.ApplyCustomTriviaTrap(_log)},//PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },
                 { "Drop Everything Trap", () => DropEverythingTrapEffect.ApplyDropEverythingTrap(_log) },
                 { "Swap Trap", () => SwapTrapEffect.ApplyPositionSwapTrap(_log) },
                 { "Nap Time Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Drowsy) },
@@ -1838,6 +1844,15 @@ namespace Peak.AP
             };
 
             _log.LogInfo("[PeakPelago] Initialized item effect handlers with " + _itemEffectHandlers.Count + " items");
+        }
+        public string GetCustomTriviaFolder()
+        {
+            return cfgCustomTriviaFolder.Value;
+        }
+
+        public bool GetIncludeStandardTrivia()
+        {
+            return cfgIncludeStandardTrivia.Value;
         }
         [PunRPC]
         public void SpawnEruptionTrapRPC(Vector3 position)
@@ -1897,15 +1912,13 @@ namespace Peak.AP
         [PunRPC]
         private void StartPokemonTriviaRPC()
         {
-            try
-            {
-                _log.LogInfo("[PeakPelago] RPC received: Start Pokemon Trivia");
-                PokemonTriviaTrapEffect.ApplyPokemonTriviaTrapLocal(_log);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error in StartPokemonTriviaRPC: {ex.Message}");
-            }
+            PokemonTriviaTrapEffect.ApplyPokemonTriviaTrapLocal(_log);
+        }
+
+        [PunRPC]
+        private void StartCustomTriviaRPC()
+        {
+            CustomTriviaTrapEffect.ApplyCustomTriviaTrapLocal(_log);
         }
 
         [PunRPC]

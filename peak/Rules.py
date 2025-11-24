@@ -262,7 +262,7 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Sports Drink", "Acquire Big Lollipop", "Acquire Button Shroom", "Acquire Bugle Shroom",
         "Acquire Cluster Shroom", "Acquire Chubby Shroom", "Acquire Conch",
         "Acquire Bing Bong", "Acquire Red Crispberry", "Acquire Green Crispberry",
-        "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half",
+        "Acquire Yellow Crispberry", "Acquire Coconut", "Acquire Coconut Half", "Acquire Blowgun",
         "Acquire Book of Bones", "Acquire Marshmallow", "Acquire Glizzy", "Acquire Rescue Claw", "Acquire Fortified Milk", "Acquire Scoutmaster's Bugle"
     ]
     

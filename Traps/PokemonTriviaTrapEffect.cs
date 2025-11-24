@@ -436,6 +436,12 @@ namespace Peak.AP
             log.LogInfo("[PeakPelago] Pokemon Trivia trap completed");
         }
         
+        /// <summary>
+        /// this is SUPPOSED to get the right input glyph sprite based on controller type and settings but i have not tested it at all with controllers
+        /// </summary>
+        /// <param name="answerIndex"></param>
+        /// <param name="inputSpriteData"></param>
+        /// <returns></returns>
         private static Sprite GetInputGlyphSprite(int answerIndex, InputSpriteData inputSpriteData)
         {
             if (inputSpriteData == null) return null;
