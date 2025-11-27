@@ -308,6 +308,11 @@ class BeetleHordeTrapWeight(BaseTrapWeight):
     Likelihood of receiving a trap which spawns a horde of beetles to chase a player
     """
     display_name = "Beetle Horde Trap Weight"
+class CustomTriviaTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which quizzes the player with custom trivia questions
+    """
+    display_name = "Custom Trivia Trap Weight"
 
 class TrapPercentage(Range):
     """
@@ -417,6 +422,7 @@ peak_option_groups = [
         PixelTrapWeight,
         EruptionTrapWeight,
         BeetleHordeTrapWeight,
+        CustomTriviaTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,
@@ -477,6 +483,7 @@ class PeakOptions(PerGameCommonOptions):
     pixel_trap_weight: PixelTrapWeight
     eruption_trap_weight: EruptionTrapWeight
     beetle_horde_trap_weight: BeetleHordeTrapWeight
+    custom_trivia_trap_weight: CustomTriviaTrapWeight
 
     disable_multiplayer_badges: DisableMultiplayerBadges
     disable_hard_badges: DisableHardBadges

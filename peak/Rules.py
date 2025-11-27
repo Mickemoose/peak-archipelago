@@ -65,6 +65,7 @@ def apply_rules(world: "PeakWorld"):
     player = world.player
     required_ascent = world.options.ascent_count.value
     goal_type = world.options.goal.value
+    progressive_stamina_enabled = world.options.progressive_stamina.value
 
     try:
         # Roots and Tropics require 1 Progressive Mountain
@@ -148,20 +149,33 @@ def apply_rules(world: "PeakWorld"):
                             state.has("Kiln Access", player) and
                             state.has("Progressive Ascent", player, asc))
             elif ascent_num in [3, 4, 5]:
-                # Ascents 3-5 require Progressive Ascent + 3 stamina bars
-                set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
-                        lambda state, asc=ascent_num: 
-                            state.has("Kiln Access", player) and
-                            state.has("Progressive Ascent", player, asc) and
-                            state.has("Progressive Stamina Bar", player, 3))
+                # Ascents 3-5 require Progressive Ascent + optionally 3 stamina bars
+                if progressive_stamina_enabled:
+                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                            lambda state, asc=ascent_num: 
+                                state.has("Kiln Access", player) and
+                                state.has("Progressive Ascent", player, asc) and
+                                state.has("Progressive Stamina Bar", player, 3))
+                else:
+                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                            lambda state, asc=ascent_num: 
+                                state.has("Kiln Access", player) and
+                                state.has("Progressive Ascent", player, asc))
             elif ascent_num in [6, 7]:
-                # Ascents 6-7 require Progressive Ascent + 3 stamina + 4 endurance
-                set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
-                        lambda state, asc=ascent_num: 
-                            state.has("Kiln Access", player) and
-                            state.has("Progressive Ascent", player, asc) and
-                            state.has("Progressive Stamina Bar", player, 3) and
-                            state.has("Progressive Endurance", player, 4))
+                # Ascents 6-7 require Progressive Ascent + optionally 3 stamina + 4 endurance
+                if progressive_stamina_enabled:
+                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                            lambda state, asc=ascent_num: 
+                                state.has("Kiln Access", player) and
+                                state.has("Progressive Ascent", player, asc) and
+                                state.has("Progressive Stamina Bar", player, 3) and
+                                state.has("Progressive Endurance", player, 4))
+                else:
+                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                            lambda state, asc=ascent_num: 
+                                state.has("Kiln Access", player) and
+                                state.has("Progressive Ascent", player, asc) and
+                                state.has("Progressive Endurance", player, 4))
         except KeyError:
             pass
     

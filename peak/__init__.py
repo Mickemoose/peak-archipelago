@@ -96,7 +96,7 @@ class PeakWorld(World):
         total_locations = len(LOCATION_TABLE)
         
         # Add event locations
-        total_locations += 15  # 7 Ascent Completed + Mesa/Roots/Alpine/Tropics/Caldera/Kiln Access + Idol Dunked + All Badges Collected
+        #total_locations += 15  # 7 Ascent Completed + Mesa/Roots/Alpine/Tropics/Caldera/Kiln Access + Idol Dunked + All Badges Collected
         
         # Subtract excluded ascent locations if goal is Reach Peak
         if goal_type == 0 or goal_type == 3: # Reach Peak goal or Peak and Badges goal
@@ -201,6 +201,7 @@ class PeakWorld(World):
         trap_weights += (["Pixel Trap"] * self.options.pixel_trap_weight.value)
         trap_weights += (["Eruption Trap"] * self.options.eruption_trap_weight.value)
         trap_weights += (["Beetle Horde Trap"] * self.options.beetle_horde_trap_weight.value)
+        trap_weights += (["Custom Trivia Trap"] * self.options.custom_trivia_trap_weight.value)
         
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -262,6 +263,7 @@ class PeakWorld(World):
         trap_data["pixel_trap"] = self.options.pixel_trap_weight.value
         trap_data["eruption_trap"] = self.options.eruption_trap_weight.value
         trap_data["beetle_horde_trap"] = self.options.beetle_horde_trap_weight.value
+        trap_data["custom_trivia_trap"] = self.options.custom_trivia_trap_weight.value
 
         return trap_data
 
@@ -294,8 +296,6 @@ class PeakWorld(World):
                 location.name not in ALPINE_LOCATIONS and
                 location.name not in CALDERA_LOCATIONS and
                 location.name not in KILN_LOCATIONS and
-                "berry" not in location.name.lower() and
-                "conch" not in location.name.lower() and
                 "(Ascent" not in location.name):
                 shore_accessible_locations.append(location)
         

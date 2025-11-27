@@ -76,6 +76,7 @@ namespace Peak.AP
                 { "Pixel Trap", "144p Trap"},
                 { "Eruption Trap", "Light Up Path Trap"},
                 { "Beetle Horde Trap", "Buyon Trap" },
+                { "Trivia Trap", "Custom Trivia Trap" },
             };
 
             // Standardized/External trap name -> PEAK internal name (for RECEIVING)
@@ -137,7 +138,7 @@ namespace Peak.AP
                 { "Zoom Trap", "Zoom Trap"},
                 { "Screen Flip Trap", "Screen Flip Trap"},
                 { "Empty Item Box Trap", "Drop Everything Trap"},
-                { "Trivia Trap", "Pokemon Trivia Trap" },
+                { "Trivia Trap", "Custom Trivia Trap" },
                 { "144p Trap", "Pixel Trap"},
                 { "Pixellation Trap", "Pixel Trap"},
                 { "Pixelate Trap", "Pixel Trap"},

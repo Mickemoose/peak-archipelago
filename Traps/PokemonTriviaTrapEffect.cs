@@ -17,6 +17,9 @@ namespace Peak.AP
         private static ManualLogSource _log;
         private static PeakArchipelagoPlugin _plugin;
         private static bool _isActive = false;
+
+        private const float TIMEOUT_DURATION = 20f;
+
         public enum Pokemon
         {
             totodile,
@@ -61,10 +64,10 @@ namespace Peak.AP
             corsola,
             entei,
 
+            // hehe these arent pokemon dont choose them or u get cursed :O
             terriermon,
             wizardmon,
             cheat,
-
         }
 
         private static Dictionary<Pokemon, CharacterAfflictions.STATUSTYPE> _pokemonAfflictions = new()
@@ -111,7 +114,7 @@ namespace Peak.AP
             { Pokemon.corsola, CharacterAfflictions.STATUSTYPE.Cold },
             { Pokemon.entei, CharacterAfflictions.STATUSTYPE.Hot },
 
-            //hehe these arent pokemon dont choose them or u get cursed :O
+            // Curse for fake pokemon
             { Pokemon.terriermon, CharacterAfflictions.STATUSTYPE.Curse },
             { Pokemon.wizardmon, CharacterAfflictions.STATUSTYPE.Curse },
             { Pokemon.cheat, CharacterAfflictions.STATUSTYPE.Curse },
@@ -153,8 +156,7 @@ namespace Peak.AP
                 if (_isActive)
                 {
                     log.LogInfo("[PeakPelago] Pokemon Trivia already active, queueing for later");
-
-                    _plugin.StartCoroutine(QueueTriviaForLater(log));
+                    _plugin.StartCoroutine(TriviaUIHelper.QueueTriviaForLater(log, () => _isActive, () => ApplyPokemonTriviaTrap(log)));
                     return;
                 }
 
@@ -181,60 +183,18 @@ namespace Peak.AP
                 log.LogError($"[PeakPelago] Error applying Pokemon Trivia trap: {ex.Message}");
             }
         }
-        
-        private static IEnumerator QueueTriviaForLater(ManualLogSource log)
-        {
-            while (_isActive)
-            {
-                yield return new WaitForSeconds(3f);
-            }
-            
-            yield return new WaitForSeconds(2f);
-            
-            log.LogInfo("[PeakPelago] Starting queued Pokemon Trivia trap");
-            ApplyPokemonTriviaTrap(log);
-        }
 
         private static IEnumerator PokemonTriviaCoroutine(ManualLogSource log)
         {
-            //a bunch of stuff happens here, UI setup, input handling, etc. it should be cleaned up later and commented better
             _isActive = true;
             var question = GetRandomQuestion();
             InputSpriteData inputSpriteData = SingletonAsset<InputSpriteData>.Instance;
-            var triviaUI = new GameObject("PokemonTriviaUI");
-            var canvas = triviaUI.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 10000;
-            var canvasScaler = triviaUI.AddComponent<CanvasScaler>();
-            canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            canvasScaler.referenceResolution = new Vector2(1920, 1080);
-            triviaUI.AddComponent<GraphicRaycaster>();
-            var questionBanner = new GameObject("QuestionBanner");
-            questionBanner.transform.SetParent(triviaUI.transform);
-            var bannerRect = questionBanner.AddComponent<RectTransform>();
-            bannerRect.anchorMin = new Vector2(0.1f, 0.75f);
-            bannerRect.anchorMax = new Vector2(0.9f, 0.95f);
-            bannerRect.offsetMin = Vector2.zero;
-            bannerRect.offsetMax = Vector2.zero;
 
-            var questionTextObj = new GameObject("QuestionText");
-            questionTextObj.transform.SetParent(questionBanner.transform);
-            var questionRect = questionTextObj.AddComponent<RectTransform>();
-            questionRect.anchorMin = new Vector2(0.05f, 0.05f);
-            questionRect.anchorMax = new Vector2(0.95f, 0.95f);
-            questionRect.offsetMin = Vector2.zero;
-            questionRect.offsetMax = Vector2.zero;
-            var questionText = questionTextObj.AddComponent<Text>();
-            Font customFont = LoadCustomFont();
-            questionText.font = customFont ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
-            questionText.fontSize = 48;
-            questionText.color = Color.white;
-            questionText.alignment = TextAnchor.MiddleCenter;
-            questionText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            questionText.fontStyle = FontStyle.Bold;
-            var textOutline = questionTextObj.AddComponent<Outline>();
-            textOutline.effectColor = Color.black;
-            textOutline.effectDistance = new Vector2(3, 3);
+            var (triviaUI, questionText) = TriviaUIHelper.CreateTriviaUI();
+
+            Text countdownTimer = TriviaUIHelper.CreateCountdownTimer(triviaUI.transform);
+            countdownTimer.transform.parent.gameObject.SetActive(false);
+
             var answerPositions = new[]
             {
                 new Vector2(0.5f, 0.60f),
@@ -242,10 +202,9 @@ namespace Peak.AP
                 new Vector2(0.75f, 0.38f),
                 new Vector2(0.5f, 0.20f)
             };
+
             var answerObjects = new List<GameObject>();
             var pokemonImages = new List<Image>();
-            // i forget what this was gonna be for but lets not delete it yet mightve been when i was experimenting with the first version of this trap
-            var inputActions = new[] { "Move Up", "Move Left", "Move Right", "Move Down" };
 
             for (int i = 0; i < 4; i++)
             {
@@ -272,154 +231,71 @@ namespace Peak.AP
                     );
                 }
 
-                var glyphObj = new GameObject($"InputGlyph{i}");
-                glyphObj.transform.SetParent(pokemonObj.transform);
-                var glyphRect = glyphObj.AddComponent<RectTransform>();
-                glyphRect.anchorMin = new Vector2(0f, 1f);
-                glyphRect.anchorMax = new Vector2(0f, 1f);
-                glyphRect.pivot = new Vector2(0f, 1f);
-                glyphRect.anchoredPosition = new Vector2(10, -10);
-                glyphRect.sizeDelta = new Vector2(80, 80);
-
-                var glyphImage = glyphObj.AddComponent<Image>();
-                glyphImage.preserveAspect = true;
-                glyphImage.color = Color.white;
-
-                Sprite glyphSprite = GetInputGlyphSprite(i, inputSpriteData);
-                if (glyphSprite != null)
-                {
-                    glyphImage.sprite = glyphSprite;
-                }
+                TriviaUIHelper.AddInputGlyph(pokemonObj.transform, i, inputSpriteData);
 
                 pokemonObj.SetActive(false);
                 pokemonImages.Add(pokemonImage);
                 answerObjects.Add(pokemonObj);
             }
-            questionText.text = "GET READY!";
-            questionText.fontSize = 72;
-            for (int countdown = 3; countdown > 0; countdown--)
-            {
-                yield return new WaitForSeconds(1f);
-            }
 
+            yield return TriviaUIHelper.DoCountdown(questionText);
+
+            // Show question and answers
             questionText.text = question.Question;
             questionText.fontSize = 48;
             foreach (var pokemonObj in answerObjects)
             {
                 pokemonObj.SetActive(true);
             }
-            int selectedAnswer = -1;
-            float timeoutDuration = 10f;
-            float elapsed = 0f;
-            var inputKeys = new[] { KeyCode.W, KeyCode.A, KeyCode.D, KeyCode.S };
-            var altInputKeys = new[] { KeyCode.UpArrow, KeyCode.LeftArrow, KeyCode.RightArrow, KeyCode.DownArrow };
-            var answerIndices = new[] { 0, 1, 2, 3 };
-            while (selectedAnswer == -1 && elapsed < timeoutDuration)
-            {
-                elapsed += Time.deltaTime;
-                // Check keyboard input
-                for (int i = 0; i < 4; i++)
-                {
-                    if (Input.GetKeyDown(inputKeys[i]) || Input.GetKeyDown(altInputKeys[i]))
-                    {
-                        selectedAnswer = answerIndices[i];
-                        break;
-                    }
-                }
-                // Check joystick input
-                if (selectedAnswer == -1)
-                {
-                    float horizontal = Input.GetAxis("Horizontal");
-                    float vertical = Input.GetAxis("Vertical");
 
-                    if (Mathf.Abs(horizontal) > 0.7f || Mathf.Abs(vertical) > 0.7f)
-                    {
-                        if (vertical > 0.7f) selectedAnswer = 0;
-                        else if (horizontal < -0.7f) selectedAnswer = 1;
-                        else if (horizontal > 0.7f) selectedAnswer = 2;
-                        else if (vertical < -0.7f) selectedAnswer = 3;
+            // Show countdown timer
+            countdownTimer.transform.parent.gameObject.SetActive(true);
 
-                        if (selectedAnswer != -1)
-                        {
-                            yield return new WaitForSeconds(0.3f);
-                            break;
-                        }
-                    }
-                }
+            // Wait for input
+            var inputCoroutine = TriviaUIHelper.WaitForInput(TIMEOUT_DURATION, countdownTimer);
+            yield return inputCoroutine;
+            int selectedAnswer = (int)inputCoroutine.Current;
 
-                yield return null;
-            }
-            bool correct = false;
+            // Hide countdown timer
+            countdownTimer.transform.parent.gameObject.SetActive(false);
+
+            // Default to first answer if no input
             if (selectedAnswer == -1)
             {
                 selectedAnswer = 0;
             }
-            else
-            {
-                correct = question.Options[selectedAnswer] == question.CorrectMon;
-            }
+
+            // Check if answer is correct
+            bool correct = question.CorrectMons.Contains(question.Options[selectedAnswer]);
+
             if (correct)
             {
-                var connectionLog = UnityEngine.Object.FindFirstObjectByType<PlayerConnectionLog>();
-                if (connectionLog != null && connectionLog.sfxJoin != null)
-                {
-                    connectionLog.sfxJoin.Play();
-                }
+                TriviaUIHelper.PlayCorrectSound();
 
                 Texture2D correctTex = LoadOverlayTexture("correct.png");
                 if (correctTex != null)
                 {
-                    var overlayObj = new GameObject("CorrectOverlay");
-                    overlayObj.transform.SetParent(answerObjects[selectedAnswer].transform);
-                    var overlayRect = overlayObj.AddComponent<RectTransform>();
-                    overlayRect.anchorMin = Vector2.zero;
-                    overlayRect.anchorMax = Vector2.one;
-                    overlayRect.offsetMin = Vector2.zero;
-                    overlayRect.offsetMax = Vector2.zero;
-
-                    var overlayImage = overlayObj.AddComponent<Image>();
-                    overlayImage.sprite = Sprite.Create(
-                        correctTex,
-                        new Rect(0, 0, correctTex.width, correctTex.height),
-                        new Vector2(0.5f, 0.5f)
-                    );
-                    overlayImage.preserveAspect = true;
+                    AddOverlay(answerObjects[selectedAnswer], correctTex);
                 }
                 questionText.text = "CORRECT!";
                 questionText.color = Color.green;
             }
             else
             {
-                var connectionLog = UnityEngine.Object.FindFirstObjectByType<PlayerConnectionLog>();
-                if (connectionLog != null && connectionLog.sfxLeave != null)
-                {
-                    connectionLog.sfxLeave.Play();
-                }
+                TriviaUIHelper.PlayWrongSound();
+
                 Texture2D wrongTex = LoadOverlayTexture("wrong.png");
                 if (wrongTex != null)
                 {
-                    var overlayObj = new GameObject("WrongOverlay");
-                    overlayObj.transform.SetParent(answerObjects[selectedAnswer].transform);
-                    var overlayRect = overlayObj.AddComponent<RectTransform>();
-                    overlayRect.anchorMin = Vector2.zero;
-                    overlayRect.anchorMax = Vector2.one;
-                    overlayRect.offsetMin = Vector2.zero;
-                    overlayRect.offsetMax = Vector2.zero;
-
-                    var overlayImage = overlayObj.AddComponent<Image>();
-                    overlayImage.sprite = Sprite.Create(
-                        wrongTex,
-                        new Rect(0, 0, wrongTex.width, wrongTex.height),
-                        new Vector2(0.5f, 0.5f)
-                    );
-                    overlayImage.preserveAspect = true;
+                    AddOverlay(answerObjects[selectedAnswer], wrongTex);
                 }
                 questionText.text = "TOO BAD!";
                 questionText.color = Color.red;
+
+                // Apply affliction based on selected Pokemon
                 Pokemon selectedPokemon = question.Options[selectedAnswer];
-                if (_pokemonAfflictions.ContainsKey(selectedPokemon))
+                if (_pokemonAfflictions.TryGetValue(selectedPokemon, out var statusType))
                 {
-                    var statusType = _pokemonAfflictions[selectedPokemon];
                     StatusOverTimeTrapEffect.ApplyStatusOverTime(
                         log,
                         StatusOverTimeTrapEffect.TargetMode.LocalPlayer,
@@ -430,135 +306,32 @@ namespace Peak.AP
                     );
                 }
             }
+
             yield return new WaitForSeconds(3f);
             UnityEngine.Object.Destroy(triviaUI);
             _isActive = false;
             log.LogInfo("[PeakPelago] Pokemon Trivia trap completed");
         }
-        
-        /// <summary>
-        /// this is SUPPOSED to get the right input glyph sprite based on controller type and settings but i have not tested it at all with controllers
-        /// </summary>
-        /// <param name="answerIndex"></param>
-        /// <param name="inputSpriteData"></param>
-        /// <returns></returns>
-        private static Sprite GetInputGlyphSprite(int answerIndex, InputSpriteData inputSpriteData)
+
+        private static void AddOverlay(GameObject parent, Texture2D texture)
         {
-            if (inputSpriteData == null) return null;
-            
-            try
-            {
-                // Check if using gamepad - simplified approach
-                bool usingGamepad = UnityEngine.Input.GetJoystickNames().Length > 0 && 
-                                !string.IsNullOrEmpty(UnityEngine.Input.GetJoystickNames()[0]);
-                
-                TMP_SpriteAsset spriteAsset = null;
-                int spriteIndex = 0;
-                
-                if (usingGamepad)
-                {
-                    // Check controller icon setting to determine which sprite set to use
-                    var iconSetting = SettingsHandler.Instance?.GetSetting<ControllerIconSetting>();
-                    if (iconSetting != null)
-                    {
-                        switch (iconSetting.Value)
-                        {
-                            case ControllerIconSetting.IconMode.Style1:
-                                spriteAsset = inputSpriteData.xboxSprites;
-                                break;
-                            case ControllerIconSetting.IconMode.Style2:
-                                spriteAsset = inputSpriteData.ps5Sprites;
-                                break;
-                            case ControllerIconSetting.IconMode.KBM:
-                                usingGamepad = false; // Force keyboard mode
-                                break;
-                            case ControllerIconSetting.IconMode.Auto:
-                            default:
-                                spriteAsset = inputSpriteData.xboxSprites; // Default to Xbox
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        spriteAsset = inputSpriteData.xboxSprites;
-                    }
-                    
-                    if (usingGamepad)
-                    {
-                        spriteIndex = answerIndex switch
-                        {
-                            0 => 12, // up
-                            1 => 14, // left
-                            2 => 15, // right
-                            3 => 13, // down
-                            _ => 12
-                        };
-                    }
-                }
-                
-                if (!usingGamepad)
-                {
-                    spriteAsset = inputSpriteData.keyboardSprites;
-                    
-                    spriteIndex = answerIndex switch
-                    {
-                        0 => 32, // w
-                        1 => 10, // a
-                        2 => 13, // d
-                        3 => 28, // s
-                        _ => 32
-                    };
-                }
-                
-                if (spriteAsset != null && spriteIndex < spriteAsset.spriteGlyphTable.Count)
-                {
-                    var spriteGlyph = spriteAsset.spriteGlyphTable[spriteIndex];
-                    var glyphRect = spriteGlyph.glyphRect;
-                    
-                    // Convert GlyphRect to Rect
-                    return Sprite.Create(
-                        spriteAsset.spriteSheet as Texture2D,
-                        new Rect(glyphRect.x, glyphRect.y, glyphRect.width, glyphRect.height),
-                        new Vector2(0.5f, 0.5f)
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                _log?.LogWarning($"[PeakPelago] Failed to load input glyph: {ex.Message}");
-            }
-            
-            return null;
+            var overlayObj = new GameObject("Overlay");
+            overlayObj.transform.SetParent(parent.transform);
+            var overlayRect = overlayObj.AddComponent<RectTransform>();
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.offsetMin = Vector2.zero;
+            overlayRect.offsetMax = Vector2.zero;
+
+            var overlayImage = overlayObj.AddComponent<Image>();
+            overlayImage.sprite = Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f)
+            );
+            overlayImage.preserveAspect = true;
         }
 
-        // I should probably check out the code for SoFly since they use the font properly and i dont lmao
-        private static Font LoadCustomFont()
-        {
-            try
-            {
-                Font[] loadedFonts = Resources.FindObjectsOfTypeAll<Font>();
-                foreach (Font font in loadedFonts)
-                {
-                    if (font.name.Contains("Daruma") || font.name.Contains("DarumaDropOne"))
-                    {
-                        return font;
-                    }
-                }
-                foreach (Font font in loadedFonts)
-                {
-                    if (!font.name.Contains("Arial") && !font.name.Contains("Legacy"))
-                    {
-                        return font;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning($"[PeakPelago] Could not find PEAK font: {ex.Message}");
-            }
-            
-            return null;
-        }
         private static Texture2D LoadPokemonTexture(Pokemon pokemon)
         {
             try
@@ -572,6 +345,7 @@ namespace Peak.AP
             }
             return null;
         }
+
         private static Texture2D LoadOverlayTexture(string filename)
         {
             try
@@ -585,12 +359,13 @@ namespace Peak.AP
             }
             return null;
         }
+
         private static Texture2D LoadEmbeddedTexture(string resourceName)
         {
             try
             {
                 var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-                
+
                 using (var stream = assembly.GetManifestResourceStream(resourceName))
                 {
                     if (stream == null)
@@ -612,24 +387,38 @@ namespace Peak.AP
                 return null;
             }
         }
+
         private static PokemonTriviaQuestion GetRandomQuestion()
         {
             var random = new System.Random();
             return PokemonTriviaQuestions[random.Next(PokemonTriviaQuestions.Count)];
         }
+
         private class PokemonTriviaQuestion
         {
             public string Question { get; set; }
-            public Pokemon CorrectMon { get; set; }
+            public Pokemon[] CorrectMons { get; set; }
             public Pokemon[] Options { get; set; }
-
             public PokemonTriviaQuestion(string question, Pokemon correctMon)
+                : this(question, [correctMon])
+            {
+            }
+            public PokemonTriviaQuestion(string question, Pokemon[] correctMons)
             {
                 Question = question;
-                CorrectMon = correctMon;
+                CorrectMons = correctMons;
+
                 var allPokemon = Enum.GetValues(typeof(Pokemon)).Cast<Pokemon>().ToList();
-                var wrongPokemon = allPokemon.Where(p => p != correctMon).OrderBy(_ => Guid.NewGuid()).Take(3).ToList();
-                var options = new List<Pokemon> { correctMon };
+
+                // Remove ALL correct answers from the wrong answer pool
+                var wrongPokemon = allPokemon
+                    .Where(p => !correctMons.Contains(p))
+                    .OrderBy(_ => Guid.NewGuid())
+                    .Take(3) // 3 wrong answers
+                    .ToList();
+
+                var displayedCorrect = correctMons.OrderBy(_ => Guid.NewGuid()).First();
+                var options = new List<Pokemon> { displayedCorrect };
                 options.AddRange(wrongPokemon);
                 Options = options.OrderBy(_ => Guid.NewGuid()).ToArray();
             }
@@ -638,16 +427,15 @@ namespace Peak.AP
         private static readonly List<PokemonTriviaQuestion> PokemonTriviaQuestions = new List<PokemonTriviaQuestion>
         {
             new PokemonTriviaQuestion("Which Pokemon is the water starter of Johto?", Pokemon.totodile),
-            new PokemonTriviaQuestion("Which Pokemon is the evolve form of Cyndaquill?", Pokemon.quilava),
+            new PokemonTriviaQuestion("Which Pokemon is the evolved form of Cyndaquil?", Pokemon.quilava),
             new PokemonTriviaQuestion("Which Pokemon can be found in the Ruins Of Alph?", Pokemon.unown),
             new PokemonTriviaQuestion("Which Pokemon eventually evolves into Raichu?", Pokemon.pichu),
             new PokemonTriviaQuestion("Which Pokemon evolves into Feraligatr?", Pokemon.totodile),
             new PokemonTriviaQuestion("Which Pokemon evolves from Cyndaquil?", Pokemon.quilava),
             new PokemonTriviaQuestion("Which Pokemon has many forms based on letters?", Pokemon.unown),
-            new PokemonTriviaQuestion("Which Pokemon eventually evolves into Raichu?", Pokemon.pichu),
             new PokemonTriviaQuestion("Which Pokemon is known as the Guardian of the Skies?", Pokemon.lugia),
             new PokemonTriviaQuestion("Which Pokemon knows the move Sacred Fire?", Pokemon.hooh),
-            new PokemonTriviaQuestion("Which of these Pokemon evolve with King's Rock?", Pokemon.slowking),
+            new PokemonTriviaQuestion("Which of these Pokemon evolve with King's Rock?", [Pokemon.slowking, Pokemon.politoed]),
             new PokemonTriviaQuestion("Which Pokemon is the main pokemon of the 4th Movie?", Pokemon.celebi),
             new PokemonTriviaQuestion("Which of these Pokemon can be encountered in the Goldenrod City Gym?", Pokemon.miltank),
             new PokemonTriviaQuestion("Which Pokemon is obtainable from Mr. Pokemon?", Pokemon.togepi),
@@ -656,7 +444,7 @@ namespace Peak.AP
             new PokemonTriviaQuestion("Which Pokemon appears at the top of Tin Tower?", Pokemon.hooh),
             new PokemonTriviaQuestion("Which Pokemon resides in the Whirl Islands?", Pokemon.lugia),
             new PokemonTriviaQuestion("Which Pokemon is the time travel Pokemon?", Pokemon.celebi),
-            new PokemonTriviaQuestion("Which Pokemon can only be found at night?", Pokemon.hoothoot),
+            new PokemonTriviaQuestion("Which Pokemon can only be found at night?", [Pokemon.hoothoot, Pokemon.misdreavus]),
             new PokemonTriviaQuestion("Which Pokemon is evolved into while holding Metal Coat on Scyther?", Pokemon.scizor),
             new PokemonTriviaQuestion("Which Pokemon evolves from Eevee with high friendship at night?", Pokemon.umbreon),
             new PokemonTriviaQuestion("Which Pokemon evolves from Eevee with high friendship during day?", Pokemon.espeon),
@@ -674,10 +462,8 @@ namespace Peak.AP
             new PokemonTriviaQuestion("Which Pokemon is known for its round, blue body and tail?", Pokemon.marill),
             new PokemonTriviaQuestion("Which Psychic/Flying type Pokemon is known for its small size and big eyes?", Pokemon.natu),
             new PokemonTriviaQuestion("Which of these Pokemon has a regional form that evolves into Clodsire?", Pokemon.wooper),
-            new PokemonTriviaQuestion("Which of these evolves from Poliwhirl?", Pokemon.politoed),
+            new PokemonTriviaQuestion("Which of these evolves from Poliwhirl?", [Pokemon.slowking, Pokemon.politoed]),
             new PokemonTriviaQuestion("Which Pokemon is caught on Mount Silver?", Pokemon.larvitar),
-
-
         };
     }
 }

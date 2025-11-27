@@ -117,7 +117,6 @@ LOCATION_TABLE: Dict[str, int] = {
     "Resourcefulness Badge": 76404,
     "Ultimate Badge": 76405,
     "Participation Badge": 76406,
-    "High Altitude Badge": 76407,
         
     # Acquire Item Locations
     "Acquire Rope Spool": 76200,

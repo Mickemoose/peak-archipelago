@@ -26,10 +26,20 @@ namespace PeakArchipelago
                 var multiplayerItems = new Dictionary<ushort, int>
                 {
                     { 70, 15 },  // Blowgun (HealingDart Variant)
-                    { 25, 10 },  // Cursed Skull
-                    { 67, 15 },  // Scout Effigy
-                    { 16, 10 },  // Bugle of Friendship (Bugle_Magic)
                 };
+
+                var multiplayerSpecialItems = new Dictionary<ushort, int>
+                {
+                    { 25, 11 },  // Cursed Skull
+                    { 67, 11 },  // Scout Effigy
+                    { 16, 11 },  // Bugle of Friendship (Bugle_Magic)
+                };
+
+                SpawnPool[] specialPools =
+                [
+                    SpawnPool.RespawnCoffin,
+                    SpawnPool.LuggageCursed,
+                ];
 
                 // All luggage spawn pools
                 SpawnPool[] luggagePools =
@@ -42,6 +52,24 @@ namespace PeakArchipelago
                     SpawnPool.LuggageRoots,
                     SpawnPool.LuggageClimber,
                 ];
+
+                foreach (var item in multiplayerSpecialItems)
+                {
+                    ushort itemId = item.Key;
+                    int weight = item.Value;
+
+                    foreach (SpawnPool pool in specialPools)
+                    {
+                        if (LootData.AllSpawnWeightData.ContainsKey(pool))
+                        {
+                            if (!LootData.AllSpawnWeightData[pool].ContainsKey(itemId) || 
+                                LootData.AllSpawnWeightData[pool][itemId] == 0)
+                            {
+                                LootData.AllSpawnWeightData[pool][itemId] = weight;
+                            }
+                        }
+                    }
+                }
 
                 foreach (var item in multiplayerItems)
                 {
@@ -59,11 +87,7 @@ namespace PeakArchipelago
                             }
                         }
                     }
-
-                    _log?.LogInfo($"[PeakPelago] Added multiplayer item ID {itemId} to loot pools with weight {weight}");
                 }
-
-                _log?.LogInfo("[PeakPelago] Multiplayer loot table modifications complete");
             }
             catch (Exception ex)
             {

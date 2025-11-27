@@ -116,7 +116,7 @@ namespace Peak.AP
                     }
                     yPos += rowHeight;
 
-                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.lockState = CursorLockMode.Confined;
                     Cursor.visible = true;
 
                     int fieldWidth = rectWidth - labelWidth;

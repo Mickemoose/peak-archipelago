@@ -14,6 +14,36 @@ class PeakItem(Item):
     def __init__(self, name: str, classification: ItemClassification, code: int = None, player: int = None):
         super(PeakItem, self).__init__(name, classification, code, player)
 
+class PeakLttPText(typing.NamedTuple):
+    pedestal: typing.Optional[str]
+    sickkid: typing.Optional[str]
+    magicshop: typing.Optional[str]
+    zora: typing.Optional[str]
+    fluteboy: typing.Optional[str]
+
+LttPCreditsText = {
+    "Progressive Ascent": PeakLttPText("Another difficult climb",
+                                "Hope its not too STEEP",
+                                "Climb higher for 9999.99",
+                                "I need to go UP",
+                                "What dangers await?"),
+    "Progressive Endurance": PeakLttPText("Endurance increased",
+                                  "You look more STAMINAous",
+                                  "Stamina upgraded for 9999.99",
+                                  "You seem more ENDURANT",
+                                  "Increased stamina capacity!"),
+    "Progressive Mountain": PeakLttPText("A new mountain appears",
+                                 "Another PEAK to conquer",
+                                 "New mountain unlocked for 9999.99",
+                                 "A new MOUNTAIN has formed",
+                                 "New mountain unlocked!"),
+    "Progressive Stamina Bar": PeakLttPText("Stamina bar increased",
+                                        "Your stamina looks BIGGER",
+                                        "That's a lot of bars!",
+                                        "You ready for a marathon?",
+                                        "Wow you must be really fit now!"),
+}
+
 
 progression_table = {
     "Progressive Ascent": ItemData(76019, ItemClassification.progression),
@@ -167,6 +197,7 @@ trap_table = {
     "Pixel Trap":                 ItemData(77103, ItemClassification.trap),
     "Eruption Trap":              ItemData(77104, ItemClassification.trap),
     "Beetle Horde Trap":          ItemData(77105, ItemClassification.trap),
+    "Custom Trivia Trap":         ItemData(77120, ItemClassification.trap),
 }
 
 item_table = {
@@ -186,3 +217,14 @@ item_groups: typing.Dict[str, typing.List[str]] = {
     "Filler":           list(filler_table.keys()),
     "Traps":            list(trap_table.keys()),
 }
+
+try:
+    from worlds.alttp import ALTTPWorld
+    ALTTPWorld.pedestal_credit_texts.update({item_table[name]: f"and the {texts.pedestal}"
+                                             for name, texts in LttPCreditsText.items()})
+    ALTTPWorld.sickkid_credit_texts.update({item_table[name]: texts.sickkid for name, texts in LttPCreditsText.items()})
+    ALTTPWorld.magicshop_credit_texts.update({item_table[name]: texts.magicshop for name, texts in LttPCreditsText.items()})
+    ALTTPWorld.zora_credit_texts.update({item_table[name]: texts.zora for name, texts in LttPCreditsText.items()})
+    ALTTPWorld.fluteboy_credit_texts.update({item_table[name]: texts.fluteboy for name, texts in LttPCreditsText.items()})
+except ModuleNotFoundError:
+    pass

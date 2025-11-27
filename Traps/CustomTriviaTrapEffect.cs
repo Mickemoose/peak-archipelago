@@ -427,6 +427,14 @@ namespace Peak.AP
             new("Which planet is known as the Red Planet?", "Mars", ["Venus", "Mars", "Jupiter", "Saturn"]),
             new("What is 2 + 2?", "4", ["3", "4", "5", "22"]),
             new("Who wrote 'Hamlet'?", "William Shakespeare", ["Charles Dickens", "Mark Twain", "William Shakespeare", "Jane Austen"]),
+            new("What is the largest ocean on Earth?", "Pacific Ocean", ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean", "Pacific Ocean"]),
+            new("What is the chemical symbol for water?", "H2O", ["CO2", "O2", "H2O", "NaCl"]),
+            new("Who painted the Mona Lisa?", "Leonardo da Vinci", ["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Claude Monet"]),
+            new("What is the hardest natural substance on Earth?", "Diamond", ["Gold", "Iron", "Diamond", "Silver"]),
+            new("Which country is known as the Land of the Rising Sun?", "Japan", ["China", "Japan", "Thailand", "South Korea"]),
+            new("What is the smallest prime number?", "2", ["1", "2", "3", "5"]),
+            new("In which year did the Titanic sink?", "1912", ["1905", "1912", "1918", "1923"]),
+            new("What is the main ingredient in guacamole?", "Avocado", ["Tomato", "Onion", "Avocado", "Pepper"]),
         ];
 
     }

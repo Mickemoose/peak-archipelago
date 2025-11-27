@@ -38,6 +38,7 @@ namespace Peak.AP
         private ConfigEntry<string> cfgPassword;
         private ConfigEntry<string> cfgCustomTriviaFolder;
         private ConfigEntry<bool> cfgIncludeStandardTrivia;
+        private ConfigEntry<bool> cfgDeathLinkEnabled;
 
         // ===== Session =====
         private ArchipelagoSession _session;
@@ -150,6 +151,7 @@ namespace Peak.AP
                 cfgPassword = Config.Bind("Connection", "Password", "", "Room password (optional)");
                 cfgCustomTriviaFolder = Config.Bind("Custom Trivia", "CustomTriviaFolder", "plugins/PeakArchipelago-PEAKPELAGO/CustomTrivia", "Folder path for custom trivia questions (relative to BepInEx folder)");
                 cfgIncludeStandardTrivia = Config.Bind("Custom Trivia", "IncludeStandardTrivia", true, "Whether to include the standard trivia questions along with custom ones");
+                cfgDeathLinkEnabled = Config.Bind("Archipelago Links", "DeathLinkEnabled", true, "Enable DeathLink (if slot has it enabled)");
                 _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
@@ -675,7 +677,7 @@ namespace Peak.AP
         /// <summary>Handle incoming death link from Archipelago</summary>
         private void HandleDeathLinkReceived(string cause, string source)
         {
-            if (_deathLinkService == null || !_deathLinkEnabled)
+            if (_deathLinkService == null || !_deathLinkEnabled || !cfgDeathLinkEnabled.Value)
             {
                 _log.LogDebug("[PeakPelago] Death link received but disabled");
                 return;
@@ -1799,24 +1801,25 @@ namespace Peak.AP
                 { "Destroy Held Item", () => DestroyHeldItem() },
                 { "Blue Berrynana Peel", () => SpawnPhysicalItem("Berrynana Peel Blue Variant") },
                 { "Banana Peel Trap", () => SpawnPhysicalItem("Berrynana Peel Yellow") },
-                { "Minor Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.25f, CharacterAfflictions.STATUSTYPE.Poison) },
-                { "Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.53f, CharacterAfflictions.STATUSTYPE.Poison) },
-                { "Deadly Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.95f, CharacterAfflictions.STATUSTYPE.Poison) },
+                { "Minor Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.25f, STATUSTYPE.Poison) },
+                { "Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.53f, STATUSTYPE.Poison) },
+                { "Deadly Poison Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.95f, STATUSTYPE.Poison) },
                 { "Tornado Trap", () => TornadoTrapEffect.SpawnTornadoOnPlayer(_log) },
-                { "Pokemon Trivia Trap", () => CustomTriviaTrapEffect.ApplyCustomTriviaTrap(_log)},//PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },
+                { "Pokemon Trivia Trap", () => PokemonTriviaTrapEffect.ApplyPokemonTriviaTrap(_log) },
+                { "Custom Trivia Trap", () => CustomTriviaTrapEffect.ApplyCustomTriviaTrap(_log) },
                 { "Drop Everything Trap", () => DropEverythingTrapEffect.ApplyDropEverythingTrap(_log) },
                 { "Swap Trap", () => SwapTrapEffect.ApplyPositionSwapTrap(_log) },
-                { "Nap Time Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Drowsy) },
+                { "Nap Time Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, STATUSTYPE.Drowsy) },
                 { "Hungry Hungry Camper Trap", () => HungryHungryCamperTrapEffect.ApplyHungerTrap(_log) },
                 { "Balloon Trap", () => BalloonTrapEffect.ApplyBalloonTrap(_log) },
                 { "Slip Trap", () => SlipTrapEffect.ApplySlipTrap(_log) },
                 { "Clear All Effects", () => ClearAllEffects() },
                 { "Speed Upgrade", () => ApplySpeedUpgrade() },
                 { "Cactus Ball Trap", () =>ItemToWhateverTrapEffect.ApplyItemToWhateverTrap(_log, "CactusBall") },
-                { "Freeze Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, CharacterAfflictions.STATUSTYPE.Cold) },
-                { "Cold Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Cold) },
-                { "Hot Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Hot) },
-                { "Injury Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, CharacterAfflictions.STATUSTYPE.Injury) },
+                { "Freeze Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 1.0f, STATUSTYPE.Cold) },
+                { "Cold Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, STATUSTYPE.Cold) },
+                { "Hot Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, STATUSTYPE.Hot) },
+                { "Injury Trap", () => AfflictionTrapEffect.ApplyAfflictionTrap(_log, AfflictionTrapEffect.TargetMode.RandomPlayer, 0.5f, STATUSTYPE.Injury) },
                 { "Bounce Fungus", () => SpawnPhysicalItem("BounceShroom") },
                 { "Cloud Fungus", () => SpawnPhysicalItem("CloudFungus") },
                 { "Instant Death Trap", () => InstantDeathTrapEffect.ApplyInstantDeathTrap(_log) },
@@ -1833,7 +1836,7 @@ namespace Peak.AP
                 { "Blackout Trap", () => BlackoutTrapEffect.ApplyBlackoutTrap(_log) },
                 { "Eruption Trap", () => EruptionTrapEffect.ApplyEruptionTrap(_log) },
                 { "Fungal Infection Trap", () => StatusOverTimeTrapEffect.ApplyStatusOverTime(_log, StatusOverTimeTrapEffect.TargetMode.RandomPlayer,
-                CharacterAfflictions.STATUSTYPE.Spores,
+                STATUSTYPE.Spores,
                 amountPerTick: 0.1f,
                 tickInterval: 1.0f,
                 duration: 5.0f
@@ -3392,7 +3395,7 @@ namespace Peak.AP
                     if (_instance._deathLinkService == null) return;
                     
                     // Check if Death Link is enabled
-                    if (!_instance._deathLinkEnabled)
+                    if (!_instance._deathLinkEnabled || !_instance.cfgDeathLinkEnabled.Value)
                     {
                         _instance._log.LogDebug("[PeakPelago] Death Link is disabled, not sending death link");
                         return;
@@ -3453,7 +3456,7 @@ namespace Peak.AP
                     if (_instance._deathLinkService == null) return;
                     
                     // Check if Death Link is enabled
-                    if (!_instance._deathLinkEnabled)
+                    if (!_instance._deathLinkEnabled || !_instance.cfgDeathLinkEnabled.Value)
                     {
                         _instance._log.LogDebug("[PeakPelago] Death Link is disabled, not sending death link");
                         return;
@@ -4263,6 +4266,7 @@ namespace Peak.AP
                 { "pixel_trap", "Pixel Trap" },
                 { "eruption_trap", "Eruption Trap" },
                 { "beetle_horde_trap", "Beetle Horde Trap" },
+                { "custom_trivia_trap", "Custom Trivia Trap" },
             };
             
             return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;
