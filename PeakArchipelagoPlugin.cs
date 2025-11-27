@@ -24,7 +24,7 @@ using static CharacterAfflictions;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.6")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.7")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====

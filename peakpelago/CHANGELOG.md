@@ -1,3 +1,13 @@
+## v0.5.7
+<ul>
+    <li>Clamped RingLink/HardRingLink extra stamina gains</li>
+    <li>Fixed mouse cursor not being confined to game window</li>
+    <li>Config option to toggle DeathLink (assuming its enabled in the AP slot)</li>
+    <li>Config option to spawn the last X items received from AP on the SHORE (Traps & Progressive items are ignored)</li>
+    <li>Multiplayer only items have been added to the loot tables all the time</li>
+    <li>Custom Trivia Trap has been added</li>
+</ul>
+
 ## v0.5.6
 <ul>
     <li>Fixed checks for Tick, Airline Food, Pirate's Compass</li>

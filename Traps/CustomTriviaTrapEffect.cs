@@ -36,6 +36,7 @@ namespace Peak.AP
         ];
 
         private const float DEFAULT_TIMER = 30f;
+        private const int NUM_WRONG_ANSWERS_TO_SHOW = 3;
 
         public static void Initialize(ManualLogSource log, PeakArchipelagoPlugin plugin)
         {
@@ -145,17 +146,22 @@ namespace Peak.AP
                 {
                     if (IsValidQuestion(q))
                     {
+                        // Extract wrong answers from options array (filter out the correct answer)
+                        var wrongAnswers = q.Options
+                            .Where(o => o != q.CorrectAnswer)
+                            .ToArray();
+
                         _loadedQuestions.Add(new CustomTriviaQuestion(
                             q.Question,
                             q.CorrectAnswer,
-                            q.Options,
+                            wrongAnswers,
                             q.Timer ?? 0
                         ));
                         loaded++;
                     }
                     else
                     {
-                        _log.LogWarning($"[PeakPelago] Invalid question in {Path.GetFileName(filePath)}: {q.Question ?? "(no question text)"}");
+                        _log.LogWarning($"[PeakPelago] Invalid question in {Path.GetFileName(filePath)}: {q.Question ?? "(no question text)"} - needs correct_answer and at least {NUM_WRONG_ANSWERS_TO_SHOW + 1} options (including the correct one)");
                     }
                 }
 
@@ -171,9 +177,30 @@ namespace Peak.AP
         {
             if (string.IsNullOrWhiteSpace(q.Question)) return false;
             if (string.IsNullOrWhiteSpace(q.CorrectAnswer)) return false;
-            if (q.Options == null || q.Options.Length != 4) return false;
+            if (q.Options == null || q.Options.Length < NUM_WRONG_ANSWERS_TO_SHOW + 1) return false;
             if (!q.Options.Contains(q.CorrectAnswer)) return false;
             return true;
+        }
+
+        /// <summary>
+        /// Generates 4 options (1 correct + 3 random wrong) and returns them shuffled along with the correct answer's index
+        /// </summary>
+        private static (string[] options, int correctIndex) GenerateOptions(CustomTriviaQuestion question)
+        {
+            var random = new System.Random();
+
+            // Pick 3 random wrong answers from the pool
+            var selectedWrong = question.WrongAnswers
+                .OrderBy(_ => random.Next())
+                .Take(NUM_WRONG_ANSWERS_TO_SHOW)
+                .ToList();
+
+            // Add correct answer and shuffle all options
+            var allOptions = new List<string>(selectedWrong) { question.CorrectAnswer };
+            var shuffled = allOptions.OrderBy(_ => random.Next()).ToArray();
+
+            int correctIndex = Array.IndexOf(shuffled, question.CorrectAnswer);
+            return (shuffled, correctIndex);
         }
 
         public static void ApplyCustomTriviaTrapLocal(ManualLogSource log)
@@ -246,10 +273,11 @@ namespace Peak.AP
         {
             _isActive = true;
             var question = GetRandomQuestion();
+            var (options, correctIndex) = GenerateOptions(question);
             InputSpriteData inputSpriteData = SingletonAsset<InputSpriteData>.Instance;
 
             var (triviaUI, questionText) = TriviaUIHelper.CreateTriviaUI();
-            
+
             Text countdownTimer = TriviaUIHelper.CreateCountdownTimer(triviaUI.transform);
             countdownTimer.transform.parent.gameObject.SetActive(false);
 
@@ -265,7 +293,7 @@ namespace Peak.AP
 
             for (int i = 0; i < 4; i++)
             {
-                var answerObj = CreateTextAnswer(triviaUI.transform, answerPositions[i], question.Options[i], i, inputSpriteData);
+                var answerObj = CreateTextAnswer(triviaUI.transform, answerPositions[i], options[i], i, inputSpriteData);
                 answerObj.SetActive(false);
                 answerObjects.Add(answerObj);
             }
@@ -278,7 +306,7 @@ namespace Peak.AP
             {
                 answerObj.SetActive(true);
             }
-            
+
             countdownTimer.transform.parent.gameObject.SetActive(true);
 
             float timerDuration = question.TimerSeconds > 0 ? question.TimerSeconds : DEFAULT_TIMER;
@@ -289,7 +317,7 @@ namespace Peak.AP
 
             if (selectedAnswer == -1) selectedAnswer = 0;
 
-            bool correct = question.Options[selectedAnswer] == question.CorrectAnswer;
+            bool correct = selectedAnswer == correctIndex;
             var selectedBg = answerObjects[selectedAnswer].GetComponent<Image>();
 
             if (correct)
@@ -304,12 +332,9 @@ namespace Peak.AP
                 TriviaUIHelper.PlayWrongSound();
                 selectedBg.color = new Color(0.8f, 0, 0, 0.8f);
 
-                int correctIndex = Array.IndexOf(question.Options, question.CorrectAnswer);
-                if (correctIndex >= 0)
-                {
-                    var correctBg = answerObjects[correctIndex].GetComponent<Image>();
-                    correctBg.color = new Color(0, 0.8f, 0, 0.8f);
-                }
+                // Highlight the correct answer
+                var correctBg = answerObjects[correctIndex].GetComponent<Image>();
+                correctBg.color = new Color(0, 0.8f, 0, 0.8f);
 
                 questionText.text = "TOO BAD!";
                 questionText.color = Color.red;
@@ -406,36 +431,47 @@ namespace Peak.AP
         {
             public string Question { get; set; }
             public string CorrectAnswer { get; set; }
-            public string[] Options { get; set; }
+            public string[] WrongAnswers { get; set; }
             public float TimerSeconds { get; set; }
 
-            public CustomTriviaQuestion(string question, string correctAnswer, string[] options, float timerSeconds = 0)
+            public CustomTriviaQuestion(string question, string correctAnswer, string[] wrongAnswers, float timerSeconds = 0)
             {
                 Question = question;
                 CorrectAnswer = correctAnswer;
-                Options = options;
+                WrongAnswers = wrongAnswers;
                 TimerSeconds = timerSeconds;
             }
         }
 
         /// <summary>
-        /// Default trivia questions so theres always some ready. will probably add some more later
+        /// Default trivia questions so theres always some ready to go
         /// </summary>
         private static readonly List<CustomTriviaQuestion> DefaultQuestions =
         [
-            new("What is the capital of France?", "Paris", ["Paris", "London", "Berlin", "Madrid"]),
-            new("Which planet is known as the Red Planet?", "Mars", ["Venus", "Mars", "Jupiter", "Saturn"]),
-            new("What is 2 + 2?", "4", ["3", "4", "5", "22"]),
-            new("Who wrote 'Hamlet'?", "William Shakespeare", ["Charles Dickens", "Mark Twain", "William Shakespeare", "Jane Austen"]),
-            new("What is the largest ocean on Earth?", "Pacific Ocean", ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean", "Pacific Ocean"]),
-            new("What is the chemical symbol for water?", "H2O", ["CO2", "O2", "H2O", "NaCl"]),
-            new("Who painted the Mona Lisa?", "Leonardo da Vinci", ["Vincent van Gogh", "Pablo Picasso", "Leonardo da Vinci", "Claude Monet"]),
-            new("What is the hardest natural substance on Earth?", "Diamond", ["Gold", "Iron", "Diamond", "Silver"]),
-            new("Which country is known as the Land of the Rising Sun?", "Japan", ["China", "Japan", "Thailand", "South Korea"]),
-            new("What is the smallest prime number?", "2", ["1", "2", "3", "5"]),
-            new("In which year did the Titanic sink?", "1912", ["1905", "1912", "1918", "1923"]),
-            new("What is the main ingredient in guacamole?", "Avocado", ["Tomato", "Onion", "Avocado", "Pepper"]),
+            new("What is the capital of France?", "Paris",
+                ["London", "Berlin", "Madrid", "Rome", "Vienna", "Amsterdam", "Brussels", "Lisbon"]),
+            new("Which planet is known as the Red Planet?", "Mars",
+                ["Venus", "Jupiter", "Saturn", "Mercury", "Neptune", "Uranus", "Pluto"]),
+            new("What is 2 + 2?", "4",
+                ["3", "5", "22", "6", "7", "8", "2"]),
+            new("Who wrote 'Hamlet'?", "William Shakespeare",
+                ["Charles Dickens", "Mark Twain", "Jane Austen", "Leo Tolstoy", "Homer", "Fyodor Dostoevsky"]),
+            new("What is the largest ocean on Earth?", "Pacific Ocean",
+                ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean", "Southern Ocean", "Mediterranean Sea"]),
+            new("What is the chemical symbol for water?", "H2O",
+                ["CO2", "O2", "NaCl", "H2SO4", "NH3", "CH4", "NO2"]),
+            new("Who painted the Mona Lisa?", "Leonardo da Vinci",
+                ["Vincent van Gogh", "Pablo Picasso", "Claude Monet", "Michelangelo", "Rembrandt", "Raphael"]),
+            new("What is the hardest natural substance on Earth?", "Diamond",
+                ["Gold", "Iron", "Silver", "Platinum", "Titanium", "Quartz", "Sapphire"]),
+            new("Which country is known as the Land of the Rising Sun?", "Japan",
+                ["China", "Thailand", "South Korea", "Vietnam", "Taiwan", "Philippines", "Indonesia"]),
+            new("What is the smallest prime number?", "2",
+                ["1", "3", "5", "7", "0", "11", "13"]),
+            new("In which year did the Titanic sink?", "1912",
+                ["1905", "1918", "1923", "1898", "1910", "1915", "1920"]),
+            new("What is the main ingredient in guacamole?", "Avocado",
+                ["Tomato", "Onion", "Pepper", "Lime", "Cilantro", "Jalapeno", "Garlic"]),
         ];
-
     }
 }
