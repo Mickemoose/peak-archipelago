@@ -62,7 +62,7 @@ namespace Peak.AP
             int rectWidth = (int)Math.Round(320.0 * ((double)_fontSize / 12.0));
             int rowHeight = _fontSize + 8;
             int xPos = 16;
-            int yPos = 36;
+            int yPos = 10;
             int labelWidth = rectWidth / 2;
             bool isConnected = _plugin.Status == "Connected";
             bool isHost = PhotonNetwork.IsMasterClient;
