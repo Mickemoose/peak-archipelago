@@ -5,7 +5,7 @@
     <li>Config option to toggle DeathLink (assuming its enabled in the AP slot)</li>
     <li>Config option to spawn the last X items received from AP on the SHORE (Traps & Progressive items are ignored)</li>
     <li>Multiplayer only items have been added to the loot tables all the time</li>
-    <li>Custom Trivia Trap has been added. View the GUIDE for more info.</li>
+    <li>Custom Trivia Trap has been added. View the GUIDE on Github for more info.</li>
 </ul>
 
 ## v0.5.6
