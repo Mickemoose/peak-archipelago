@@ -104,7 +104,7 @@ class PeakWorld(World):
             # Each excluded ascent has 6 badge locations (Beachcomber, Trailblazer, Alpinist, Volcanology, Nomad, Forestry)
             # Plus 1 Scout Sashe location
             # Plus 1 Ascent Completed event
-            locations_per_ascent = 6 + 1 + 1  # 8 total
+            locations_per_ascent = 7
             total_locations -= (excluded_ascent_count * locations_per_ascent)
             
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {excluded_ascent_count} ascent levels, removing {excluded_ascent_count * locations_per_ascent} locations")
@@ -462,7 +462,8 @@ class PeakWorld(World):
             return  # Unsupported goal type, exit early
 
         # Ensure item pool matches number of locations
-        final_locations = [loc for loc in self.multiworld.get_locations() if loc.player == self.player]
+        final_locations = [loc for loc in self.multiworld.get_locations() 
+                   if loc.player == self.player and loc.address is not None]
         current_items = [item for item in self.multiworld.itempool if item.player == self.player]
         missing = len(final_locations) - len(current_items)
 
