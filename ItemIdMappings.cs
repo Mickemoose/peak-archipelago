@@ -180,11 +180,143 @@ namespace Peak.AP
         };
 
         /// <summary>
+        /// Maps AP item names to internal game names.
+        /// </summary>
+        public static readonly Dictionary<string, string> ApNameToInternalName = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Rope Spool", "RopeSpool" },
+            { "Rope Cannon", "RopeShooter" },
+            { "Anti-Rope Spool", "Anti-Rope Spool" },
+            { "Anti-Rope Cannon", "RopeShooterAnti" },
+            { "Chain Launcher", "ChainShooter" },
+            { "Piton", "ClimbingSpike" },
+            { "Rescue Claw", "RescueHook" },
+            { "Magic Bean", "MagicBean" },
+            { "Parasol", "Parasol" },
+            { "Balloon", "Balloon" },
+            { "Balloon Bunch", "BalloonBunch" },
+            { "Scout Cannon", "ScoutCannonItem" },
+            { "Flying Disc", "Frisbee" },
+            { "Guidebook", "Guidebook" },
+            { "Portable Stove", "PortableStovetopItem" },
+            { "Checkpoint Flag", "Flag_Plantable_Checkpoint" },
+            { "Lantern", "Lantern" },
+            { "Flare", "Flare" },
+            { "Torch", "Torch" },
+            { "Faerie Lantern", "Lantern_Faerie" },
+            { "Blowgun", "HealingDart Variant" },
+            { "Cactus", "CactusBall" },
+            { "Compass", "Compass" },
+            { "Pirate's Compass", "Pirate Compass" },
+            { "Binoculars", "Binoculars" },
+            { "Bandages", "Bandages" },
+            { "First-Aid Kit", "FirstAidKit" },
+            { "Antidote", "Antidote" },
+            { "Heat Pack", "Heat Pack" },
+            { "Cure-All", "Cure-All" },
+            { "Remedy Fungus", "HealingPuffShroom" },
+            { "Medicinal Root", "MedicinalRoot" },
+            { "Aloe Vera", "AloeVera" },
+            { "Sunscreen", "Sunscreen" },
+            { "Marshmallow", "Marshmallow" },
+            { "Glizzy", "Glizzy" },
+            { "Fortified Milk", "FortifiedMilk" },
+            { "Scout Effigy", "ScoutEffigy" },
+            { "Cursed Skull", "Cursed Skull" },
+            { "Pandora's Lunchbox", "PandorasBox" },
+            { "Ancient Idol", "AncientIdol" },
+            { "Strange Gem", "Strange Gem" },
+            { "Book of Bones", "BookOfBones" },
+            { "Cloud Fungus", "CloudFungus" },
+            { "Bugle of Friendship", "Bugle_Magic" },
+            { "Bugle", "Bugle" },
+            { "Shelf Shroom", "ShelfShroom" },
+            { "Bounce Shroom", "BounceShroom" },
+            { "Button Shroom", "Mushroom Normie" },
+            { "Bugle Shroom", "Mushroom Lace" },
+            { "Cluster Shroom", "Mushroom Cluster" },
+            { "Chubby Shroom", "Mushroom Chubby" },
+            { "Trail Mix", "TrailMix" },
+            { "Granola Bar", "Granola Bar" },
+            { "Scout Cookies", "ScoutCookies" },
+            { "Airline Food", "Airplane Food" },
+            { "Energy Drink", "Energy Drink" },
+            { "Sports Drink", "Sports Drink" },
+            { "Big Lollipop", "Lollipop" },
+            { "Big Egg", "NestEgg" },
+            { "Egg", "Egg" },
+            { "Cooked Bird", "EggTurkey" },
+            { "Honeycomb", "Item_Honeycomb" },
+            { "Beehive", "Beehive" },
+            { "Scorpion", "Scorpion" },
+            { "Tick", "Bugfix" },
+            { "Conch", "Shell Big" },
+            { "Dynamite", "Dynamite" },
+            { "Bing Bong", "BingBong" },
+            { "Mandrake", "Mandrake" },
+            { "Red Crispberry", "Apple Berry Red" },
+            { "Green Crispberry", "Apple Berry Green" },
+            { "Yellow Crispberry", "Apple Berry Yellow" },
+            { "Coconut", "Item_Coconut" },
+            { "Coconut Half", "Item_Coconut_half" },
+            { "Brown Berrynana", "Berrynana Brown" },
+            { "Blue Berrynana", "Berrynana Blue" },
+            { "Pink Berrynana", "Berrynana Pink" },
+            { "Yellow Berrynana", "Berrynana Yellow" },
+            { "Orange Winterberry", "Winterberry Orange" },
+            { "Yellow Winterberry", "Winterberry Yellow" },
+            { "Red Prickleberry", "Prickleberry_Red" },
+            { "Gold Prickleberry", "Prickleberry_Gold" },
+            { "Red Shroomberry", "Shroomberry_Red" },
+            { "Blue Shroomberry", "Shroomberry_Blue" },
+            { "Green Shroomberry", "Shroomberry_Green" },
+            { "Yellow Shroomberry", "Shroomberry_Yellow" },
+            { "Purple Shroomberry", "Shroomberry_Purple" },
+            { "Purple Kingberry", "Kingberry Purple" },
+            { "Yellow Kingberry", "Kingberry Yellow" },
+            { "Green Kingberry", "Kingberry Green" },
+            { "Napberry", "Napberry" },
+            { "Black Clusterberry", "Clusterberry Black" },
+            { "Red Clusterberry", "Clusterberry Red" },
+            { "Yellow Clusterberry", "Clusterberry Yellow" },
+            { "Scoutmaster's Bugle", "Bugle_Scoutmaster Variant" },
+        };
+
+        /// <summary>
         /// Try to get an item ID by its internal name.
         /// </summary>
         public static bool TryGetId(string itemName, out ushort itemId)
         {
             return NameToId.TryGetValue(itemName, out itemId);
+        }
+
+        /// <summary>
+        /// Try to get an item ID by its AP item name.
+        /// </summary>
+        public static bool TryGetIdFromApName(string apItemName, out ushort itemId)
+        {
+            itemId = 0;
+            if (ApNameToInternalName.TryGetValue(apItemName, out string internalName))
+            {
+                return NameToId.TryGetValue(internalName, out itemId);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Get all item IDs that are tracked by AP (have an AP name mapping).
+        /// </summary>
+        public static HashSet<ushort> GetAllApTrackedItemIds()
+        {
+            var ids = new HashSet<ushort>();
+            foreach (var apName in ApNameToInternalName.Keys)
+            {
+                if (TryGetIdFromApName(apName, out ushort id))
+                {
+                    ids.Add(id);
+                }
+            }
+            return ids;
         }
     }
 }

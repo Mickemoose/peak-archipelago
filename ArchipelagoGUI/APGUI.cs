@@ -52,6 +52,16 @@ namespace Peak.AP
 
         private void OnGUI()
         {
+
+            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            bool isInAirport = currentScene.Contains("Airport");
+            bool isHost = PhotonNetwork.IsMasterClient; //|| !PhotonNetwork.IsConnected;
+            
+            if (!isInAirport || !isHost)
+            {
+                return;
+            }
+
             GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
             GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
             GUIStyle textFieldStyle = new GUIStyle(GUI.skin.textField);
@@ -65,7 +75,6 @@ namespace Peak.AP
             int yPos = 10;
             int labelWidth = rectWidth / 2;
             bool isConnected = _plugin.Status == "Connected";
-            bool isHost = PhotonNetwork.IsMasterClient;
             bool inMultiplayer = PhotonNetwork.IsConnected && PhotonNetwork.CurrentRoom != null;
             bool isReconnecting = _plugin != null && _plugin.IsReconnecting;
             int reconnectAttempts = _plugin != null ? _plugin._reconnectAttempts : 0;
