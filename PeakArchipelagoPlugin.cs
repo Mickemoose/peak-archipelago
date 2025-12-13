@@ -26,7 +26,7 @@ using UnityEngine.UI;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.7")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.8")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====

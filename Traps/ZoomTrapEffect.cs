@@ -98,77 +98,85 @@ namespace Peak.AP
         private static IEnumerator ZoomTrapCoroutine(ManualLogSource log)
         {
             _isActive = true;
+            Camera mainCamera = null;
+            float originalFov = 60f;
 
-            Camera mainCamera = Camera.main;
-            if (mainCamera == null)
+            try
             {
-                log.LogError("[PeakPelago] Could not find main camera");
-                _isActive = false;
-                yield break;
-            }
+                mainCamera = Camera.main;
+                if (mainCamera == null)
+                {
+                    log.LogError("[PeakPelago] Could not find main camera");
+                    yield break;
+                }
 
-            float originalFov = mainCamera.fieldOfView;
-            float targetFov = 20f;
-            float nearClip = mainCamera.nearClipPlane;
-            float farClip = mainCamera.farClipPlane;
+                originalFov = mainCamera.fieldOfView;
+                float targetFov = 20f;
+                float nearClip = mainCamera.nearClipPlane;
+                float farClip = mainCamera.farClipPlane;
 
-            log.LogInfo($"[PeakPelago] Starting zoom from {originalFov} to {targetFov} via projection matrix");
+                log.LogInfo($"[PeakPelago] Starting zoom from {originalFov} to {targetFov} via projection matrix");
 
-            // Zoom in over 1 second
-            float elapsed = 0f;
-            while (elapsed < 1f)
-            {
-                elapsed += Time.deltaTime;
-                float currentFov = Mathf.Lerp(originalFov, targetFov, elapsed);
-                
-                // Calculate custom projection matrix with our FOV
-                mainCamera.projectionMatrix = Matrix4x4.Perspective(
-                    currentFov, 
-                    mainCamera.aspect, 
-                    nearClip, 
-                    farClip
-                );
-                
-                yield return null;
-            }
+                // Zoom in over 1 second
+                float elapsed = 0f;
+                while (elapsed < 1f)
+                {
+                    elapsed += Time.deltaTime;
+                    float currentFov = Mathf.Lerp(originalFov, targetFov, elapsed);
+                    
+                    // Calculate custom projection matrix with our FOV
+                    mainCamera.projectionMatrix = Matrix4x4.Perspective(
+                        currentFov, 
+                        mainCamera.aspect, 
+                        nearClip, 
+                        farClip
+                    );
+                    
+                    yield return null;
+                }
 
-            // Set to exact target FOV
-            mainCamera.projectionMatrix = Matrix4x4.Perspective(targetFov, mainCamera.aspect, nearClip, farClip);
-            log.LogInfo($"[PeakPelago] Holding zoom at {targetFov} for 13 seconds");
-
-            // Hold for 13 seconds - keep setting projection matrix in case something resets it
-            float holdTime = 0f;
-            while (holdTime < 13f)
-            {
-                holdTime += Time.deltaTime;
+                // Set to exact target FOV
                 mainCamera.projectionMatrix = Matrix4x4.Perspective(targetFov, mainCamera.aspect, nearClip, farClip);
-                yield return null;
+                log.LogInfo($"[PeakPelago] Holding zoom at {targetFov} for 13 seconds");
+
+                // Hold for 13 seconds - keep setting projection matrix in case something resets it
+                float holdTime = 0f;
+                while (holdTime < 13f)
+                {
+                    holdTime += Time.deltaTime;
+                    mainCamera.projectionMatrix = Matrix4x4.Perspective(targetFov, mainCamera.aspect, nearClip, farClip);
+                    yield return null;
+                }
+
+                log.LogInfo("[PeakPelago] Zooming out");
+
+                // Zoom out over 2 seconds
+                elapsed = 0f;
+                while (elapsed < 2f)
+                {
+                    elapsed += Time.deltaTime;
+                    float currentFov = Mathf.Lerp(targetFov, originalFov, elapsed / 2f);
+                    
+                    mainCamera.projectionMatrix = Matrix4x4.Perspective(
+                        currentFov, 
+                        mainCamera.aspect, 
+                        nearClip, 
+                        farClip
+                    );
+                    
+                    yield return null;
+                }
+
+                // Reset to default projection matrix
+                mainCamera.ResetProjectionMatrix();
+                log.LogInfo("[PeakPelago] Zoom Trap complete!");
             }
-
-            log.LogInfo("[PeakPelago] Zooming out");
-
-            // Zoom out over 2 seconds
-            elapsed = 0f;
-            while (elapsed < 2f)
+            finally
             {
-                elapsed += Time.deltaTime;
-                float currentFov = Mathf.Lerp(targetFov, originalFov, elapsed / 2f);
-                
-                mainCamera.projectionMatrix = Matrix4x4.Perspective(
-                    currentFov, 
-                    mainCamera.aspect, 
-                    nearClip, 
-                    farClip
-                );
-                
-                yield return null;
+                // Ensure camera is reset and flag is cleared even if something goes wrong
+                mainCamera?.ResetProjectionMatrix();
+                _isActive = false;
             }
-
-            // Reset to default projection matrix
-            mainCamera.ResetProjectionMatrix();
-
-            log.LogInfo("[PeakPelago] Zoom Trap complete!");
-            _isActive = false;
         }
     }
 }

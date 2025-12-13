@@ -1,3 +1,13 @@
+## v0.5.8
+<ul>
+    <li>Items are locked and won't spawn until they are first recieved through AP</li>
+    <li>Some potential mitigation against crashing due to picking up items and releasing games</li>
+    <li>Zoom Trap protections incase it gets stuck active</li>
+    <li>AP Connection UI will now only show once hosting the game</li>
+    <li>Campfires will show a hint to Progressive Mountain</li>
+    <li>Potential fix for Daredevil Badge not triggering</li>
+</ul>
+
 ## v0.5.7
 <ul>
     <li>Clamped RingLink/HardRingLink extra stamina gains</li>
