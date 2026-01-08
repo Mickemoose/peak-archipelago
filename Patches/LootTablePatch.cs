@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BepInEx.Logging;
 using HarmonyLib;
 using Peak.AP;
+using UnityEngine;
 
 namespace PeakArchipelago
 {
@@ -21,10 +23,10 @@ namespace PeakArchipelago
                     return;
                 }
 
-                // Capture original weights before any modifications
+                // Capture original weights
                 OriginalLootWeights.CaptureOriginalWeights();
 
-                // Add multiplayer-focused items
+                // Add multiplayer only items (special items still go to special pools which are just luggage cursed and the statue)
                 var multiplayerItems = new Dictionary<ushort, int>
                 {
                     { 70, 15 },  // Blowgun
@@ -37,7 +39,7 @@ namespace PeakArchipelago
                     { 16, 11 },  // Bugle of Friendship
                 };
 
-                SpawnPool[] specialPools = { SpawnPool.RespawnCoffin, SpawnPool.LuggageCursed };
+                SpawnPool[] specialPools = [SpawnPool.RespawnCoffin, SpawnPool.LuggageCursed];
                 SpawnPool[] luggagePools =
                 {
                     SpawnPool.LuggageBeach, SpawnPool.LuggageJungle, SpawnPool.LuggageTundra,
@@ -75,8 +77,7 @@ namespace PeakArchipelago
                     }
                 }
 
-                // Zero out tracked items until unlocked via AP
-                UnlockedItemsManager.RefreshLootTables();
+                UnlockedItemsManager.CheckDeferredRefresh();
             }
             catch (Exception ex)
             {
@@ -88,13 +89,13 @@ namespace PeakArchipelago
     [HarmonyPatch(typeof(LootData), "GetRandomItems")]
     public static class GetRandomItemsPatch
     {
-        static bool Prefix(SpawnPool spawnPool, int count, ref List<UnityEngine.GameObject> __result)
+        static bool Prefix(SpawnPool spawnPool, int count, ref List<GameObject> __result)
         {
             if (LootData.AllSpawnWeightData == null ||
                 !LootData.AllSpawnWeightData.ContainsKey(spawnPool) ||
                 LootData.AllSpawnWeightData[spawnPool].Count == 0)
             {
-                __result = new List<UnityEngine.GameObject>();
+                __result = [];
                 return false;
             }
             return true;
@@ -104,7 +105,7 @@ namespace PeakArchipelago
     [HarmonyPatch(typeof(LootData), "GetRandomItem")]
     public static class GetRandomItemPatch
     {
-        static bool Prefix(SpawnPool spawnPool, ref UnityEngine.GameObject __result)
+        static bool Prefix(SpawnPool spawnPool, ref GameObject __result)
         {
             if (LootData.AllSpawnWeightData == null ||
                 !LootData.AllSpawnWeightData.ContainsKey(spawnPool) ||
@@ -113,6 +114,34 @@ namespace PeakArchipelago
                 __result = null;
                 return false;
             }
+            return true;
+        }
+    }
+    [HarmonyPatch(typeof(LootData), nameof(LootData.GetRandomItem))]
+    public static class LootDataGetRandomItemPatch
+    {
+        public static bool Prefix(SpawnPool spawnPool, ref GameObject __result)
+        {
+            if (LootData.AllSpawnWeightData == null)
+            {
+                LootData.PopulateLootData();
+            }
+
+            if (!LootData.AllSpawnWeightData.TryGetValue(spawnPool, out var pool))
+            {
+                __result = null;
+                return false; 
+            }
+
+            // Check if pool has any items with weight > 0
+            var validItems = pool.Where(kvp => kvp.Value > 0).ToList();
+            if (validItems.Count == 0)
+            {
+                __result = null;
+                return false; // Skip original - empty pool returns null
+            }
+
+            // Let original method handle it since pool has valid items
             return true;
         }
     }

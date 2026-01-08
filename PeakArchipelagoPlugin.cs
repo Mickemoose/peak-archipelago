@@ -1238,8 +1238,6 @@ namespace Peak.AP
         /// <summary>Report a check by its AP location name (defined in the apworld).</summary>
         public void ReportCheckByName(string locationName)
         {
-            _log.LogInfo($"[PeakPelago] === ReportCheckByName START: '{locationName}' ===");
-            
             try
             {
                 if (!PhotonNetwork.IsMasterClient)
@@ -1256,15 +1254,10 @@ namespace Peak.AP
                     return;
                 }
 
-                _log.LogInfo($"[PeakPelago] Processing as master client...");
-
                 // Host processing
                 try
                 {
                     long id = -1;
-                    
-                    _log.LogInfo($"[PeakPelago] Session null? {_session == null}");
-                    _log.LogInfo($"[PeakPelago] Session.Locations null? {_session?.Locations == null}");
                     
                     // Try to get location ID
                     if (_session != null && _session.Locations != null)
@@ -1272,7 +1265,6 @@ namespace Peak.AP
                         try
                         {
                             id = _session.Locations.GetLocationIdFromName("PEAK", locationName);
-                            _log.LogInfo($"[PeakPelago] GetLocationIdFromName returned: {id}");
                             // Cache it for offline use
                             _locationCache[locationName] = id;
                         }
@@ -1286,7 +1278,6 @@ namespace Peak.AP
                     if (id <= 0 && _locationCache.ContainsKey(locationName))
                     {
                         id = _locationCache[locationName];
-                        _log.LogInfo($"[PeakPelago] Using cached location ID {id} for '{locationName}'");
                     }
 
                     if (id <= 0)
@@ -1298,12 +1289,9 @@ namespace Peak.AP
                     // Check if already reported
                     if (_stateData.ReportedChecks.Contains(id))
                     {
-                        _log.LogDebug($"[PeakPelago] ✗ Check already reported: {locationName} (ID: {id})");
+                        _log.LogDebug($"[PeakPelago] Check already reported: {locationName} (ID: {id})");
                         return;
                     }
-
-                    _log.LogInfo($"[PeakPelago] About to report check ID {id}...");
-                    _log.LogInfo($"[PeakPelago] Socket connected? {_session?.Socket?.Connected}");
 
                     // If connected, report immediately
                     if (_session != null && _session.Socket != null && _session.Socket.Connected)
@@ -1312,7 +1300,7 @@ namespace Peak.AP
                         {
                             _session.Locations.CompleteLocationChecks([id]);
                             _stateData.ReportedChecks.Add(id);
-                            _log.LogInfo($"[PeakPelago] ✓ Reported NEW check: {locationName} (ID: {id})");
+                            _log.LogInfo($"[PeakPelago] Reported NEW check: {locationName} (ID: {id})");
                             
                             BroadcastCheckCompleted(locationName, id);
                             _stateManager.StateDirty = true;
@@ -1327,7 +1315,7 @@ namespace Peak.AP
                     else
                     {
                         // Not connected - queue for later
-                        _log.LogInfo($"[PeakPelago] 📦 Queued check for reconnect: {locationName} (ID: {id})");
+                        _log.LogInfo($"[PeakPelago] Queued check for reconnect: {locationName} (ID: {id})");
                         _stateData.OfflineChecks.Add(id);
                         SaveOfflineChecks();
                     }
@@ -1343,8 +1331,6 @@ namespace Peak.AP
                 _log.LogError($"[PeakPelago] Error in ReportCheckByName wrapper: {ex.Message}");
                 _log.LogError($"[PeakPelago] Stack trace: {ex.StackTrace}");
             }
-            
-            _log.LogInfo($"[PeakPelago] === ReportCheckByName END: '{locationName}' ===");
         }
         /// <summary>Broadcast to all clients that a check was completed</summary>
         private void BroadcastCheckCompleted(string locationName, long locationId)
@@ -1368,7 +1354,6 @@ namespace Peak.AP
             {
                 // All clients add this to their reported checks to avoid duplicate reports
                 _stateData.ReportedChecks.Add(locationId);
-                _log.LogInfo($"[PeakPelago] Check completed notification: {locationName}");
                 
                 // Update local state
                 SaveState();
@@ -1695,7 +1680,7 @@ namespace Peak.AP
 
         private void InitializeItemEffectHandlers()
         {
-            _itemEffectHandlers = new Dictionary<string, System.Action>
+            _itemEffectHandlers = new Dictionary<string, Action>
             {
                 { "Rope Spool", () => SpawnPhysicalItem("RopeSpool") },
                 { "Rope Cannon", () => SpawnPhysicalItem("RopeShooter") },
@@ -2501,9 +2486,6 @@ namespace Peak.AP
                 _itemsReceivedFromAP++;
                 _lastReceivedItemName = itemName;
                 _lastReceivedItemTime = DateTime.Now;
-
-                // Refresh loot tables when we receive an item
-                UnlockedItemsManager.RefreshLootTables();
 
                 if (_itemEffectHandlers.ContainsKey(itemName))
                 {
@@ -4282,8 +4264,13 @@ namespace Peak.AP
                 _status = "Connected";
                 _wantReconnect = false;
                 UnlockedItemsManager.Initialize(_log, _session);
-                UnlockedItemsManager.RefreshLootTables();
                 _notifications.ShowConnected();
+                if (LootData.AllSpawnWeightData != null)
+                {
+                    _log.LogInfo("[PeakPelago] Forcing loot table refresh after connection");
+                    UnlockedItemsManager.RefreshLootTables();
+                }
+
                 _log.LogInfo("[PeakPelago] Connected.");
             }
             catch (Exception ex)
@@ -4296,6 +4283,16 @@ namespace Peak.AP
             {
                 _isConnecting = false;
             }
+        }
+
+        private System.Collections.IEnumerator RefreshLootTablesAfterStartup()
+        {
+            yield return new WaitForSeconds(2f);
+            while (!_itemQueue.IsEmpty)
+            {
+                yield return new WaitForSeconds(0.5f);
+            }
+            UnlockedItemsManager.RefreshLootTables();
         }
 
         private void RebuildCollectedBadgesFromChecks()
@@ -4678,7 +4675,15 @@ namespace Peak.AP
                     _log.LogError($"[PeakPelago] Error in main thread action: {ex.Message}");
                 }
             }
-            
+
+            if (!OriginalLootWeights.HasCaptured)
+            {
+                LootData.PopulateLootData();
+                _log.LogInfo("[PeakPelago] Forced loot data population - capturing original weights");
+                OriginalLootWeights.CaptureOriginalWeights();
+                UnlockedItemsManager.CheckDeferredRefresh();
+            }
+    
             if (_itemQueue.IsEmpty || Time.time - _lastItemProcessed < ITEM_PROCESSING_COOLDOWN)
             {
                 return;
@@ -4738,6 +4743,7 @@ namespace Peak.AP
                 _stateData.LastProcessedItemIndex = item.itemIndex;
                 SaveState();
                 _lastItemProcessed = Time.time;
+                UnlockedItemsManager.CheckDeferredRefresh();
             }
             catch (Exception ex)
             {

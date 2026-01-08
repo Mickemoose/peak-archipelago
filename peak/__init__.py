@@ -192,7 +192,7 @@ class PeakWorld(World):
 
         for item_name in acquire_required_items:
             if item_name in item_table:
-                item_pool.append(self.create_item(item_name))
+                item_pool.append(self.create_item(item_name, ItemClassification.progression))
             else:
                 logging.warning(f"[Player {self.multiworld.player_name[self.player]}] Acquire item '{item_name}' not found in item_table")
 

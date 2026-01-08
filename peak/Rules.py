@@ -12,7 +12,7 @@ CALDERA_LOCATIONS = [
 KILN_LOCATIONS = [
     "Acquire Strange Gem", "Peak Badge", "Speed Climber Badge", "Lone Wolf Badge", "Participation Badge",
     "Survivalist Badge", "Naturalist Badge", "Leave No Trace Badge", "Balloon Badge", "Bing Bong Badge",
-    "Gourmand Badge", "High Altitude Badge", "Knot Tying Badge",
+    "Gourmand Badge", "High Altitude Badge", "Knot Tying Badge", "24 Karat Badge",
 ]
 
 ROOTS_LOCATIONS = [
@@ -35,7 +35,7 @@ TROPICS_LOCATIONS = [
 MESA_LOCATIONS = [
     "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol",
     "Acquire Red Prickleberry", "Acquire Gold Prickleberry", "Acquire Scorpion", "Acquire Torch",
-    "Megaentomology Badge", "Cool Cucumber Badge", "24 Karat Badge", "Astronomy Badge",
+    "Megaentomology Badge", "Cool Cucumber Badge", "Astronomy Badge",
     "Daredevil Badge", "Needlepoint Badge", "Acquire Parasol", "Acquire Dynamite", "Forestry Badge",
 ]
 
