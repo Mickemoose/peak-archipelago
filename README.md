@@ -10,6 +10,12 @@ Also available on Thunderstore: https://thunderstore.io/c/peak/p/PeakArchipelago
 
 This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld randomizer system. Ascent unlocks, badges, and other progression items are randomized across multiple games and players, creating a unique cooperative or competitive experience.
 
+Nothing is randomized per say in this mod as PEAK is already slightly random at its core. Yes there are some checks that rely on the biomes that can be locked each day. There are mods that can potentially allow you to pick which biome is played, but I have not tested any of these myself so do so at your own risk.
+
+The multiplayer exclusive items are added to the regular pool of items to allow full singleplayer play.
+
+In multiplayer, only the Host's AP slot is affected. Any player who joins that hosts world is essentially just an extension of the host when it comes to sending/recieving checks from Archipelago.
+
 ## Features
 
 - **Ascent Progression**: Unlock ascents (1-7) by receiving Archipelago items
