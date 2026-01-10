@@ -6,6 +6,7 @@
     <li>AP Connection UI will now only show once hosting the game</li>
     <li>Campfires will show a hint to Progressive Mountain</li>
     <li>Potential fix for Daredevil Badge not triggering</li>
+    <li>24 Karat Badge in logic fixed</li>
 </ul>
 
 ## v0.5.7
