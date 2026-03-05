@@ -266,7 +266,7 @@ namespace Peak.AP
         private int _cachedEnergy = 0;
         private string _selectedBundleName;
         private Action _selectedBundleAction;
-        private const int BUNDLE_COST = 300;
+        private const int BUNDLE_COST = 150000000; // 150 MJ
         private const float PURCHASE_TIME = 2f;
         private const float ENERGY_UPDATE_INTERVAL = 0.5f;
         private float _lastEnergyUpdateTime = 0f;

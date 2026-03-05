@@ -184,18 +184,196 @@ namespace Peak.AP
             if (item == null) return 0;
             
             string itemName = item.GetName().ToLower();
-            if (itemName.Contains("cursed skull") || itemName.Contains("pirate's compass") || itemName.Contains("faerie lantern") || itemName.Contains("pandora")
-                || itemName.Contains("scout effigy") || itemName.Contains("cure-all") || itemName.Contains("the book of bones"))
-                return 250;
-            if (itemName.Contains("ancient idol"))
-                return 1000;
-            if (itemName.Contains("conch"))
-                return 25;
-            if (itemName.Contains("bing bong"))
-                return 1;
-            
-            // Default value for misc items
-            return 100;
+            /*
+            The below energy values were chosen in an attempt to match the expected energy earned from playing Plants vs. Zombies: Game of the Year Edition in the same multiworld.
+            */
+            double megajoules = 30f;
+            switch (itemName)
+            {
+                // Packaged foods
+                case "pandora's lunchbox":
+                    megajoules = 66.6f;
+                    break;
+                case "airline food":
+                    megajoules = 40;
+                    break;
+                case "big lollipop":
+                case "scout cookies":
+                    megajoules = 39.95f;
+                    break;
+                case "granola bar":
+                    megajoules = 29.95f;
+                    break;
+                case string s when s.Contains("drink"):
+                case "trail mix":
+                    megajoules = 19.95f;
+                    break;
+                // Berries and mushrooms
+                case "napberry":
+                    megajoules = 55;
+                    break;
+                case string s when s.Contains("berrynana peel"):
+                    megajoules = 1;
+                    break;
+                case string s when s.Contains("berry"):
+                    megajoules = 9;
+                    break;
+                case string s when s.Contains("shroom"):
+                    megajoules = 10;
+                    break;
+                // Other naturally-found foods
+                case "beehive":
+                    megajoules = 60;
+                    break;
+                case "cooked bird":
+                case string s when s.Contains("egg"):
+                    megajoules = 40;
+                    break;
+                case "honeycomb":
+                    megajoules = 30;
+                    break;
+                case "hot dog":
+                case "marshmallow":
+                    megajoules = 29.95f;
+                    break;
+                case "half-coconut":
+                    megajoules = 3.75f;
+                    break;
+                case "coconut":
+                    megajoules = 7.5f;
+                    break;
+                // Living food
+                case "mandrake":
+                case "scorpion":
+                    megajoules = 50;
+                    break;
+                case "tick":
+                    megajoules = 7.5f;
+                    break;
+                // Balloon and Balloon Bunch
+                case "balloon bunch":
+                    megajoules = 15;
+                    break;
+                case "balloon":
+                    megajoules = 5;
+                    break;
+                // Rope and Scout launchers
+                case "anti-rope cannon":
+                    megajoules = 77.5f;
+                    break;
+                case "chain launcher":
+                case "rescue claw":
+                    megajoules = 75;
+                    break;
+                case "rope cannon":
+                case "scout cannon":
+                    megajoules = 60;
+                    break;
+                // First aid and treatment
+                case "faerie lantern":
+                case "scout effigy":
+                    megajoules = 99.9f;
+                    break;
+                case "cursed skull":
+                case "the book of bones":
+                    megajoules = 96;
+                    break;
+                case "cure-all":
+                case "remedy fungus":
+                    megajoules = 80;
+                    break;
+                case "first aid kit":
+                    megajoules = 79.95f;
+                    break;
+                case "antidote":
+                case "medicinal root":
+                    megajoules = 50;
+                    break;
+                case "fortified milk":
+                    megajoules = 49.95f;
+                    break;
+                case "blowgun":
+                    megajoules = 45;
+                    break;
+                case "portable stove":
+                    megajoules = 44.95f;
+                    break;
+                case "heat pack":
+                    megajoules = 42;
+                    break;
+                case "aloe vera":
+                    megajoules = 30;
+                    break;
+                case "sunscreen":
+                    megajoules = 29.95f;
+                    break;
+                case "bandages":
+                    megajoules = 7.5f;
+                    break;
+                // Magical fungus (non-remedy)
+                case string s when s.Contains("fungus"):
+                case "magic bean":
+                    megajoules = 40;
+                    break;
+                // Mystical valuables
+                case "ancient idol":
+                    megajoules = 300;
+                    break;
+                case "bugle of friendship":
+                case "scoutmaster's bugle":
+                    megajoules = 60;
+                    break;
+                case "strange gem":
+                    megajoules = 19;
+                    break;
+                // Miscellaneous
+                case "anti-rope spool":
+                case "checkpoint flag":
+                    megajoules = 35;
+                    break;
+                case "parasol":
+                case "pirate's compass":
+                    megajoules = 33;
+                    break;
+                case "piton":
+                case "rope spool":
+                case "torch":
+                    megajoules = 25;
+                    break;
+                case "scroll":
+                    megajoules = 8;
+                    break;
+                case "cactus":
+                    megajoules = 1;
+                    break;
+                case "snowball":
+                    megajoules = 0.5f;
+                    break;
+                // Items found on the Shore, worth less to discourage farming
+                case "bugle":
+                case "guidebook":
+                    megajoules = 2;
+                    break;
+                case "compass":
+                case "flare":
+                    megajoules = 1.95f;
+                    break;
+                case "bing bong":
+                    megajoules = 1.88f;
+                    break;
+                case "binoculars":
+                case "lantern":
+                    megajoules = 1.5f;
+                    break;
+                case "flying disc":
+                    megajoules = 1;
+                    break;
+                case "conch":
+                    megajoules = 0.2f;
+                    break;
+            }
+            // Convert megajoules to joules (max 2 decimal places)
+            return ((int) Math.Round(megajoules * 100.0f)) * 10000;
         }
 
         /// <summary>
