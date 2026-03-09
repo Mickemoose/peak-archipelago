@@ -132,18 +132,18 @@ namespace Peak.AP
         /// Contribute energy to the EnergyLink pool
         /// </summary>
 
-        public void ContributeEnergy(int amount)
+        public void ContributeEnergy(string itemName, int amount)
         {
             if (!_isEnabled || amount <= 0) return;
 
-            _log.LogInfo($"[PeakPelago] ContributeEnergy called: {amount} (HasSession: {_session != null})");
+            _log.LogInfo($"[PeakPelago] ContributeEnergy called: {itemName}, {amount} (HasSession: {_session != null})");
 
             if (_session == null)
             {
                 if (_plugin != null && _plugin.PhotonView != null && PhotonNetwork.IsConnected)
                 {
-                    _log.LogInfo($"[PeakPelago] CLIENT: Requesting host to contribute {amount} energy");
-                    _plugin.PhotonView.RPC("RPC_ContributeEnergy", RpcTarget.MasterClient, amount);
+                    _log.LogInfo($"[PeakPelago] CLIENT: Requesting host to contribute {amount} J from {itemName}");
+                    _plugin.PhotonView.RPC("RPC_ContributeEnergy", RpcTarget.MasterClient, itemName, amount);
                 }
                 else
                 {
@@ -155,8 +155,29 @@ namespace Peak.AP
             try
             {
                 _dataStorageHelper[Scope.Global, _energyKey] += amount;
-                _log.LogInfo($"[PeakPelago] HOST: Contributed {amount} energy to EnergyLink");
-                _notifications.ShowEnergyLinkNotification($"EnergyLink: Contributed +{amount} energy");
+                _log.LogInfo($"[PeakPelago] HOST: Contributed {amount} J from {itemName} to EnergyLink");
+                double megajoules = (double) amount / 1000000f;
+                if (megajoules >= 1) {
+                    int kjRemainder = amount % 1000;
+                    if (kjRemainder == 0) {
+                        _notifications.ShowEnergyLinkNotification(
+                            $"EnergyLink: Contributed {megajoules:F0} MJ from {itemName}"
+                        );
+                    }
+                    else
+                    {
+                        _notifications.ShowEnergyLinkNotification(
+                            $"EnergyLink: Contributed {megajoules:F2} MJ from {itemName}"
+                        );
+                    }
+                }
+                else
+                {
+                    megajoules = (double) amount / 1000f;
+                    _notifications.ShowEnergyLinkNotification(
+                        $"EnergyLink: Contributed {megajoules:F0} kJ from {itemName}"
+                    );
+                }
             }
             catch (Exception ex)
             {
@@ -445,14 +466,22 @@ namespace Peak.AP
             // Check if it's a special item that shouldn't be converted
             string itemName = item.GetName().ToLower();
             
-            // Exclude important progression items
-            if (itemName.Contains("passport") || itemName.Contains("rook") || itemName.Contains("basketball") || itemName.Contains("pawn")
-                || itemName.Contains("knight") || itemName.Contains("king") || itemName.Contains("queen") || itemName.Contains("bishop"))
+            // Exclude Airport and highly dangerous items
+            switch (itemName)
             {
-                return false;
+                case "passport":
+                case "rook":
+                case "basketball":
+                case "pawn":
+                case "knight":
+                case "king":
+                case "queen":
+                case "bishop":
+                case "dynamite":
+                    return false;
+                default:
+                    return true;
             }
-            
-            return true;
         }
         /// <summary>
         /// Create the tertiary prompt UI
@@ -627,7 +656,7 @@ namespace Peak.AP
                     
                     _log.LogInfo($"[PeakPelago] Converting {itemName} to {energyValue} energy");
                     
-                    ContributeEnergy(energyValue);
+                    ContributeEnergy(itemName, energyValue);
                     item.overrideProgress = 0f;
                     item.overrideForceProgress = false;
                     item.StartCoroutine(item.ConsumeDelayed(ignoreActions: true));

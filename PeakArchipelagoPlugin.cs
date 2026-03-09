@@ -1862,15 +1862,15 @@ namespace Peak.AP
             EruptionTrapEffect.SpawnEruptionLocal(position, _log);
         }
         [PunRPC]
-        private void RPC_ContributeEnergy(int amount)
+        private void RPC_ContributeEnergy(string itemName, int amount)
         {
             try
             {
-                _log.LogInfo($"[PeakPelago] HOST: Received energy contribution request: {amount}");
+                _log.LogInfo($"[PeakPelago] HOST: Received energy contribution request: {itemName}, {amount}");
                 
                 if (_energyLinkService != null && _energyLinkService.IsEnabled())
                 {
-                    _energyLinkService.ContributeEnergy(amount);
+                    _energyLinkService.ContributeEnergy(itemName, amount);
                 }
             }
             catch (Exception ex)
