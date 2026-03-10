@@ -115,6 +115,7 @@ namespace Peak.AP
         private bool _deathLinkEnabled = false;
         private HashSet<string> _enabledTraps = new HashSet<string>();
         private string _energyLinkTeamName = "0";
+        private const int BUNDLE_COST = 400000000; // Same as AP_Links/EnergyLinkStore.cs
         private int _deathLinkBehavior = 0;
         private bool _deathLinkReceivedThisSession = false;
         private int _deathLinkSendBehavior = 0;
@@ -397,14 +398,14 @@ namespace Peak.AP
                 }
                 
                 // Check if we have enough energy
-                if (_energyLinkService.GetCurrentEnergy() < 300)
+                if (_energyLinkService.GetCurrentEnergy() < BUNDLE_COST)
                 {
-                    _log.LogWarning($"[PeakPelago] HOST: Not enough energy for purchase (have {_energyLinkService.GetCurrentEnergy()}, need 300)");
+                    _log.LogWarning($"[PeakPelago] HOST: Not enough energy for purchase (have {_energyLinkService.GetCurrentEnergy()}, need {BUNDLE_COST})");
                     return;
                 }
                 
                 // Consume the energy
-                if (_energyLinkService.ConsumeEnergy(300))
+                if (_energyLinkService.ConsumeEnergy(BUNDLE_COST))
                 {
                     _log.LogInfo($"[PeakPelago] HOST: Purchase successful, broadcasting to all clients");
                     

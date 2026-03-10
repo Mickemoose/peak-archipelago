@@ -156,10 +156,9 @@ namespace Peak.AP
             {
                 _dataStorageHelper[Scope.Global, _energyKey] += amount;
                 _log.LogInfo($"[PeakPelago] HOST: Contributed {amount} J from {itemName} to EnergyLink");
-                double megajoules = (double) amount / 1000000f;
+                double megajoules = ((double) amount) / 1000000f;
                 if (megajoules >= 1) {
-                    int kjRemainder = amount % 1000;
-                    if (kjRemainder == 0) {
+                    if (megajoules % 1 == 0) {
                         _notifications.ShowEnergyLinkNotification(
                             $"EnergyLink: Contributed {megajoules:F0} MJ from {itemName}"
                         );
@@ -173,9 +172,9 @@ namespace Peak.AP
                 }
                 else
                 {
-                    megajoules = (double) amount / 1000f;
+                    double kilojoules = ((double) amount) / 1000f;
                     _notifications.ShowEnergyLinkNotification(
-                        $"EnergyLink: Contributed {megajoules:F0} kJ from {itemName}"
+                        $"EnergyLink: Contributed {kilojoules:F0} kJ from {itemName}"
                     );
                 }
             }
@@ -208,7 +207,7 @@ namespace Peak.AP
             /*
             The below energy values were chosen in an attempt to match the expected energy earned from playing Plants vs. Zombies: Game of the Year Edition in the same multiworld.
             */
-            double megajoules = 30f;
+            float megajoules = 30f;
             switch (itemName)
             {
                 // Packaged foods
@@ -264,10 +263,6 @@ namespace Peak.AP
                     megajoules = 7.5f;
                     break;
                 // Living food
-                case "mandrake":
-                case "scorpion":
-                    megajoules = 50;
-                    break;
                 case "tick":
                     megajoules = 7.5f;
                     break;
@@ -394,7 +389,7 @@ namespace Peak.AP
                     break;
             }
             // Convert megajoules to joules (max 2 decimal places)
-            return ((int) Math.Round(megajoules * 100.0f)) * 10000;
+            return ((int) Mathf.RoundToInt(megajoules * 100.0f)) * 10000;
         }
 
         /// <summary>
@@ -433,7 +428,8 @@ namespace Peak.AP
                 _dataStorageHelper[Scope.Global, _energyKey] = energyOp;
                 
                 _log.LogInfo($"[PeakPelago] Consumed {amount} energy from EnergyLink");
-                _notifications.ShowEnergyLinkNotification($"EnergyLink: Consumed -{amount} energy");
+                double megajoules = ((double) amount) / 1000000f;
+                _notifications.ShowEnergyLinkNotification($"EnergyLink: Consumed -{megajoules:F0} MJ");
                 
                 return true;
             }
@@ -463,6 +459,9 @@ namespace Peak.AP
         {
             if (item == null) return false;
             
+            // Prevent conversion when in Airport
+            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (currentScene.Contains("Airport")) return false;
             // Check if it's a special item that shouldn't be converted
             string itemName = item.GetName().ToLower();
             
@@ -478,6 +477,8 @@ namespace Peak.AP
                 case "queen":
                 case "bishop":
                 case "dynamite":
+                case "mandrake":
+                case "scorpion":
                     return false;
                 default:
                     return true;

@@ -266,7 +266,7 @@ namespace Peak.AP
         private int _cachedEnergy = 0;
         private string _selectedBundleName;
         private Action _selectedBundleAction;
-        private const int BUNDLE_COST = 150000000; // 150 MJ
+        private const int BUNDLE_COST = 400000000; // 400 MJ
         private const float PURCHASE_TIME = 2f;
         private const float ENERGY_UPDATE_INTERVAL = 0.5f;
         private float _lastEnergyUpdateTime = 0f;
@@ -275,7 +275,7 @@ namespace Peak.AP
         private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new()
         {
             /*
-            " Alt" at the end of bundle names are hidden from players and logs. The total item cost of bundles cannot exceed the bundle cost.
+            " Alt" at the end of bundle names are hidden from players and logs. The total item cost of bundles cannot exceed half the bundle cost.
             */
             { "Trailblazer Snacks", new BundleDefinition("Granola Bar", 4) },
             { "Trailblazer Snacks Alt", new BundleDefinition([
@@ -285,27 +285,27 @@ namespace Peak.AP
             { "Lovely Bunch", new BundleDefinition("Item_Coconut", 4) },
             { "Lovely Bunch Alt", new BundleDefinition("Item_Coconut_half", 8) },
             { "Bear Favorite", new BundleDefinition("Item_Honeycomb", 4) },
-            { "Bear Favorite Alt", new BundleDefinition("Item_Honeycomb", 5) },
+            { "Bear Favorite Alt", new BundleDefinition("Item_Honeycomb", 6) },
             { "Rainy Day", new BundleDefinition("Parasol", 3) },
             { "Rainy Day Alt", new BundleDefinition("Parasol", 4) },
-            { "Turkey Day", new BundleDefinition("EggTurkey", 3) },
+            { "Turkey Day", new BundleDefinition("EggTurkey", 4) },
             { "Turkey Day Alt", new BundleDefinition([
                 ("EggTurkey", 2),
-                ("NestEgg", 1)
+                ("NestEgg", 3)
             ]) },
-            { "Special Delivery", new BundleDefinition("Lantern_Faerie", 1) },
+            { "Special Delivery", new BundleDefinition("Lantern_Faerie", 2) },
             { "Special Delivery Alt", new BundleDefinition("Dynamite", 5) },
             { "For Your Health", new BundleDefinition([
                 ("FirstAidKit", 1),
-                ("Bandages", 3)
+                ("Bandages", 4)
             ]) },
             { "For Your Health Alt", new BundleDefinition("Bandages", 8) },
-            { "Rooty Tooty", new BundleDefinition("MedicinalRoot", 3) },
+            { "Rooty Tooty", new BundleDefinition("MedicinalRoot", 4) },
             { "Rooty Tooty Alt", new BundleDefinition([
-                ("MedicinalRoot", 2),
+                ("MedicinalRoot", 3),
                 ("Mandrake", 1)
             ]) },
-            { "Grapple Pack", new BundleDefinition("RopeShooter", 2)},
+            { "Grapple Pack", new BundleDefinition("RopeShooter", 3)},
             { "Grapple Pack Alt", new BundleDefinition([
                 ("ChainShooter", 1),
                 ("RescueHook", 1)
@@ -320,7 +320,7 @@ namespace Peak.AP
             ])},
             { "Sugar Rush Alt", new BundleDefinition([
                 ("Lollipop", 2),
-                ("Energy Drink", 3)
+                ("Energy Drink", 4)
             ])}
         };
         
@@ -393,7 +393,7 @@ namespace Peak.AP
             if (_selectedBundleName.EndsWith(" Alt"))
             {
                 altBundleName = _selectedBundleName.Substring(
-                    0, _selectedBundleName.Length - 9
+                    0, _selectedBundleName.Length - 4
                 );
             }
             _log?.LogInfo($"[EnergyLinkStore] Selected bundle: {altBundleName}");
@@ -528,17 +528,17 @@ namespace Peak.AP
             string altBundleName = _selectedBundleName;
             if (_selectedBundleName.EndsWith(" Alt"))
             {
-                altBundleName = _selectedBundleName.Substring(0, _selectedBundleName.Length - 9);
+                altBundleName = _selectedBundleName.Substring(0, _selectedBundleName.Length - 4);
             }
-            double cachedMegajoules = (double) _cachedEnergy / 1000000f;
-            double bundleMegajoules = (double) BUNDLE_COST / 1000000f;
+            double cachedMegajoules = ((double) _cachedEnergy) / 1000000f;
+            double bundleMegajoules = ((double) BUNDLE_COST) / 1000000f;
             if (_cachedEnergy >= BUNDLE_COST)
             {
-                return $"Bundle: {altBundleName}\n{bundleMegajoules} MJ";
+                return $"Bundle: {altBundleName}\n{cachedMegajoules:F2} / {bundleMegajoules:F0} MJ";
             }
             else
             {
-                return $"Bundle: {altBundleName}\nNOT ENOUGH ENERGY\n({cachedMegajoules:F2}/{bundleMegajoules:F0} MJ)";
+                return $"Bundle: {altBundleName}\nNOT ENOUGH ENERGY\n({cachedMegajoules:F2} / {bundleMegajoules:F0} MJ)";
             }
         }
 
