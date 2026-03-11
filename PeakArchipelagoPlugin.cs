@@ -326,7 +326,7 @@ namespace Peak.AP
                             return itemName?.Equals("Progressive Endurance", StringComparison.OrdinalIgnoreCase) ?? false;
                         });
                         
-                        enduranceCount = Math.Min(enduranceCount, 4);
+                        enduranceCount = Mathf.Min(enduranceCount, 4);
                         
                         if (enduranceCount > 0)
                         {
@@ -2062,7 +2062,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Endurance", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
                 
-                enduranceCount = Math.Min(enduranceCount, 4);
+                enduranceCount = Mathf.Min(enduranceCount, 4);
                 
                 if (enduranceCount > 0)
                 {
@@ -2091,7 +2091,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Mountain", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
                 
-                mountainCount = Math.Min(mountainCount, 4); // Cap at 4
+                mountainCount = Mathf.Min(mountainCount, 4); // Cap at 4
                 _progressiveMountainCount = mountainCount;
                 
                 _log.LogInfo($"[PeakPelago] Applied Progressive Mountain: {mountainCount}/4 received");
@@ -2139,7 +2139,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Mountain", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
                 
-                mountainCount = Math.Min(mountainCount, 4);
+                mountainCount = Mathf.Min(mountainCount, 4);
                 _progressiveMountainCount = mountainCount;
                 
                 _log.LogInfo($"[PeakPelago] Recovered {mountainCount} Progressive Mountain items");
@@ -2164,7 +2164,7 @@ namespace Peak.AP
                 });
                 
                 // Cap upgrades
-                enduranceCount = Math.Min(enduranceCount, 8);
+                enduranceCount = Mathf.Min(enduranceCount, 8);
                 
                 _log.LogInfo($"[PeakPelago] Applied Progressive Endurance: {enduranceCount} upgrades received");
                 
@@ -2259,7 +2259,7 @@ namespace Peak.AP
                 float targetStamina = 0.25f + (staminaItems * 0.25f);
                 float currentStamina = _staminaManager.GetBaseMaxStamina();
                 
-                if (Math.Abs(targetStamina - currentStamina) < 0.01f)
+                if (Mathf.Abs(targetStamina - currentStamina) < 0.01f)
                 {
                     _log.LogInfo($"[PeakPelago] Stamina already correct: {currentStamina}");
                     return;
@@ -2371,7 +2371,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
 
-                progressiveAscentCount = Math.Min(progressiveAscentCount, 7);
+                progressiveAscentCount = Mathf.Min(progressiveAscentCount, 7);
 
                 _log.LogInfo($"[PeakPelago] UnlockAscent: {progressiveAscentCount} Progressive Ascent items received");
 
@@ -2637,7 +2637,7 @@ namespace Peak.AP
             
             _log.LogInfo($"[PeakPelago] Found {validItems.Count} valid (non-trap, non-progressive) items");
             
-            var skipCount = Math.Max(0, validItems.Count - itemCount);
+            var skipCount = Mathf.Max(0, validItems.Count - itemCount);
             var lastItems = validItems.Skip(skipCount).ToList();
             
             _log.LogInfo($"[PeakPelago] Spawning last {lastItems.Count} items at run start");

@@ -69,7 +69,7 @@ namespace Peak.AP
             _setFontSize(labelStyle, buttonStyle, textFieldStyle);
             labelStyle.normal.textColor = Color.white;
 
-            int rectWidth = (int)Math.Round(320.0 * ((double)_fontSize / 12.0));
+            int rectWidth = (int) Mathf.RoundToInt(320f * ((float)_fontSize / 12f));
             int rowHeight = _fontSize + 8;
             int xPos = 16;
             int yPos = 10;
