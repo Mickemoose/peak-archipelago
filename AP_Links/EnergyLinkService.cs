@@ -343,6 +343,9 @@ namespace Peak.AP
                 case "strange gem":
                     megajoules = 19;
                     break;
+                case "torn page":
+                    megajoules = 10;
+                    break;
                 // Miscellaneous
                 case "anti-rope spool":
                 case "checkpoint flag":
