@@ -34,14 +34,14 @@ Rename-Item -Path "peak.zip" -NewName "peak.apworld"
 
 Write-Host "Successfully created peak.apworld" -ForegroundColor Green
 
-# Copy peak folder to Archipelago-Peak/worlds directory
+# Copy peak folder to Archipelago-Peak/worlds-link directory
 Write-Host "Copying peak folder to Archipelago worlds directory..." -ForegroundColor Yellow
 
-$destinationPath = "F:\Game Dev Stuff\Archipelago-Peak\worlds\peak"
+$destinationPath = "worlds-link\peak"
 
-# Create worlds directory if it doesn't exist
-if (-not (Test-Path "F:\Game Dev Stuff\Archipelago-Peak\worlds")) {
-    New-Item -Path "F:\Game Dev Stuff\Archipelago-Peak\worlds" -ItemType Directory
+# Create worlds-link directory if it doesn't exist
+if (-not (Test-Path "worlds-link")) {
+    New-Item -Path "worlds-link" -ItemType Directory
 }
 
 # Remove old peak folder if it exists
