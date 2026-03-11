@@ -29,7 +29,7 @@ After a successful connection, start a new lobby and begin playing.
 
 ## Credits
 
-- **Mod Contributors**: ArchipelagoBrad, ManNamedGarbo, Mickemoose
+- **Mod Contributors**: ArchipelagoBrad, ManNamedGarbo, Mickemoose, Dmonet, Jack5
 - **Archipelago**: [Archipelago Team](https://archipelago.gg/)
 - **PEAK**: [Landfall](https://landfall.se/) & [Aggro Crab](https://aggrocrab.com/)
 - **BepInEx**: [BepInEx Team](https://github.com/BepInEx/BepInEx)
