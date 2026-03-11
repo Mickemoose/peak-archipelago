@@ -305,23 +305,51 @@ namespace Peak.AP
                 ("MedicinalRoot", 3),
                 ("Mandrake", 1)
             ]) },
-            { "Grapple Pack", new BundleDefinition("RopeShooter", 3)},
+            { "Banana Bonanza", new BundleDefinition([
+                ("Berrynana Yellow", 4),
+                ("Berrynana Pink", 4),
+            ]) },
+            { "Banana Bonanza Alt", new BundleDefinition([
+                ("Berrynana Blue", 4),
+                ("Berrynana Brown", 4),
+            ]) },
+            { "Cluster Of Berries" , new BundleDefinition([
+                ("Apple Berry Green", 1),
+                ("Apple Berry Red", 1),
+                ("Clusterberry Red", 1),
+                ("Clusterberry Yellow", 1),
+                ("Kingberry Green", 1),
+                ("Kingberry Yellow", 1),
+                ("Prickleberry_Red", 1),
+                ("Winterberry Orange", 1),
+            ]) },
+            { "Cluster Of Berries Alt" , new BundleDefinition([
+                ("Apple Berry Red", 1),
+                ("Apple Berry Yellow", 1),
+                ("Clusterberry Black", 1),
+                ("Clusterberry Yellow", 1),
+                ("Kingberry Green", 1),
+                ("Kingberry Purple", 1),
+                ("Prickleberry_Gold", 1),
+                ("Winterberry Yellow", 1),
+            ]) },
+            { "Grapple Pack", new BundleDefinition("RopeShooter", 3) },
             { "Grapple Pack Alt", new BundleDefinition([
                 ("ChainShooter", 1),
                 ("RescueHook", 1)
-            ])},
-            { "Mass Production", new BundleDefinition("BingBong", 4)},
-            { "Mass Production Alt", new BundleDefinition("BingBong", 8)},
+            ]) },
+            { "Mass Production", new BundleDefinition("BingBong", 4) },
+            { "Mass Production Alt", new BundleDefinition("BingBong", 8) },
             { "Night Night", new BundleDefinition("HealingDart Variant", 2) },
             { "Night Night Alt", new BundleDefinition("Napberry", 2) },
             { "Sugar Rush", new BundleDefinition([
                 ("Lollipop", 1),
                 ("Energy Drink", 4)
-            ])},
+            ]) },
             { "Sugar Rush Alt", new BundleDefinition([
                 ("Lollipop", 2),
                 ("Energy Drink", 4)
-            ])}
+            ]) }
         };
         
         private class BundleDefinition
