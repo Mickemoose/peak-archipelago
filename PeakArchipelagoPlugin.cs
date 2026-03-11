@@ -115,6 +115,7 @@ namespace Peak.AP
         private bool _deathLinkEnabled = false;
         private HashSet<string> _enabledTraps = new HashSet<string>();
         private string _energyLinkTeamName = "0";
+        private const int BUNDLE_COST = 400000000; // Same as AP_Links/EnergyLinkStore.cs
         private int _deathLinkBehavior = 0;
         private bool _deathLinkReceivedThisSession = false;
         private int _deathLinkSendBehavior = 0;
@@ -326,7 +327,7 @@ namespace Peak.AP
                             return itemName?.Equals("Progressive Endurance", StringComparison.OrdinalIgnoreCase) ?? false;
                         });
                         
-                        enduranceCount = Math.Min(enduranceCount, 4);
+                        enduranceCount = Mathf.Min(enduranceCount, 4);
                         
                         if (enduranceCount > 0)
                         {
@@ -398,14 +399,14 @@ namespace Peak.AP
                 }
                 
                 // Check if we have enough energy
-                if (_energyLinkService.GetCurrentEnergy() < 300)
+                if (_energyLinkService.GetCurrentEnergy() < BUNDLE_COST)
                 {
-                    _log.LogWarning($"[PeakPelago] HOST: Not enough energy for purchase (have {_energyLinkService.GetCurrentEnergy()}, need 300)");
+                    _log.LogWarning($"[PeakPelago] HOST: Not enough energy for purchase (have {_energyLinkService.GetCurrentEnergy()}, need {BUNDLE_COST})");
                     return;
                 }
                 
                 // Consume the energy
-                if (_energyLinkService.ConsumeEnergy(300))
+                if (_energyLinkService.ConsumeEnergy(BUNDLE_COST))
                 {
                     _log.LogInfo($"[PeakPelago] HOST: Purchase successful, broadcasting to all clients");
                     
@@ -1888,15 +1889,15 @@ namespace Peak.AP
             EruptionTrapEffect.SpawnEruptionLocal(position, _log);
         }
         [PunRPC]
-        private void RPC_ContributeEnergy(int amount)
+        private void RPC_ContributeEnergy(string itemName, int amount)
         {
             try
             {
-                _log.LogInfo($"[PeakPelago] HOST: Received energy contribution request: {amount}");
+                _log.LogInfo($"[PeakPelago] HOST: Received energy contribution request: {itemName}, {amount}");
                 
                 if (_energyLinkService != null && _energyLinkService.IsEnabled())
                 {
-                    _energyLinkService.ContributeEnergy(amount);
+                    _energyLinkService.ContributeEnergy(itemName, amount);
                 }
             }
             catch (Exception ex)
@@ -2087,7 +2088,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Endurance", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
                 
-                enduranceCount = Math.Min(enduranceCount, 4);
+                enduranceCount = Mathf.Min(enduranceCount, 4);
                 
                 if (enduranceCount > 0)
                 {
@@ -2116,7 +2117,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Mountain", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
                 
-                mountainCount = Math.Min(mountainCount, 4); // Cap at 4
+                mountainCount = Mathf.Min(mountainCount, 4); // Cap at 4
                 _progressiveMountainCount = mountainCount;
                 
                 _log.LogInfo($"[PeakPelago] Applied Progressive Mountain: {mountainCount}/4 received");
@@ -2164,7 +2165,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Mountain", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
                 
-                mountainCount = Math.Min(mountainCount, 4);
+                mountainCount = Mathf.Min(mountainCount, 4);
                 _progressiveMountainCount = mountainCount;
                 
                 _log.LogInfo($"[PeakPelago] Recovered {mountainCount} Progressive Mountain items");
@@ -2189,7 +2190,7 @@ namespace Peak.AP
                 });
                 
                 // Cap upgrades
-                enduranceCount = Math.Min(enduranceCount, 8);
+                enduranceCount = Mathf.Min(enduranceCount, 8);
                 
                 _log.LogInfo($"[PeakPelago] Applied Progressive Endurance: {enduranceCount} upgrades received");
                 
@@ -2284,7 +2285,7 @@ namespace Peak.AP
                 float targetStamina = 0.25f + (staminaItems * 0.25f);
                 float currentStamina = _staminaManager.GetBaseMaxStamina();
                 
-                if (Math.Abs(targetStamina - currentStamina) < 0.01f)
+                if (Mathf.Abs(targetStamina - currentStamina) < 0.01f)
                 {
                     _log.LogInfo($"[PeakPelago] Stamina already correct: {currentStamina}");
                     return;
@@ -2396,7 +2397,7 @@ namespace Peak.AP
                     return itemName?.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase) ?? false;
                 });
 
-                progressiveAscentCount = Math.Min(progressiveAscentCount, 7);
+                progressiveAscentCount = Mathf.Min(progressiveAscentCount, 7);
 
                 _log.LogInfo($"[PeakPelago] UnlockAscent: {progressiveAscentCount} Progressive Ascent items received");
 
@@ -2662,7 +2663,7 @@ namespace Peak.AP
             
             _log.LogInfo($"[PeakPelago] Found {validItems.Count} valid (non-trap, non-progressive) items");
             
-            var skipCount = Math.Max(0, validItems.Count - itemCount);
+            var skipCount = Mathf.Max(0, validItems.Count - itemCount);
             var lastItems = validItems.Skip(skipCount).ToList();
             
             _log.LogInfo($"[PeakPelago] Spawning last {lastItems.Count} items at run start");

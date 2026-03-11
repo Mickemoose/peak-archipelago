@@ -124,6 +124,15 @@ Requirements:
 - Harmony library
 - PEAK game assemblies for reference
 
+Setup:
+- Download and install .NET Framework
+- Create symbolic links to `PEAK` game folder and Archipelago `worlds` folder in project root (named `PEAK-link` and `worlds-link` respectively)
+
+Building:
+- Run `./build.ps1` (Windows) or `./build.sh` (Linux)
+- Copy `PeakArchipelagoPluginDLL/PeakArchipelago.dll` into `PEAK-link/BepInEx/plugins/peakpelago` folder
+- Copy `peak.apworld` into `worlds-link` folder
+
 ### Modifying the World
 
 The Python world code follows Archipelago's world API:

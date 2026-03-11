@@ -266,7 +266,7 @@ namespace Peak.AP
         private int _cachedEnergy = 0;
         private string _selectedBundleName;
         private Action _selectedBundleAction;
-        private const int BUNDLE_COST = 300;
+        private const int BUNDLE_COST = 400000000; // 400 MJ
         private const float PURCHASE_TIME = 2f;
         private const float ENERGY_UPDATE_INTERVAL = 0.5f;
         private float _lastEnergyUpdateTime = 0f;
@@ -274,23 +274,82 @@ namespace Peak.AP
         private Campfire _parentCampfire;
         private static readonly Dictionary<string, BundleDefinition> BundleDefinitions = new()
         {
-            { "Bundle: Trailblazer Snacks", new BundleDefinition([
+            /*
+            " Alt" at the end of bundle names are hidden from players and logs. The total item cost of bundles cannot exceed half the bundle cost.
+            */
+            { "Trailblazer Snacks", new BundleDefinition("Granola Bar", 4) },
+            { "Trailblazer Snacks Alt", new BundleDefinition([
                 ("Granola Bar", 2),
-                ("TrailMix", 4)
+                ("TrailMix", 6)
             ]) },
-            { "Bundle: Lovely Bunch", new BundleDefinition("Item_Coconut", 4) },
-            { "Bundle: Bear Favorite", new BundleDefinition("Item_Honeycomb", 6) },
-            { "Bundle: Rainy Day", new BundleDefinition("Parasol", 4) },
-            { "Bundle: Turkey Day", new BundleDefinition("EggTurkey", 3) },
-            { "Bundle: Special Delivery", new BundleDefinition("Dynamite", 5) },
-            { "Bundle: For Your Health", new BundleDefinition([
-                ("FirstAidKit", 4),
+            { "Lovely Bunch", new BundleDefinition("Item_Coconut", 4) },
+            { "Lovely Bunch Alt", new BundleDefinition("Item_Coconut_half", 8) },
+            { "Bear Favorite", new BundleDefinition("Item_Honeycomb", 4) },
+            { "Bear Favorite Alt", new BundleDefinition("Item_Honeycomb", 6) },
+            { "Rainy Day", new BundleDefinition("Parasol", 3) },
+            { "Rainy Day Alt", new BundleDefinition("Parasol", 4) },
+            { "Turkey Day", new BundleDefinition("EggTurkey", 4) },
+            { "Turkey Day Alt", new BundleDefinition([
+                ("EggTurkey", 2),
+                ("NestEgg", 3)
+            ]) },
+            { "Special Delivery", new BundleDefinition("Lantern_Faerie", 2) },
+            { "Special Delivery Alt", new BundleDefinition("Dynamite", 5) },
+            { "For Your Health", new BundleDefinition([
+                ("FirstAidKit", 1),
                 ("Bandages", 4)
             ]) },
-            { "Bundle: Rooty Tooty", new BundleDefinition([
-                ("MedicinalRoot", 6),
+            { "For Your Health Alt", new BundleDefinition("Bandages", 8) },
+            { "Rooty Tooty", new BundleDefinition("MedicinalRoot", 4) },
+            { "Rooty Tooty Alt", new BundleDefinition([
+                ("MedicinalRoot", 3),
                 ("Mandrake", 1)
             ]) },
+            { "Banana Bonanza", new BundleDefinition([
+                ("Berrynana Yellow", 4),
+                ("Berrynana Pink", 4),
+            ]) },
+            { "Banana Bonanza Alt", new BundleDefinition([
+                ("Berrynana Blue", 4),
+                ("Berrynana Brown", 4),
+            ]) },
+            { "Cluster Of Berries" , new BundleDefinition([
+                ("Apple Berry Green", 1),
+                ("Apple Berry Red", 1),
+                ("Clusterberry Red", 1),
+                ("Clusterberry Yellow", 1),
+                ("Kingberry Green", 1),
+                ("Kingberry Yellow", 1),
+                ("Prickleberry_Red", 1),
+                ("Winterberry Orange", 1),
+            ]) },
+            { "Cluster Of Berries Alt" , new BundleDefinition([
+                ("Apple Berry Red", 1),
+                ("Apple Berry Yellow", 1),
+                ("Clusterberry Black", 1),
+                ("Clusterberry Yellow", 1),
+                ("Kingberry Green", 1),
+                ("Kingberry Purple", 1),
+                ("Prickleberry_Gold", 1),
+                ("Winterberry Yellow", 1),
+            ]) },
+            { "Grapple Pack", new BundleDefinition("RopeShooter", 3) },
+            { "Grapple Pack Alt", new BundleDefinition([
+                ("ChainShooter", 1),
+                ("RescueHook", 1)
+            ]) },
+            { "Mass Production", new BundleDefinition("BingBong", 4) },
+            { "Mass Production Alt", new BundleDefinition("BingBong", 8) },
+            { "Night Night", new BundleDefinition("HealingDart Variant", 2) },
+            { "Night Night Alt", new BundleDefinition("Napberry", 2) },
+            { "Sugar Rush", new BundleDefinition([
+                ("Lollipop", 1),
+                ("Energy Drink", 4)
+            ]) },
+            { "Sugar Rush Alt", new BundleDefinition([
+                ("Lollipop", 2),
+                ("Energy Drink", 4)
+            ]) }
         };
         
         private class BundleDefinition
@@ -354,14 +413,24 @@ namespace Peak.AP
             var randomIndex = UnityEngine.Random.Range(0, bundleList.Count);
             var selectedBundle = bundleList[randomIndex];
 
-            _selectedBundleName = selectedBundle.Key;
             var bundleDef = selectedBundle.Value;
             _selectedBundleAction = () => DispenseBundle(bundleDef);
 
-            _log?.LogInfo($"[EnergyLinkStore] Selected bundle: {_selectedBundleName}");
+            _selectedBundleName = selectedBundle.Key;
+            string altBundleName = _selectedBundleName;
+            if (_selectedBundleName.EndsWith(" Alt"))
+            {
+                altBundleName = _selectedBundleName.Substring(
+                    0, _selectedBundleName.Length - 4
+                );
+            }
+            _log?.LogInfo($"[EnergyLinkStore] Selected bundle: {altBundleName}");
         }
         private void DispenseBundle(BundleDefinition bundle)
         {
+            _log?.LogInfo(
+                $"[EnergyLinkStore] Dispensing bundle: {_selectedBundleName}"
+            );
             if (_animator != null)
             {
                 _log?.LogInfo($"[EnergyLinkStore] Playing animation");
@@ -484,13 +553,20 @@ namespace Peak.AP
         {
             UpdateCachedEnergy();
             
+            string altBundleName = _selectedBundleName;
+            if (_selectedBundleName.EndsWith(" Alt"))
+            {
+                altBundleName = _selectedBundleName.Substring(0, _selectedBundleName.Length - 4);
+            }
+            double cachedMegajoules = ((double) _cachedEnergy) / 1000000f;
+            double bundleMegajoules = ((double) BUNDLE_COST) / 1000000f;
             if (_cachedEnergy >= BUNDLE_COST)
             {
-                return $"{_selectedBundleName}\n{BUNDLE_COST}J";
+                return $"Bundle: {altBundleName}\n{cachedMegajoules:F2} / {bundleMegajoules:F0} MJ";
             }
             else
             {
-                return $"NOT ENOUGH ENERGY\n({_cachedEnergy}/{BUNDLE_COST}J)";
+                return $"Bundle: {altBundleName}\nNOT ENOUGH ENERGY\n({cachedMegajoules:F2} / {bundleMegajoules:F0} MJ)";
             }
         }
 
