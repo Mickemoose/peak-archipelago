@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Helpers;
 using Archipelago.MultiClient.Net.DataPackage;
@@ -132,18 +133,18 @@ namespace Peak.AP
         /// Contribute energy to the EnergyLink pool
         /// </summary>
 
-        public void ContributeEnergy(int amount)
+        public void ContributeEnergy(string itemName, int amount)
         {
             if (!_isEnabled || amount <= 0) return;
 
-            _log.LogInfo($"[PeakPelago] ContributeEnergy called: {amount} (HasSession: {_session != null})");
+            _log.LogInfo($"[PeakPelago] ContributeEnergy called: {itemName}, {amount} (HasSession: {_session != null})");
 
             if (_session == null)
             {
                 if (_plugin != null && _plugin.PhotonView != null && PhotonNetwork.IsConnected)
                 {
-                    _log.LogInfo($"[PeakPelago] CLIENT: Requesting host to contribute {amount} energy");
-                    _plugin.PhotonView.RPC("RPC_ContributeEnergy", RpcTarget.MasterClient, amount);
+                    _log.LogInfo($"[PeakPelago] CLIENT: Requesting host to contribute {amount} J from {itemName}");
+                    _plugin.PhotonView.RPC("RPC_ContributeEnergy", RpcTarget.MasterClient, itemName, amount);
                 }
                 else
                 {
@@ -155,8 +156,28 @@ namespace Peak.AP
             try
             {
                 _dataStorageHelper[Scope.Global, _energyKey] += amount;
-                _log.LogInfo($"[PeakPelago] HOST: Contributed {amount} energy to EnergyLink");
-                _notifications.ShowEnergyLinkNotification($"EnergyLink: Contributed +{amount} energy");
+                _log.LogInfo($"[PeakPelago] HOST: Contributed {amount} J from {itemName} to EnergyLink");
+                double megajoules = ((double) amount) / 1000000f;
+                if (megajoules >= 1) {
+                    if (megajoules % 1 == 0) {
+                        _notifications.ShowEnergyLinkNotification(
+                            $"EnergyLink: Contributed {megajoules:F0} MJ from {itemName}"
+                        );
+                    }
+                    else
+                    {
+                        _notifications.ShowEnergyLinkNotification(
+                            $"EnergyLink: Contributed {megajoules:F2} MJ from {itemName}"
+                        );
+                    }
+                }
+                else
+                {
+                    double kilojoules = ((double) amount) / 1000f;
+                    _notifications.ShowEnergyLinkNotification(
+                        $"EnergyLink: Contributed {kilojoules:F0} kJ from {itemName}"
+                    );
+                }
             }
             catch (Exception ex)
             {
@@ -184,18 +205,195 @@ namespace Peak.AP
             if (item == null) return 0;
             
             string itemName = item.GetName().ToLower();
-            if (itemName.Contains("cursed skull") || itemName.Contains("pirate's compass") || itemName.Contains("faerie lantern") || itemName.Contains("pandora")
-                || itemName.Contains("scout effigy") || itemName.Contains("cure-all") || itemName.Contains("the book of bones"))
-                return 250;
-            if (itemName.Contains("ancient idol"))
-                return 1000;
-            if (itemName.Contains("conch"))
-                return 25;
-            if (itemName.Contains("bing bong"))
-                return 1;
-            
-            // Default value for misc items
-            return 100;
+            /*
+            The below energy values were chosen in an attempt to match the expected energy earned from playing Plants vs. Zombies: Game of the Year Edition in the same multiworld.
+            */
+            float megajoules = 30f;
+            switch (itemName)
+            {
+                // Packaged foods
+                case "pandora's lunchbox":
+                    megajoules = 66.6f;
+                    break;
+                case "airline food":
+                    megajoules = 40;
+                    break;
+                case "big lollipop":
+                case "scout cookies":
+                    megajoules = 39.95f;
+                    break;
+                case "granola bar":
+                    megajoules = 29.95f;
+                    break;
+                case string s when s.Contains("drink"):
+                case "trail mix":
+                    megajoules = 19.95f;
+                    break;
+                // Berries and mushrooms
+                case "napberry":
+                    megajoules = 55;
+                    break;
+                case string s when s.Contains("berrynana peel"):
+                    megajoules = 1;
+                    break;
+                case string s when s.Contains("berry"):
+                    megajoules = 9;
+                    break;
+                case string s when s.Contains("shroom"):
+                    megajoules = 10;
+                    break;
+                // Other naturally-found foods
+                case "beehive":
+                    megajoules = 60;
+                    break;
+                case "cooked bird":
+                case string s when s.Contains("egg"):
+                    megajoules = 40;
+                    break;
+                case "honeycomb":
+                    megajoules = 30;
+                    break;
+                case "hot dog":
+                case "marshmallow":
+                    megajoules = 29.95f;
+                    break;
+                case "half-coconut":
+                    megajoules = 3.75f;
+                    break;
+                case "coconut":
+                    megajoules = 7.5f;
+                    break;
+                // Living food
+                case "tick":
+                    megajoules = 7.5f;
+                    break;
+                // Balloon and Balloon Bunch
+                case "balloon bunch":
+                    megajoules = 15;
+                    break;
+                case "balloon":
+                    megajoules = 5;
+                    break;
+                // Rope and Scout launchers
+                case "anti-rope cannon":
+                    megajoules = 77.5f;
+                    break;
+                case "chain launcher":
+                case "rescue claw":
+                    megajoules = 75;
+                    break;
+                case "rope cannon":
+                case "scout cannon":
+                    megajoules = 60;
+                    break;
+                // First aid and treatment
+                case "faerie lantern":
+                case "scout effigy":
+                    megajoules = 99.9f;
+                    break;
+                case "cursed skull":
+                case "the book of bones":
+                    megajoules = 96;
+                    break;
+                case "cure-all":
+                case "remedy fungus":
+                    megajoules = 80;
+                    break;
+                case "first aid kit":
+                    megajoules = 79.95f;
+                    break;
+                case "antidote":
+                case "medicinal root":
+                    megajoules = 50;
+                    break;
+                case "fortified milk":
+                    megajoules = 49.95f;
+                    break;
+                case "blowgun":
+                    megajoules = 45;
+                    break;
+                case "portable stove":
+                    megajoules = 44.95f;
+                    break;
+                case "heat pack":
+                    megajoules = 42;
+                    break;
+                case "aloe vera":
+                    megajoules = 30;
+                    break;
+                case "sunscreen":
+                    megajoules = 29.95f;
+                    break;
+                case "bandages":
+                    megajoules = 7.5f;
+                    break;
+                // Magical fungus (non-remedy)
+                case string s when s.Contains("fungus"):
+                case "magic bean":
+                    megajoules = 40;
+                    break;
+                // Mystical valuables
+                case "ancient idol":
+                    megajoules = 300;
+                    break;
+                case "bugle of friendship":
+                case "scoutmaster's bugle":
+                    megajoules = 60;
+                    break;
+                case "strange gem":
+                    megajoules = 19;
+                    break;
+                case "torn page":
+                    megajoules = 10;
+                    break;
+                // Miscellaneous
+                case "anti-rope spool":
+                case "checkpoint flag":
+                    megajoules = 35;
+                    break;
+                case "parasol":
+                case "pirate's compass":
+                    megajoules = 33;
+                    break;
+                case "piton":
+                case "rope spool":
+                case "torch":
+                    megajoules = 25;
+                    break;
+                case "scroll":
+                    megajoules = 8;
+                    break;
+                case "cactus":
+                    megajoules = 1;
+                    break;
+                case "snowball":
+                    megajoules = 0.5f;
+                    break;
+                // Items found on the Shore, worth less to discourage farming
+                case "bugle":
+                case "guidebook":
+                    megajoules = 2;
+                    break;
+                case "compass":
+                case "flare":
+                    megajoules = 1.95f;
+                    break;
+                case "bing bong":
+                    megajoules = 1.88f;
+                    break;
+                case "binoculars":
+                case "lantern":
+                    megajoules = 1.5f;
+                    break;
+                case "flying disc":
+                    megajoules = 1;
+                    break;
+                case "conch":
+                    megajoules = 0.2f;
+                    break;
+            }
+            // Convert megajoules to joules (max 2 decimal places)
+            return ((int) Mathf.RoundToInt(megajoules * 100.0f)) * 10000;
         }
 
         /// <summary>
@@ -234,7 +432,61 @@ namespace Peak.AP
                 _dataStorageHelper[Scope.Global, _energyKey] = energyOp;
                 
                 _log.LogInfo($"[PeakPelago] Consumed {amount} energy from EnergyLink");
-                _notifications.ShowEnergyLinkNotification($"EnergyLink: Consumed -{amount} energy");
+                double megajoules = ((double) amount) / 1000000f;
+                List<string> messages = new List<string>
+                {
+                    "And through the square window is...",
+                    "*anxiety-inducing whirring noises*",
+                    "Are you feeling lucky?",
+                    "Bing Bong approves!",
+                    "Door opening, please stand clear.",
+                    "For your health!",
+                    "Generator online.",
+                    "Get a load of this!",
+                    "Gotta spend 'em all!",
+                    "Here, catch!",
+                    "Here's something to toot your bugle about.",
+                    "Initiating surprise in 3... 2... 1.",
+                    "It ain't Burger King, but it'll do.",
+                    "Mhhh, that's the good stuff.",
+                    "Now THIS is Pandora's Box.",
+                    "Please don't be cursed...",
+                    "Prepare to get bonked.",
+                    "Some items for your troubles.",
+                    "*slurping noises*",
+                    "Surprise! We're doing it now!",
+                    "This could be quite explosive...",
+                    "What could possibly go wrong?",
+                    "What's behind door #1?",
+                    "WHAT'S IN THE BOX!?!?",
+                    "What's the deal with airline food?",
+                    "Where are you getting all these batteries?",
+                    "You might just get a new check!",
+                };
+                // Add messages per active, alive character count
+                List<Character> validCharacters = Character.AllCharacters.Where(c =>
+                    c != null &&
+                    c.gameObject.activeInHierarchy &&
+                    !c.data.dead &&
+                    !c.data.fullyPassedOut
+                ).ToList();
+                if (validCharacters.Count >= 2)
+                {
+                    messages.Add("Let's get you all patched up.");
+                    messages.Add("Someone's gonna steal it all, I guarantee it.");
+                    messages.Add($"Watch out, {validCharacters.Count} Scouts are about!");
+                    messages.Add("What are y'all gonna get?");
+                    messages.Add("You all planning on sharing?");
+                }
+                else
+                {
+                    messages.Add("Been farming, have you?");
+                    messages.Add("If it's just you, who put these Stores here?");
+                    messages.Add("It's dangerous to go alone! Take this.");
+                    messages.Add("Let's get you patched up.");
+                    messages.Add("What are you gonna get?");
+                }
+                _notifications.ShowEnergyLinkNotification($"EnergyLink: Consumed -{megajoules:F0} MJ. {messages[UnityEngine.Random.Range(0, messages.Count)]}");
                 
                 return true;
             }
@@ -264,17 +516,30 @@ namespace Peak.AP
         {
             if (item == null) return false;
             
+            // Prevent conversion when in Airport
+            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (currentScene.Contains("Airport")) return false;
             // Check if it's a special item that shouldn't be converted
             string itemName = item.GetName().ToLower();
             
-            // Exclude important progression items
-            if (itemName.Contains("passport") || itemName.Contains("rook") || itemName.Contains("basketball") || itemName.Contains("pawn")
-                || itemName.Contains("knight") || itemName.Contains("king") || itemName.Contains("queen") || itemName.Contains("bishop"))
+            // Exclude Airport and highly dangerous items
+            switch (itemName)
             {
-                return false;
+                case "passport":
+                case "rook":
+                case "basketball":
+                case "pawn":
+                case "knight":
+                case "king":
+                case "queen":
+                case "bishop":
+                case "dynamite":
+                case "mandrake":
+                case "scorpion":
+                    return false;
+                default:
+                    return true;
             }
-            
-            return true;
         }
         /// <summary>
         /// Create the tertiary prompt UI
@@ -449,7 +714,7 @@ namespace Peak.AP
                     
                     _log.LogInfo($"[PeakPelago] Converting {itemName} to {energyValue} energy");
                     
-                    ContributeEnergy(energyValue);
+                    ContributeEnergy(itemName, energyValue);
                     item.overrideProgress = 0f;
                     item.overrideForceProgress = false;
                     item.StartCoroutine(item.ConsumeDelayed(ignoreActions: true));
