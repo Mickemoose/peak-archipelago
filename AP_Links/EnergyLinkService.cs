@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Helpers;
 using Archipelago.MultiClient.Net.DataPackage;
@@ -429,7 +430,60 @@ namespace Peak.AP
                 
                 _log.LogInfo($"[PeakPelago] Consumed {amount} energy from EnergyLink");
                 double megajoules = ((double) amount) / 1000000f;
-                _notifications.ShowEnergyLinkNotification($"EnergyLink: Consumed -{megajoules:F0} MJ");
+                List<string> messages = new List<string>
+                {
+                    "And through the square window is...",
+                    "*anxiety-inducing whirring noises*",
+                    "Are you feeling lucky?",
+                    "Bing Bong approves!",
+                    "Door opening, please stand clear.",
+                    "For your health!",
+                    "Generator online.",
+                    "Get a load of this!",
+                    "Gotta spend 'em all!",
+                    "Here, catch!",
+                    "Here's something to toot your bugle about.",
+                    "Initiating surprise in 3... 2... 1.",
+                    "It ain't Burger King, but it'll do.",
+                    "Mhhh, that's the good stuff.",
+                    "Now THIS is Pandora's Box.",
+                    "Please don't be cursed...",
+                    "Prepare to get bonked.",
+                    "Some items for your troubles.",
+                    "*slurping noises*",
+                    "Surprise! We're doing it now!",
+                    "This could be quite explosive...",
+                    "What could possibly go wrong?",
+                    "What's behind door #1?",
+                    "WHAT'S IN THE BOX!?!?",
+                    "What's the deal with airline food?",
+                    "Where are you getting all these batteries?",
+                    "You might just get a new check!",
+                };
+                // Add messages per active, alive character count
+                List<Character> validCharacters = Character.AllCharacters.Where(c =>
+                    c != null &&
+                    c.gameObject.activeInHierarchy &&
+                    !c.data.dead &&
+                    !c.data.fullyPassedOut
+                ).ToList();
+                if (validCharacters.Count >= 2)
+                {
+                    messages.Add("Let's get you all patched up.");
+                    messages.Add("Someone's gonna steal it all, I guarantee it.");
+                    messages.Add($"Watch out, {validCharacters.Count} Scouts are about!");
+                    messages.Add("What are y'all gonna get?");
+                    messages.Add("You all planning on sharing?");
+                }
+                else
+                {
+                    messages.Add("Been farming, have you?");
+                    messages.Add("If it's just you, who put these Stores here?");
+                    messages.Add("It's dangerous to go alone! Take this.");
+                    messages.Add("Let's get you patched up.");
+                    messages.Add("What are you gonna get?");
+                }
+                _notifications.ShowEnergyLinkNotification($"EnergyLink: Consumed -{megajoules:F0} MJ. {messages[UnityEngine.Random.Range(0, messages.Count)]}");
                 
                 return true;
             }
