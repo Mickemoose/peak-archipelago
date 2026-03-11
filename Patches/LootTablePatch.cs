@@ -27,14 +27,14 @@ namespace PeakArchipelago
                 // so they get proper original weights for unlock/lock cycling
                 var multiplayerItems = new Dictionary<ushort, int>
                 {
-                    { 70, 15 },  // Blowgun
+                    { 70, 1 },  // Blowgun
                 };
 
                 var multiplayerSpecialItems = new Dictionary<ushort, int>
                 {
-                    { 25, 11 },  // Cursed Skull
-                    { 67, 11 },  // Scout Effigy
-                    { 16, 11 },  // Bugle of Friendship
+                    { 25, 1 },  // Cursed Skull
+                    { 67, 1 },  // Scout Effigy
+                    { 16, 1 },  // Bugle of Friendship
                 };
 
                 SpawnPool[] specialPools = [SpawnPool.RespawnCoffin, SpawnPool.LuggageCursed];
@@ -118,6 +118,21 @@ namespace PeakArchipelago
             return true;
         }
     }
+    [HarmonyPatch(typeof(Item), "IsValidToSpawn")]
+    public static class ItemIsValidToSpawnPatch
+    {
+        static bool Prefix(ref bool __result)
+        {
+            // AP manages the loot tables directly — skip the banInSolo check
+            if (PeakArchipelagoPlugin._instance?.Session != null)
+            {
+                __result = true;
+                return false;
+            }
+            return true;
+        }
+    }
+
     [HarmonyPatch(typeof(LootData), nameof(LootData.GetRandomItem))]
     public static class LootDataGetRandomItemPatch
     {

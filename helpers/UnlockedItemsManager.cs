@@ -141,22 +141,19 @@ namespace Peak.AP
                     {
                         if (unlockedItems.Contains(itemId))
                         {
-                            // Restore the item with original weight
-                            int originalWeight = OriginalLootWeights.GetOriginalWeight(pool, itemId);
-                            if (originalWeight > 0)
+                            // Add unlocked item to pool with equal weight regardless of original presence
+                            const int equalWeight = 1;
+                            if (!LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
                             {
-                                if (!LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
-                                {
-                                    LootData.AllSpawnWeightData[pool].Add(itemId, originalWeight);
-                                    restoredCount++;
-                                    _log?.LogDebug($"[PeakPelago] Added unlocked item {itemId} to pool {pool} (weight: {originalWeight})");
-                                }
-                                else if (LootData.AllSpawnWeightData[pool][itemId] != originalWeight)
-                                {
-                                    LootData.AllSpawnWeightData[pool][itemId] = originalWeight;
-                                    restoredCount++;
-                                    _log?.LogDebug($"[PeakPelago] Updated unlocked item {itemId} in pool {pool} (weight: {originalWeight})");
-                                }
+                                LootData.AllSpawnWeightData[pool].Add(itemId, equalWeight);
+                                restoredCount++;
+                                _log?.LogDebug($"[PeakPelago] Added unlocked item {itemId} to pool {pool} (weight: {equalWeight})");
+                            }
+                            else if (LootData.AllSpawnWeightData[pool][itemId] != equalWeight)
+                            {
+                                LootData.AllSpawnWeightData[pool][itemId] = equalWeight;
+                                restoredCount++;
+                                _log?.LogDebug($"[PeakPelago] Updated unlocked item {itemId} in pool {pool} (weight: {equalWeight})");
                             }
                         }
                         else

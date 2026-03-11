@@ -1,6 +1,7 @@
 using System;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Peak.AP
 {
@@ -45,14 +46,44 @@ namespace Peak.AP
                 // The green bar shows effective stamina (base minus afflictions)
                 float effectiveMax = Mathf.Max(baseMaxStamina - statusSum, 0f);
                 
+                float targetMaxWidth = Mathf.Max(0f, effectiveMax * __instance.fullBar.sizeDelta.x + __instance.staminaBarOffset);
+                float lerpedMaxWidth = Mathf.Lerp(
+                    __instance.maxStaminaBar.sizeDelta.x,
+                    targetMaxWidth,
+                    Time.deltaTime * 10f
+                );
+
                 __instance.maxStaminaBar.sizeDelta = new Vector2(
-                    Mathf.Lerp(
-                        __instance.maxStaminaBar.sizeDelta.x,
-                        Mathf.Max(0f, effectiveMax * __instance.fullBar.sizeDelta.x + __instance.staminaBarOffset),
-                        Time.deltaTime * 10f
-                    ),
+                    lerpedMaxWidth,
                     __instance.maxStaminaBar.sizeDelta.y
                 );
+
+                // Disable the LayoutGroup so we can position afflictions manually
+                if (__instance.afflictions.Length > 0)
+                {
+                    Transform layoutGroupTransform = __instance.afflictions[0].rtf.parent;
+                    if (layoutGroupTransform != null)
+                    {
+                        var hlg = layoutGroupTransform.GetComponent<HorizontalLayoutGroup>();
+                        if (hlg != null && hlg.enabled)
+                        {
+                            hlg.enabled = false;
+                        }
+                    }
+
+                    // Position afflictions manually after the green bar
+                    float stackOffset = 0f;
+                    for (int i = 0; i < __instance.afflictions.Length; i++)
+                    {
+                        var aff = __instance.afflictions[i];
+                        if (!aff.gameObject.activeSelf || aff.width <= 0.01f)
+                            continue;
+
+                        float x = lerpedMaxWidth + stackOffset + (aff.width * 0.5f);
+                        aff.rtf.anchoredPosition = new Vector2(x, aff.rtf.anchoredPosition.y);
+                        stackOffset += aff.width;
+                    }
+                }
             }
             catch (Exception ex)
             {

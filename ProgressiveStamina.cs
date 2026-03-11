@@ -382,28 +382,8 @@ namespace Peak.AP
                 }
 
                 __instance.gameObject.SetActive(true);
-                __instance.size = bar.fullBar.sizeDelta.x * currentStatus;
-                __instance.width = __instance.size;
-                __instance.rtf.sizeDelta = new Vector2(__instance.width, __instance.rtf.sizeDelta.y);
-                float startX = bar.maxStaminaBar.sizeDelta.x + (__instance.width * 0.5f);
-                float stackOffset = 0f;
-                for (int i = 0; i < bar.afflictions.Length; i++)
-                {
-                    if (bar.afflictions[i] == __instance)
-                    {
-                        break;
-                    }
-                    
-                    if (bar.afflictions[i].gameObject.activeSelf && bar.afflictions[i].width > 0.01f)
-                    {
-                        stackOffset += bar.afflictions[i].width;
-                    }
-                }
-                
-                float finalX = startX + stackOffset;
-                __instance.rtf.anchoredPosition = new Vector2(finalX, __instance.rtf.anchoredPosition.y);
-
-                return false;
+                // Let the vanilla method handle the width lerp and let Unity's layout system handle positioning
+                return true;
             }
             catch (Exception ex)
             {
