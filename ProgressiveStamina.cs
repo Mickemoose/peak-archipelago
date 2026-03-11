@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using BepInEx.Logging;
 using HarmonyLib;
 using Photon.Pun;
@@ -497,7 +498,7 @@ namespace Peak.AP
 
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
-                
+
                 if (statusSum < baseMaxStamina && Time.time - __instance.data.lastPassedOut > 3f)
                 {
                     if (!__instance.photonView.IsMine)
@@ -560,9 +561,9 @@ namespace Peak.AP
 
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
-                
+
                 bool shouldPassOut = statusSum >= baseMaxStamina;
-                
+
                 if (__instance.data.isSkeleton)
                 {
                     if (shouldPassOut)
@@ -601,6 +602,78 @@ namespace Peak.AP
             {
                 Debug.LogError($"[PeakPelago] HandleLife patch error: {ex.Message}");
                 return true;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(CharacterAfflictions), "AddStatus")]
+    public static class CharacterAfflictionsAddStatusPatch
+    {
+        private static ProgressiveStaminaManager _staminaManager;
+        private static FieldInfo _statusArrayField;
+
+        public static void SetStaminaManager(ProgressiveStaminaManager manager)
+        {
+            _staminaManager = manager;
+        }
+
+        static void Prefix(CharacterAfflictions __instance, CharacterAfflictions.STATUSTYPE statusType, out float __state)
+        {
+            __state = __instance.GetCurrentStatus(statusType);
+        }
+
+        static void Postfix(CharacterAfflictions __instance, CharacterAfflictions.STATUSTYPE statusType, float amount, float __state)
+        {
+            try
+            {
+                if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
+                    return;
+
+                float baseMax = _staminaManager.GetBaseMaxStamina(__instance.character);
+                if (baseMax <= 1.0f) return;
+
+                float afterAdd = __instance.GetCurrentStatus(statusType);
+                float desired = __state + amount;
+
+                // If the game didn't clamp, nothing to fix
+                if (afterAdd >= desired) return;
+
+                // Find the internal float array on first use
+                if (_statusArrayField == null)
+                {
+                    foreach (var field in typeof(CharacterAfflictions).GetFields(
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+                    {
+                        if (field.FieldType == typeof(float[]))
+                        {
+                            float[] arr = (float[])field.GetValue(__instance);
+                            if (arr != null && arr.Length > (int)statusType)
+                            {
+                                _statusArrayField = field;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (_statusArrayField == null) return;
+
+                float[] statuses = (float[])_statusArrayField.GetValue(__instance);
+                int index = (int)statusType;
+                if (index < 0 || index >= statuses.Length) return;
+
+                // Calculate how much room this status type has
+                float otherSum = 0f;
+                for (int i = 0; i < statuses.Length; i++)
+                {
+                    if (i != index) otherSum += statuses[i];
+                }
+                float maxForThis = Mathf.Max(baseMax - otherSum, 0f);
+                statuses[index] = Mathf.Clamp(desired, 0f, maxForThis);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PeakPelago] AddStatus uncap patch error: {ex.Message}");
             }
         }
     }

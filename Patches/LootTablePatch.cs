@@ -23,10 +23,8 @@ namespace PeakArchipelago
                     return;
                 }
 
-                // Capture original weights
-                OriginalLootWeights.CaptureOriginalWeights();
-
-                // Add multiplayer only items (special items still go to special pools which are just luggage cursed and the statue)
+                // Add multiplayer only items BEFORE capturing original weights
+                // so they get proper original weights for unlock/lock cycling
                 var multiplayerItems = new Dictionary<ushort, int>
                 {
                     { 70, 15 },  // Blowgun
@@ -76,6 +74,9 @@ namespace PeakArchipelago
                         }
                     }
                 }
+
+                // Capture original weights AFTER multiplayer items are added
+                OriginalLootWeights.CaptureOriginalWeights();
 
                 UnlockedItemsManager.CheckDeferredRefresh();
             }

@@ -162,6 +162,7 @@ namespace Peak.AP
                 CharacterHandlePassedOutPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionChangeAfflictionPatch.SetStaminaManager(_staminaManager);
+                CharacterAfflictionsAddStatusPatch.SetStaminaManager(_staminaManager);
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _hardRingLinkService = new HardRingLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
@@ -625,11 +626,36 @@ namespace Peak.AP
             try
             {
                 _log.LogInfo($"[PeakPelago] Received check '{locationName}' from player {senderId}");
-                
+
                 // Only the host processes and reports to Archipelago
                 if (PhotonNetwork.IsMasterClient)
                 {
                     ReportCheckByName(locationName);
+
+                    // Track badge for goal completion if this check is a badge
+                    var badgeMapping = GetBadgeToLocationMapping();
+                    foreach (var kvp in badgeMapping)
+                    {
+                        if (kvp.Value == locationName)
+                        {
+                            _collectedBadges.Add(kvp.Key);
+                            _log.LogInfo($"[PeakPelago] Tracked badge '{locationName}' from player {senderId} ({_collectedBadges.Count} total)");
+
+                            if (_collectedBadges.Count >= _slotRequiredBadges)
+                            {
+                                _log.LogInfo("[PeakPelago] All required badges collected - reporting All Badges Collected location");
+                                ReportCheckByName("All Badges Collected");
+                            }
+                            if (kvp.Key == ACHIEVEMENTTYPE.TwentyFourKaratBadge)
+                            {
+                                _log.LogInfo("[PeakPelago] 24 Karat Badge earned - reporting Idol Dunked location");
+                                ReportCheckByName("Idol Dunked");
+                            }
+
+                            CheckForGoalCompletion(kvp.Key);
+                            break;
+                        }
+                    }
                 }
                 else
                 {
@@ -4743,7 +4769,7 @@ namespace Peak.AP
                 _stateData.LastProcessedItemIndex = item.itemIndex;
                 SaveState();
                 _lastItemProcessed = Time.time;
-                UnlockedItemsManager.CheckDeferredRefresh();
+                UnlockedItemsManager.RequestRefresh();
             }
             catch (Exception ex)
             {
