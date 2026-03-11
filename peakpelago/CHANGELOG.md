@@ -7,7 +7,7 @@
     <li>Campfires will show a hint to Progressive Mountain</li>
     <li>Potential fix for Daredevil Badge not triggering</li>
     <li>24 Karat Badge in logic fixed</li>
-    <li>EnergyLink values rebalanced & EnergyLink slightly reworked & improved thanks to Jacks5</li>
+    <li>EnergyLink values rebalanced & EnergyLink improved thanks to Jacks5</li>
     <li>All items have the same weight in the loot pools and all multiplayer only items skip the multiplayer check when spawning</li>
     <li>Afflictions will kill you with additional stamina bars enabled now</li>
 </ul>
