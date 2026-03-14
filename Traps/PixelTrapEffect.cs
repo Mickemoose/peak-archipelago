@@ -107,19 +107,21 @@ namespace Peak.AP
             {
                 log.LogError("[PeakPelago] No render pipeline asset found!");
                 _isActive = false;
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                 yield break;
             }
 
             var urpAssetType = urpAsset.GetType();
-            
+
             // Get renderScale property
             var renderScaleProperty = urpAssetType.GetProperty("renderScale");
             var upscalingFilterProperty = urpAssetType.GetProperty("upscalingFilter");
-            
+
             if (renderScaleProperty == null)
             {
                 log.LogError("[PeakPelago] Could not find renderScale property!");
                 _isActive = false;
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                 yield break;
             }
 
@@ -164,6 +166,7 @@ namespace Peak.AP
 
             log.LogInfo("[PeakPelago] Screen restored to normal resolution!");
             _isActive = false;
+            PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
         }
     }
 }

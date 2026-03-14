@@ -42,6 +42,10 @@ namespace Peak.AP
         EruptionTrap,
         BeetleHordeTrap,
         CustomTriviaTrap,
+        PokemonCountTrap,
+        InvertedMouseTrap,
+        StaminaDrainTrap,
+        ChaosControlTrap,
     }
 
     public static class TrapTypeExtensions
@@ -83,6 +87,10 @@ namespace Peak.AP
             { TrapType.EruptionTrap, "Eruption Trap" },
             { TrapType.BeetleHordeTrap, "Beetle Horde Trap" },
             { TrapType.CustomTriviaTrap, "Custom Trivia Trap" },
+            { TrapType.PokemonCountTrap, "Pokemon Count Trap" },
+            { TrapType.InvertedMouseTrap, "Inverted Mouse Trap" },
+            { TrapType.StaminaDrainTrap, "Stamina Drain Trap" },
+            { TrapType.ChaosControlTrap, "Chaos Control Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

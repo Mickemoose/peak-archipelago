@@ -84,18 +84,21 @@ namespace Peak.AP
             if (GUIManager.instance == null)
             {
                 log.LogWarning("[PeakPelago] Cannot apply Blackout Trap - GUIManager not found");
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                 yield break;
             }
             var curseSVFX = GUIManager.instance.curseSVFX;
             if (curseSVFX == null)
             {
                 log.LogWarning("[PeakPelago] Cannot apply Blackout Trap - Curse ScreenVFX not found");
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                 yield break;
             }
             log.LogInfo("[PeakPelago] Starting Blackout effect - Curse ScreenVFX activated!");
             curseSVFX.StartFX(0.5f);
             yield return new WaitForSeconds(15f);
             curseSVFX.EndFX();
+            PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
             log.LogInfo("[PeakPelago] Blackout Trap complete!");
         }
     }

@@ -11,13 +11,27 @@ namespace Peak.AP
         private static ManualLogSource _log;
         private static ArchipelagoSession _session;
         private static bool _needsRefresh = false;
+        private static bool _itemSanityEnabled = false;
 
-        public static void Initialize(ManualLogSource log, ArchipelagoSession session)
+        /// <summary>
+        /// Item IDs for multiplayer-only items that should always be equalized
+        /// even when ItemSanity is off, since they don't normally appear in solo.
+        /// </summary>
+        private static readonly HashSet<ushort> MultiplayerOnlyItemIds = new HashSet<ushort>
+        {
+            70,  // Blowgun (HealingDart Variant)
+            25,  // Cursed Skull
+            67,  // Scout Effigy
+            16,  // Bugle of Friendship (Bugle_Magic)
+        };
+
+        public static void Initialize(ManualLogSource log, ArchipelagoSession session, bool itemSanityEnabled = false)
         {
             _log = log;
             _log?.LogInfo($"[PeakPelago] Initialize - lootData:{LootData.AllSpawnWeightData != null}, captured:{OriginalLootWeights.HasCaptured}");
             _session = session;
-            _log?.LogInfo("[PeakPelago] UnlockedItemsManager initialized");
+            _itemSanityEnabled = itemSanityEnabled;
+            _log?.LogInfo($"[PeakPelago] UnlockedItemsManager initialized (ItemSanity: {(_itemSanityEnabled ? "ON" : "OFF")})");
             
             // Session is now available - if loot data is ready, refresh immediately
             if (LootData.AllSpawnWeightData != null && OriginalLootWeights.HasCaptured)
@@ -128,16 +142,18 @@ namespace Peak.AP
 
                 HashSet<ushort> trackableItems = ItemIdMappings.GetAllApTrackedItemIds();
                 HashSet<ushort> unlockedItems = GetUnlockedItemIds();
-                
-                _log?.LogInfo($"[PeakPelago] RefreshLootTables: {trackableItems.Count} trackable, {unlockedItems.Count} unlocked");
-                _log?.LogInfo($"[PeakPelago] Unlocked item IDs: {string.Join(", ", unlockedItems.OrderBy(x => x))}");
+
+
 
                 int removedCount = 0;
                 int restoredCount = 0;
 
+                // When ItemSanity is OFF, only process multiplayer-only items
+                HashSet<ushort> itemsToProcess = _itemSanityEnabled ? trackableItems : MultiplayerOnlyItemIds;
+
                 foreach (var pool in LootData.AllSpawnWeightData.Keys.ToList())
                 {
-                    foreach (ushort itemId in trackableItems)
+                    foreach (ushort itemId in itemsToProcess)
                     {
                         if (unlockedItems.Contains(itemId))
                         {
@@ -162,23 +178,12 @@ namespace Peak.AP
                             {
                                 LootData.AllSpawnWeightData[pool].Remove(itemId);
                                 removedCount++;
-                                _log?.LogDebug($"[PeakPelago] Removed locked item {itemId} from pool {pool}");
                             }
                         }
                     }
                 }
 
-                _log?.LogInfo($"[PeakPelago] ✓ Refreshed loot tables: removed {removedCount}, restored {restoredCount}");
                 _needsRefresh = false;
-                foreach (var pool in LootData.AllSpawnWeightData)
-                {
-                    var nonZeroItems = pool.Value.Where(kvp => kvp.Value > 0).ToList();
-                    _log?.LogInfo($"[PeakPelago] Pool {pool.Key}: {nonZeroItems.Count} items with weight > 0");
-                    foreach (var item in nonZeroItems.Take(10)) // First 10
-                    {
-                        _log?.LogInfo($"[PeakPelago]   ID {item.Key}: weight {item.Value}");
-                    }
-                }
             }
             catch (Exception ex)
             {

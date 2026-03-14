@@ -6,13 +6,13 @@ if TYPE_CHECKING:
     from . import PeakWorld
 
 CALDERA_LOCATIONS = [
-    "Acquire Big Egg", "Acquire Egg", "Acquire Cooked Bird", "Volcanology Badge", "Nomad Badge", "Alpinist Badge",
+    "Acquire Big Egg", "Acquire Egg", "Acquire Cooked Bird", "Nomad Badge", "Alpinist Badge", "Cool Cucumber Badge", "Bundled Up Badge"
 ]
 
 KILN_LOCATIONS = [
     "Acquire Strange Gem", "Peak Badge", "Speed Climber Badge", "Lone Wolf Badge", "Participation Badge",
     "Survivalist Badge", "Naturalist Badge", "Leave No Trace Badge", "Balloon Badge", "Bing Bong Badge",
-    "Gourmand Badge", "High Altitude Badge", "Knot Tying Badge", "24 Karat Badge",
+    "Gourmand Badge", "High Altitude Badge", "Knot Tying Badge", "24 Karat Badge", "Volcanology Badge",
 ]
 
 ROOTS_LOCATIONS = [
@@ -35,12 +35,12 @@ TROPICS_LOCATIONS = [
 MESA_LOCATIONS = [
     "Acquire Cactus", "Acquire Aloe Vera", "Acquire Sunscreen", "Acquire Ancient Idol",
     "Acquire Red Prickleberry", "Acquire Gold Prickleberry", "Acquire Scorpion", "Acquire Torch",
-    "Megaentomology Badge", "Cool Cucumber Badge", "Astronomy Badge",
+    "Megaentomology Badge", "Astronomy Badge",
     "Daredevil Badge", "Needlepoint Badge", "Acquire Parasol", "Acquire Dynamite", "Forestry Badge",
 ]
 
 ALPINE_LOCATIONS = [
-    "Acquire Orange Winterberry", "Acquire Napberry", "Bundled Up Badge", "Acquire Yellow Winterberry",
+    "Acquire Orange Winterberry", "Acquire Napberry", "Acquire Yellow Winterberry",
     "Animal Serenading Badge", "Acquire Heat Pack", "Trailblazer Badge",
 ]
 
@@ -86,142 +86,173 @@ def apply_rules(world: "PeakWorld"):
     except KeyError:
         pass
 
-    # Acquire locations - require having received the item from AP first
+    item_sanity = world.options.item_sanity.value
+
+    # Acquire locations - when ItemSanity is on, require having received the unlock item from AP first
+    # When ItemSanity is off, acquire locations only need biome access (handled below)
     acquire_item_rules = {
-        "Acquire Rope Spool": "Rope Spool",
-        "Acquire Rope Cannon": "Rope Cannon",
-        "Acquire Anti-Rope Spool": "Anti-Rope Spool",
-        "Acquire Anti-Rope Cannon": "Anti-Rope Cannon",
-        "Acquire Chain Launcher": "Chain Launcher",
-        "Acquire Piton": "Piton",
-        "Acquire Rescue Claw": "Rescue Claw",
-        "Acquire Magic Bean": "Magic Bean",
-        "Acquire Parasol": "Parasol",
-        "Acquire Balloon": "Balloon",
-        "Acquire Balloon Bunch": "Balloon Bunch",
-        "Acquire Scout Cannon": "Scout Cannon",
-        "Acquire Flying Disc": "Flying Disc",
-        "Acquire Guidebook": "Guidebook",
-        "Acquire Portable Stove": "Portable Stove",
-        "Acquire Checkpoint Flag": "Checkpoint Flag",
-        "Acquire Lantern": "Lantern",
-        "Acquire Flare": "Flare",
-        "Acquire Torch": "Torch",
-        "Acquire Faerie Lantern": "Faerie Lantern",
-        "Acquire Blowgun": "Blowgun",
-        "Acquire Cactus": "Cactus",
-        "Acquire Compass": "Compass",
-        "Acquire Pirate's Compass": "Pirate's Compass",
-        "Acquire Binoculars": "Binoculars",
-        "Acquire Bandages": "Bandages",
-        "Acquire First-Aid Kit": "First-Aid Kit",
-        "Acquire Antidote": "Antidote",
-        "Acquire Heat Pack": "Heat Pack",
-        "Acquire Cure-All": "Cure-All",
-        "Acquire Remedy Fungus": "Remedy Fungus",
-        "Acquire Medicinal Root": "Medicinal Root",
-        "Acquire Aloe Vera": "Aloe Vera",
-        "Acquire Sunscreen": "Sunscreen",
-        "Acquire Marshmallow": "Marshmallow",
-        "Acquire Glizzy": "Glizzy",
-        "Acquire Fortified Milk": "Fortified Milk",
-        "Acquire Scout Effigy": "Scout Effigy",
-        "Acquire Cursed Skull": "Cursed Skull",
-        "Acquire Pandora's Lunchbox": "Pandora's Lunchbox",
-        "Acquire Ancient Idol": "Ancient Idol",
-        "Acquire Strange Gem": "Strange Gem",
-        "Acquire Book of Bones": "Book of Bones",
-        "Acquire Cloud Fungus": "Cloud Fungus",
-        "Acquire Bugle of Friendship": "Bugle of Friendship",
-        "Acquire Bugle": "Bugle",
-        "Acquire Shelf Shroom": "Shelf Shroom",
-        "Acquire Bounce Shroom": "Bounce Shroom",
-        "Acquire Button Shroom": "Button Shroom",
-        "Acquire Bugle Shroom": "Bugle Shroom",
-        "Acquire Cluster Shroom": "Cluster Shroom",
-        "Acquire Chubby Shroom": "Chubby Shroom",
-        "Acquire Trail Mix": "Trail Mix",
-        "Acquire Granola Bar": "Granola Bar",
-        "Acquire Scout Cookies": "Scout Cookies",
-        "Acquire Airline Food": "Airline Food",
-        "Acquire Energy Drink": "Energy Drink",
-        "Acquire Sports Drink": "Sports Drink",
-        "Acquire Big Lollipop": "Big Lollipop",
-        "Acquire Big Egg": "Big Egg",
-        "Acquire Egg": "Egg",
-        "Acquire Cooked Bird": "Cooked Bird",
-        "Acquire Honeycomb": "Honeycomb",
-        "Acquire Beehive": "Beehive",
-        "Acquire Scorpion": "Scorpion",
-        "Acquire Tick": "Tick",
-        "Acquire Conch": "Conch",
-        "Acquire Dynamite": "Dynamite",
-        "Acquire Bing Bong": "Bing Bong",
-        "Acquire Mandrake": "Mandrake",
-        "Acquire Red Crispberry": "Red Crispberry",
-        "Acquire Green Crispberry": "Green Crispberry",
-        "Acquire Yellow Crispberry": "Yellow Crispberry",
-        "Acquire Coconut": "Coconut",
-        "Acquire Coconut Half": "Coconut Half",
-        "Acquire Brown Berrynana": "Brown Berrynana",
-        "Acquire Blue Berrynana": "Blue Berrynana",
-        "Acquire Pink Berrynana": "Pink Berrynana",
-        "Acquire Yellow Berrynana": "Yellow Berrynana",
-        "Acquire Orange Winterberry": "Orange Winterberry",
-        "Acquire Yellow Winterberry": "Yellow Winterberry",
-        "Acquire Red Prickleberry": "Red Prickleberry",
-        "Acquire Gold Prickleberry": "Gold Prickleberry",
-        "Acquire Red Shroomberry": "Red Shroomberry",
-        "Acquire Blue Shroomberry": "Blue Shroomberry",
-        "Acquire Green Shroomberry": "Green Shroomberry",
-        "Acquire Yellow Shroomberry": "Yellow Shroomberry",
-        "Acquire Purple Shroomberry": "Purple Shroomberry",
-        "Acquire Purple Kingberry": "Purple Kingberry",
-        "Acquire Yellow Kingberry": "Yellow Kingberry",
-        "Acquire Green Kingberry": "Green Kingberry",
-        "Acquire Napberry": "Napberry",
-        "Acquire Black Clusterberry": "Black Clusterberry",
-        "Acquire Red Clusterberry": "Red Clusterberry",
-        "Acquire Yellow Clusterberry": "Yellow Clusterberry",
-        "Acquire Scoutmaster's Bugle": "Scoutmaster's Bugle",
-        "Acquire Yellow Berrynana Peel": "Yellow Berrynana",
-        "Acquire Pink Berrynana Peel": "Pink Berrynana",
-        "Acquire Blue Berrynana Peel": "Blue Berrynana",
-        "Acquire Brown Berrynana Peel": "Brown Berrynana",
+        "Acquire Rope Spool": "Rope Spool Unlock",
+        "Acquire Rope Cannon": "Rope Cannon Unlock",
+        "Acquire Anti-Rope Spool": "Anti-Rope Spool Unlock",
+        "Acquire Anti-Rope Cannon": "Anti-Rope Cannon Unlock",
+        "Acquire Chain Launcher": "Chain Launcher Unlock",
+        "Acquire Piton": "Piton Unlock",
+        "Acquire Rescue Claw": "Rescue Claw Unlock",
+        "Acquire Magic Bean": "Magic Bean Unlock",
+        "Acquire Parasol": "Parasol Unlock",
+        "Acquire Balloon": "Balloon Unlock",
+        "Acquire Balloon Bunch": "Balloon Bunch Unlock",
+        "Acquire Scout Cannon": "Scout Cannon Unlock",
+        "Acquire Flying Disc": "Flying Disc Unlock",
+        "Acquire Guidebook": "Guidebook Unlock",
+        "Acquire Portable Stove": "Portable Stove Unlock",
+        "Acquire Checkpoint Flag": "Checkpoint Flag Unlock",
+        "Acquire Lantern": "Lantern Unlock",
+        "Acquire Flare": "Flare Unlock",
+        "Acquire Torch": "Torch Unlock",
+        "Acquire Faerie Lantern": "Faerie Lantern Unlock",
+        "Acquire Blowgun": "Blowgun Unlock",
+        "Acquire Cactus": "Cactus Unlock",
+        "Acquire Compass": "Compass Unlock",
+        "Acquire Pirate's Compass": "Pirate's Compass Unlock",
+        "Acquire Binoculars": "Binoculars Unlock",
+        "Acquire Bandages": "Bandages Unlock",
+        "Acquire First-Aid Kit": "First-Aid Kit Unlock",
+        "Acquire Antidote": "Antidote Unlock",
+        "Acquire Heat Pack": "Heat Pack Unlock",
+        "Acquire Cure-All": "Cure-All Unlock",
+        "Acquire Remedy Fungus": "Remedy Fungus Unlock",
+        "Acquire Medicinal Root": "Medicinal Root Unlock",
+        "Acquire Aloe Vera": "Aloe Vera Unlock",
+        "Acquire Sunscreen": "Sunscreen Unlock",
+        "Acquire Marshmallow": "Marshmallow Unlock",
+        "Acquire Glizzy": "Glizzy Unlock",
+        "Acquire Fortified Milk": "Fortified Milk Unlock",
+        "Acquire Scout Effigy": "Scout Effigy Unlock",
+        "Acquire Cursed Skull": "Cursed Skull Unlock",
+        "Acquire Pandora's Lunchbox": "Pandora's Lunchbox Unlock",
+        "Acquire Ancient Idol": "Ancient Idol Unlock",
+        "Acquire Strange Gem": "Strange Gem Unlock",
+        "Acquire Book of Bones": "Book of Bones Unlock",
+        "Acquire Cloud Fungus": "Cloud Fungus Unlock",
+        "Acquire Bugle of Friendship": "Bugle of Friendship Unlock",
+        "Acquire Bugle": "Bugle Unlock",
+        "Acquire Shelf Shroom": "Shelf Shroom Unlock",
+        "Acquire Bounce Shroom": "Bounce Shroom Unlock",
+        "Acquire Button Shroom": "Button Shroom Unlock",
+        "Acquire Bugle Shroom": "Bugle Shroom Unlock",
+        "Acquire Cluster Shroom": "Cluster Shroom Unlock",
+        "Acquire Chubby Shroom": "Chubby Shroom Unlock",
+        "Acquire Trail Mix": "Trail Mix Unlock",
+        "Acquire Granola Bar": "Granola Bar Unlock",
+        "Acquire Scout Cookies": "Scout Cookies Unlock",
+        "Acquire Airline Food": "Airline Food Unlock",
+        "Acquire Energy Drink": "Energy Drink Unlock",
+        "Acquire Sports Drink": "Sports Drink Unlock",
+        "Acquire Big Lollipop": "Big Lollipop Unlock",
+        "Acquire Big Egg": "Big Egg Unlock",
+        "Acquire Egg": "Egg Unlock",
+        "Acquire Cooked Bird": "Cooked Bird Unlock",
+        "Acquire Honeycomb": "Honeycomb Unlock",
+        "Acquire Beehive": "Beehive Unlock",
+        "Acquire Scorpion": "Scorpion Unlock",
+        "Acquire Tick": "Tick Unlock",
+        "Acquire Conch": "Conch Unlock",
+        "Acquire Dynamite": "Dynamite Unlock",
+        "Acquire Bing Bong": "Bing Bong Unlock",
+        "Acquire Mandrake": "Mandrake Unlock",
+        "Acquire Red Crispberry": "Red Crispberry Unlock",
+        "Acquire Green Crispberry": "Green Crispberry Unlock",
+        "Acquire Yellow Crispberry": "Yellow Crispberry Unlock",
+        "Acquire Coconut": "Coconut Unlock",
+        "Acquire Coconut Half": "Coconut Half Unlock",
+        "Acquire Brown Berrynana": "Brown Berrynana Unlock",
+        "Acquire Blue Berrynana": "Blue Berrynana Unlock",
+        "Acquire Pink Berrynana": "Pink Berrynana Unlock",
+        "Acquire Yellow Berrynana": "Yellow Berrynana Unlock",
+        "Acquire Orange Winterberry": "Orange Winterberry Unlock",
+        "Acquire Yellow Winterberry": "Yellow Winterberry Unlock",
+        "Acquire Red Prickleberry": "Red Prickleberry Unlock",
+        "Acquire Gold Prickleberry": "Gold Prickleberry Unlock",
+        "Acquire Red Shroomberry": "Red Shroomberry Unlock",
+        "Acquire Blue Shroomberry": "Blue Shroomberry Unlock",
+        "Acquire Green Shroomberry": "Green Shroomberry Unlock",
+        "Acquire Yellow Shroomberry": "Yellow Shroomberry Unlock",
+        "Acquire Purple Shroomberry": "Purple Shroomberry Unlock",
+        "Acquire Purple Kingberry": "Purple Kingberry Unlock",
+        "Acquire Yellow Kingberry": "Yellow Kingberry Unlock",
+        "Acquire Green Kingberry": "Green Kingberry Unlock",
+        "Acquire Napberry": "Napberry Unlock",
+        "Acquire Black Clusterberry": "Black Clusterberry Unlock",
+        "Acquire Red Clusterberry": "Red Clusterberry Unlock",
+        "Acquire Yellow Clusterberry": "Yellow Clusterberry Unlock",
+        "Acquire Scoutmaster's Bugle": "Scoutmaster's Bugle Unlock",
+        "Acquire Yellow Berrynana Peel": "Yellow Berrynana Unlock",
+        "Acquire Pink Berrynana Peel": "Pink Berrynana Unlock",
+        "Acquire Blue Berrynana Peel": "Blue Berrynana Unlock",
+        "Acquire Brown Berrynana Peel": "Brown Berrynana Unlock",
     }
 
     # Apply acquire item rules - combine with biome requirements where needed
-    for location_name, required_item in acquire_item_rules.items():
-        try:
-            if location_name in MESA_LOCATIONS:
-                set_rule(world.get_location(location_name),
-                         lambda state, item=required_item:
-                         state.has(item, player) and state.has("Mesa Access", player))
-            elif location_name in ALPINE_LOCATIONS:
-                set_rule(world.get_location(location_name),
-                         lambda state, item=required_item:
-                         state.has(item, player) and state.has("Alpine Access", player))
-            elif location_name in ROOTS_LOCATIONS:
-                set_rule(world.get_location(location_name),
-                         lambda state, item=required_item:
-                         state.has(item, player) and state.has("Roots Access", player))
-            elif location_name in TROPICS_LOCATIONS:
-                set_rule(world.get_location(location_name),
-                         lambda state, item=required_item:
-                         state.has(item, player) and state.has("Tropics Access", player))
-            elif location_name in CALDERA_LOCATIONS:
-                set_rule(world.get_location(location_name),
-                         lambda state, item=required_item:
-                         state.has(item, player) and state.has("Caldera Access", player))
-            elif location_name in KILN_LOCATIONS:
-                set_rule(world.get_location(location_name),
-                         lambda state, item=required_item:
-                         state.has(item, player) and state.has("Kiln Access", player))
-            else:
-                set_rule(world.get_location(location_name),
-                         lambda state, item=required_item: state.has(item, player))
-        except KeyError:
-            pass
+    if item_sanity:
+        # ItemSanity ON: require unlock item + biome access
+        for location_name, required_item in acquire_item_rules.items():
+            try:
+                if location_name in MESA_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state, item=required_item:
+                             state.has(item, player) and state.has("Mesa Access", player))
+                elif location_name in ALPINE_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state, item=required_item:
+                             state.has(item, player) and state.has("Alpine Access", player))
+                elif location_name in ROOTS_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state, item=required_item:
+                             state.has(item, player) and state.has("Roots Access", player))
+                elif location_name in TROPICS_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state, item=required_item:
+                             state.has(item, player) and state.has("Tropics Access", player))
+                elif location_name in CALDERA_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state, item=required_item:
+                             state.has(item, player) and state.has("Caldera Access", player))
+                elif location_name in KILN_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state, item=required_item:
+                             state.has(item, player) and state.has("Kiln Access", player))
+                else:
+                    set_rule(world.get_location(location_name),
+                             lambda state, item=required_item: state.has(item, player))
+            except KeyError:
+                pass
+    else:
+        # ItemSanity OFF: acquire locations only need biome access (no unlock required)
+        for location_name in acquire_item_rules.keys():
+            try:
+                if location_name in MESA_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state: state.has("Mesa Access", player))
+                elif location_name in ALPINE_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state: state.has("Alpine Access", player))
+                elif location_name in ROOTS_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state: state.has("Roots Access", player))
+                elif location_name in TROPICS_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state: state.has("Tropics Access", player))
+                elif location_name in CALDERA_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state: state.has("Caldera Access", player))
+                elif location_name in KILN_LOCATIONS:
+                    set_rule(world.get_location(location_name),
+                             lambda state: state.has("Kiln Access", player))
+                else:
+                    set_rule(world.get_location(location_name), lambda state: True)
+            except KeyError:
+                pass
 
     # All regular badge locations are always accessible
     regular_badges = [

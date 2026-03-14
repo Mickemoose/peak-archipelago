@@ -353,6 +353,7 @@ namespace Peak.AP
             yield return new WaitForSeconds(3f);
             UnityEngine.Object.Destroy(triviaUI);
             _isActive = false;
+            PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
             log.LogInfo("[PeakPelago] Custom Trivia trap completed");
         }
 

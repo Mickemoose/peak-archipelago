@@ -107,6 +107,7 @@ namespace Peak.AP
                 if (mainCamera == null)
                 {
                     log.LogError("[PeakPelago] Could not find main camera");
+                    PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                     yield break;
                 }
 
@@ -176,6 +177,7 @@ namespace Peak.AP
                 // Ensure camera is reset and flag is cleared even if something goes wrong
                 mainCamera?.ResetProjectionMatrix();
                 _isActive = false;
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
             }
         }
     }

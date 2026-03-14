@@ -45,6 +45,15 @@ class BadgeCount(Range):
     range_end = 54
     default = 20
 
+class ItemSanity(Toggle):
+    """
+    When enabled, items must be unlocked via Archipelago before they appear in the loot pool.
+    "Acquire X" checks require the corresponding unlock item first.
+
+    When disabled, all items are always available in the loot pool.
+    "Acquire X" checks still exist but only require biome access.
+    """
+    display_name = "Item Sanity"
 
 class ProgressiveStamina(Toggle):
     """
@@ -98,6 +107,13 @@ class TrapLink(Toggle):
     if you have a weight above "none" set for that trap
     """
     display_name = "Trap Link"
+
+
+class BreathLink(Toggle):
+    """
+    When enabled, if any player in the lobby runs out of stamina, all players with Breath Link enabled get their stamina fully depleted.
+    """
+    display_name = "Breath Link"
 
 
 class DeathLinkBehavior(Choice):
@@ -313,6 +329,26 @@ class CustomTriviaTrapWeight(BaseTrapWeight):
     Likelihood of receiving a trap which quizzes the player with custom trivia questions
     """
     display_name = "Custom Trivia Trap Weight"
+class PokemonCountTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap where Pokemon stroll across the screen and the player must count how many of a specific Pokemon appeared
+    """
+    display_name = "Pokemon Count Trap Weight"
+class InvertedMouseTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which inverts a player's mouse controls for 10 seconds
+    """
+    display_name = "Inverted Mouse Trap Weight"
+class StaminaDrainTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which slowly drains a player's stamina over 15 seconds
+    """
+    display_name = "Stamina Drain Trap Weight"
+class ChaosControlTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which inverts screen colors, freezes the player in midair, and displays a 10 second countdown
+    """
+    display_name = "Chaos Control Trap Weight"
 
 class TrapPercentage(Range):
     """
@@ -322,6 +358,9 @@ class TrapPercentage(Range):
     range_start = 0
     range_end = 100
     default = 10
+
+
+
 
 class DisableMultiplayerBadges(Toggle):
     """
@@ -336,6 +375,7 @@ class DisableMultiplayerBadges(Toggle):
         Disaster Response Badge
         Applied Esoterica Badge
         Needlepoint Badge
+        Happy Camper Badge
     """
     display_name = "Disable Multiplayer Badges"
 class DisableHardBadges(Toggle):
@@ -373,6 +413,9 @@ peak_option_groups = [
         AscentCount,
         BadgeCount,
     ]),
+    OptionGroup("Item Settings", [
+        ItemSanity,
+    ]),
     OptionGroup("Stamina", [
         ProgressiveStamina,
         AdditionalStaminaBars,
@@ -382,6 +425,7 @@ peak_option_groups = [
         HardRingLink,
         EnergyLink,
         TrapLink,
+        BreathLink,
         DeathLink,
         DeathLinkBehavior,
         DeathLinkSendBehavior,
@@ -423,6 +467,10 @@ peak_option_groups = [
         EruptionTrapWeight,
         BeetleHordeTrapWeight,
         CustomTriviaTrapWeight,
+        PokemonCountTrapWeight,
+        InvertedMouseTrapWeight,
+        StaminaDrainTrapWeight,
+        ChaosControlTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,
@@ -444,6 +492,7 @@ class PeakOptions(PerGameCommonOptions):
     hard_ring_link: HardRingLink
     energy_link: EnergyLink
     trap_link: TrapLink
+    breath_link: BreathLink
     death_link: DeathLink
     death_link_behavior: DeathLinkBehavior
     death_link_send_behavior: DeathLinkSendBehavior
@@ -484,6 +533,12 @@ class PeakOptions(PerGameCommonOptions):
     eruption_trap_weight: EruptionTrapWeight
     beetle_horde_trap_weight: BeetleHordeTrapWeight
     custom_trivia_trap_weight: CustomTriviaTrapWeight
+    pokemon_count_trap_weight: PokemonCountTrapWeight
+    inverted_mouse_trap_weight: InvertedMouseTrapWeight
+    stamina_drain_trap_weight: StaminaDrainTrapWeight
+    chaos_control_trap_weight: ChaosControlTrapWeight
+
+    item_sanity: ItemSanity
 
     disable_multiplayer_badges: DisableMultiplayerBadges
     disable_hard_badges: DisableHardBadges

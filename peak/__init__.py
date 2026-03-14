@@ -5,7 +5,7 @@ import typing
 
 from BaseClasses import ItemClassification, CollectionState, LocationProgressType
 from worlds.AutoWorld import World, WebWorld
-from .Items import PeakItem, item_table, progression_table, useful_table, filler_table, trap_table, lookup_id_to_name, item_groups
+from .Items import PeakItem, item_table, progression_table, useful_table, filler_table, trap_table, unlock_table, lookup_id_to_name, item_groups
 from .Locations import LOCATION_TABLE, EXCLUDED_LOCATIONS
 from .Options import PeakOptions, peak_option_groups
 from .Rules import apply_rules, TROPICS_LOCATIONS, MESA_LOCATIONS, ALPINE_LOCATIONS, ROOTS_LOCATIONS, CALDERA_LOCATIONS, KILN_LOCATIONS
@@ -109,7 +109,7 @@ class PeakWorld(World):
             
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {excluded_ascent_count} ascent levels, removing {excluded_ascent_count * locations_per_ascent} locations")
         if self.options.disable_multiplayer_badges.value:
-            multiplayer_badge_count = 9
+            multiplayer_badge_count = 10
             total_locations -= multiplayer_badge_count
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {multiplayer_badge_count} multiplayer badges")
         
@@ -161,42 +161,13 @@ class PeakWorld(World):
         for item_name in useful_table.keys():
             if item_name != "Progressive Stamina Bar":  # Skip stamina bar since we handled it above
                 item_pool.append(self.create_item(item_name))
-                # Ensure all items needed for acquire locations are in the pool (one each)
-        acquire_required_items = [
-            "Rope Spool", "Rope Cannon", "Anti-Rope Spool", "Anti-Rope Cannon",
-            "Chain Launcher", "Piton", "Rescue Claw", "Scout Cannon", "Flying Disc",
-            "Guidebook", "Portable Stove", "Checkpoint Flag", "Compass", "Pirate's Compass",
-            "Binoculars", "Parasol", "Balloon", "Balloon Bunch",
-            "Lantern", "Flare", "Torch", "Faerie Lantern",
-            "Bandages", "First-Aid Kit", "Antidote", "Heat Pack", "Cure-All",
-            "Remedy Fungus", "Medicinal Root", "Aloe Vera", "Sunscreen",
-            "Marshmallow", "Glizzy", "Fortified Milk", "Trail Mix", "Granola Bar",
-            "Scout Cookies", "Airline Food", "Energy Drink", "Sports Drink", "Big Lollipop",
-            "Big Egg", "Egg", "Cooked Bird", "Honeycomb", "Beehive", "Bing Bong",
-            "Magic Bean", "Blowgun", "Cactus", "Scout Effigy", "Cursed Skull",
-            "Pandora's Lunchbox", "Ancient Idol", "Strange Gem", "Book of Bones",
-            "Bugle of Friendship", "Bugle", "Scoutmaster's Bugle", "Conch", "Dynamite",
-            "Scorpion", "Tick", "Mandrake",
-            "Cloud Fungus", "Shelf Shroom", "Bounce Shroom", "Button Shroom",
-            "Bugle Shroom", "Cluster Shroom", "Chubby Shroom",
-            "Red Crispberry", "Green Crispberry", "Yellow Crispberry",
-            "Coconut", "Coconut Half",
-            "Brown Berrynana", "Blue Berrynana", "Pink Berrynana", "Yellow Berrynana",
-            "Orange Winterberry", "Yellow Winterberry", "Napberry",
-            "Red Prickleberry", "Gold Prickleberry",
-            "Red Shroomberry", "Blue Shroomberry", "Green Shroomberry",
-            "Yellow Shroomberry", "Purple Shroomberry",
-            "Purple Kingberry", "Yellow Kingberry", "Green Kingberry",
-            "Black Clusterberry", "Red Clusterberry", "Yellow Clusterberry",
-        ]
-
-        for item_name in acquire_required_items:
-            if item_name in item_table:
-                item_pool.append(self.create_item(item_name, ItemClassification.progression))
-            else:
-                logging.warning(f"[Player {self.multiworld.player_name[self.player]}] Acquire item '{item_name}' not found in item_table")
-
-        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {len(acquire_required_items)} acquire-required items")
+        # Add unlock items only when ItemSanity is enabled
+        if self.options.item_sanity.value:
+            for unlock_name in unlock_table.keys():
+                item_pool.append(self.create_item(unlock_name))
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {len(unlock_table)} unlock items (ItemSanity enabled)")
+        else:
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Skipping unlock items (ItemSanity disabled)")
         # Calculate how many slots are left for traps and fillers
         remaining_slots = total_locations - len(item_pool)
         
@@ -237,7 +208,11 @@ class PeakWorld(World):
         trap_weights += (["Eruption Trap"] * self.options.eruption_trap_weight.value)
         trap_weights += (["Beetle Horde Trap"] * self.options.beetle_horde_trap_weight.value)
         trap_weights += (["Custom Trivia Trap"] * self.options.custom_trivia_trap_weight.value)
-        
+        trap_weights += (["Pokemon Count Trap"] * self.options.pokemon_count_trap_weight.value)
+        trap_weights += (["Inverted Mouse Trap"] * self.options.inverted_mouse_trap_weight.value)
+        trap_weights += (["Stamina Drain Trap"] * self.options.stamina_drain_trap_weight.value)
+        trap_weights += (["Chaos Control Trap"] * self.options.chaos_control_trap_weight.value)
+
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
         
@@ -299,6 +274,10 @@ class PeakWorld(World):
         trap_data["eruption_trap"] = self.options.eruption_trap_weight.value
         trap_data["beetle_horde_trap"] = self.options.beetle_horde_trap_weight.value
         trap_data["custom_trivia_trap"] = self.options.custom_trivia_trap_weight.value
+        trap_data["pokemon_count_trap"] = self.options.pokemon_count_trap_weight.value
+        trap_data["inverted_mouse_trap"] = self.options.inverted_mouse_trap_weight.value
+        trap_data["stamina_drain_trap"] = self.options.stamina_drain_trap_weight.value
+        trap_data["chaos_control_trap"] = self.options.chaos_control_trap_weight.value
 
         return trap_data
 
@@ -546,10 +525,12 @@ class PeakWorld(World):
             "hard_ring_link": self.options.hard_ring_link.value,
             "energy_link": self.options.energy_link.value,
             "trap_link": self.options.trap_link.value,
+            "breath_link": self.options.breath_link.value,
             "death_link": self.options.death_link.value,
             "death_link_behavior": self.options.death_link_behavior.value,
             "death_link_send_behavior": self.options.death_link_send_behavior.value,
             "active_traps": self.output_active_traps(),
+            "item_sanity": self.options.item_sanity.value,
             "session_id": session_id,
             "mountain_hints": mountain_hints
         }

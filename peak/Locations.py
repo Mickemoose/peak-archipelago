@@ -26,7 +26,7 @@ LOCATION_TABLE: Dict[str, int] = {
     "Bing Bong Badge": 76116,
     "Cooking Badge": 76120,
     "Plunderer Badge": 76121,
-    "High Altitude Badge": 76122,
+    #"High Altitude Badge": 76122, DISABLED FOR NOW SINCE ITS NOT WORKING IDK I CANT FIND WHERE THEY IMPLEMENT IT ATM WILL LOOK SOME OTHER TIME >:(
     "Volcanology Badge": 76123,
     "Alpinist Badge": 76124,
     "Esoterica Badge": 76125,

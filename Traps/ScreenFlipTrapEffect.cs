@@ -104,6 +104,7 @@ namespace Peak.AP
             {
                 log.LogError("[PeakPelago] Could not find main camera");
                 _isActive = false;
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                 yield break;
             }
 
@@ -127,6 +128,7 @@ namespace Peak.AP
 
             log.LogInfo("[PeakPelago] Screen flip complete!");
             _isActive = false;
+            PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
         }
     }
 }

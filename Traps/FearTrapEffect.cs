@@ -76,15 +76,17 @@ namespace Peak.AP
             if (screenEffect == null)
             {
                 log.LogWarning("[PeakPelago] IllegalScreenEffect not found in scene");
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                 yield break;
             }
 
-            var activeSecondsField = typeof(IllegalScreenEffect).GetField("activeForSeconds", 
+            var activeSecondsField = typeof(IllegalScreenEffect).GetField("activeForSeconds",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            
+
             if (activeSecondsField == null)
             {
                 log.LogError("[PeakPelago] Could not find activeForSeconds field");
+                PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                 yield break;
             }
 
@@ -134,6 +136,7 @@ namespace Peak.AP
                 }
             }
 
+            PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
             log.LogInfo("[PeakPelago] Fear trap completed");
         }
 

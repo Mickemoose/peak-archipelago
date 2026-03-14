@@ -140,6 +140,7 @@ namespace Peak.AP
                 if (character == null || character.data.dead || !character.gameObject.activeInHierarchy)
                 {
                     log.LogInfo($"[PeakPelago] Stopping {statusType} DOT on {characterName} - character invalid/dead");
+                    PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
                     yield break;
                 }
 
@@ -156,6 +157,7 @@ namespace Peak.AP
                 elapsed += tickInterval;
             }
 
+            PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
             log.LogInfo($"[PeakPelago] Finished {statusType} over time on {characterName} " +
                        $"(applied {tickCount} ticks)");
         }

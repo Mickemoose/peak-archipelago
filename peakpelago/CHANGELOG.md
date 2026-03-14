@@ -1,3 +1,5 @@
+## v0.5.9
+
 ## v0.5.8
 <ul>
     <li>Items are locked and won't spawn until they are first recieved through AP</li>
