@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Logging;
 using Photon.Pun;
@@ -80,12 +81,6 @@ namespace Peak.AP
                     return;
                 }
 
-                if (Character.localCharacter == null)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply Chaos Control Trap - no local character");
-                    return;
-                }
-
                 log.LogInfo("[PeakPelago] Starting Chaos Control Trap locally");
                 _plugin.StartCoroutine(ChaosControlCoroutine(log));
             }
@@ -99,6 +94,14 @@ namespace Peak.AP
         {
             _isActive = true;
             float duration = 10f;
+
+            // Wait for loading screen and passed out state
+            while (LoadingScreenHandler.loading
+                || Character.localCharacter == null
+                || Character.localCharacter.data.passedOutOnTheBeach > 0f)
+            {
+                yield return new WaitForSecondsRealtime(0.25f);
+            }
 
             // --- Screen effect via curseSVFX ---
             ScreenVFX curseSVFX = null;
@@ -125,21 +128,63 @@ namespace Peak.AP
                 overlay.Initialize(duration);
             }
 
-            // --- Freeze everything via timeScale ---
-            Time.timeScale = 0f;
-            log.LogInfo($"[PeakPelago] Chaos Control: Time frozen for {duration} seconds");
+            // --- Freeze all characters' ragdoll parts ---
+            var character = Character.localCharacter;
+            float originalMovementModifier = 0f;
+            var savedPartStates = new List<(Bodypart part, bool wasKinematic)>();
 
-            // Wait using real time since timeScale is 0
+            if (character != null && character.refs.movement != null && character.refs.ragdoll != null)
+            {
+                originalMovementModifier = character.refs.movement.movementModifier;
+                character.refs.movement.movementModifier = -1f;
+
+                foreach (var part in character.refs.ragdoll.partList)
+                {
+                    if (part != null && part.Rig != null)
+                    {
+                        savedPartStates.Add((part, part.Rig.isKinematic));
+                        part.Rig.linearVelocity = Vector3.zero;
+                        part.Rig.angularVelocity = Vector3.zero;
+                        part.Rig.isKinematic = true;
+                    }
+                }
+
+                log.LogInfo($"[PeakPelago] Chaos Control: Player frozen ({savedPartStates.Count} ragdoll parts)");
+            }
+
+            log.LogInfo($"[PeakPelago] Chaos Control active for {duration} seconds");
+
+            // Hold frozen for duration
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                elapsed += Time.unscaledDeltaTime;
+                elapsed += Time.deltaTime;
                 yield return null;
             }
 
-            // --- Restore time ---
-            Time.timeScale = 1f;
-            log.LogInfo("[PeakPelago] Chaos Control: Time restored");
+            // --- Restore movement ---
+            if (character != null && character.refs.movement != null)
+            {
+                character.refs.movement.movementModifier = originalMovementModifier;
+
+                foreach (var state in savedPartStates)
+                {
+                    if (state.part != null && state.part.Rig != null)
+                    {
+                        state.part.Rig.isKinematic = state.wasKinematic;
+                        if (!state.wasKinematic)
+                        {
+                            state.part.Rig.linearVelocity = Vector3.down * 0.1f;
+                            state.part.Rig.WakeUp();
+                        }
+                    }
+                }
+
+                yield return new WaitForFixedUpdate();
+                yield return new WaitForFixedUpdate();
+
+                log.LogInfo("[PeakPelago] Chaos Control: Player unfrozen");
+            }
 
             // --- Clean up screen effect ---
             if (curseSVFX != null)
@@ -161,7 +206,6 @@ namespace Peak.AP
 
     /// <summary>
     /// MonoBehaviour attached to the camera that draws a centered countdown timer.
-    /// Uses unscaledDeltaTime since timeScale is 0 during Chaos Control.
     /// </summary>
     public class ChaosControlOverlay : MonoBehaviour
     {
@@ -182,7 +226,7 @@ namespace Peak.AP
         {
             if (!_initialized) return;
 
-            _timeRemaining -= Time.unscaledDeltaTime;
+            _timeRemaining -= Time.deltaTime;
             if (_timeRemaining <= 0f)
             {
                 Destroy(this);
