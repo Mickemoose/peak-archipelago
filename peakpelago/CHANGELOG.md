@@ -6,6 +6,9 @@
     <li>Connection UI moved into pause menu under Archipelago button</li>
     <li>Archipelago Settings in game now includes toggling DeathLink, TrapLink, RingLink/HardRingLink, BreathLink on the fly</li>
     <li>Small handful of new traps</li>
+    <li>Milk & Idol invincibility fixed</li>
+    <li>Some badge logic fixed</li>
+    <li>Potential fix for Basketball checks</li>
     <li>In Game Items as Items severely reduced to reduce potential crashing. Instead theres a handful of filler items so not every item can be sent to you.</li>
 </ul>
 
