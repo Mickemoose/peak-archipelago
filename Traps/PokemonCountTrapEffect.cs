@@ -359,12 +359,22 @@ namespace Peak.AP
             if (correct)
             {
                 TriviaUIHelper.PlayCorrectSound();
+                Texture2D correctTex = LoadOverlayTexture("correct.png");
+                if (correctTex != null)
+                    AddOverlay(answerObjects[selectedAnswer], correctTex);
                 bannerText.text = "CORRECT!";
                 bannerText.color = Color.green;
             }
             else
             {
                 TriviaUIHelper.PlayWrongSound();
+                Texture2D wrongTex = LoadOverlayTexture("wrong.png");
+                if (wrongTex != null)
+                    AddOverlay(answerObjects[selectedAnswer], wrongTex);
+                // Also show correct answer
+                Texture2D correctTex = LoadOverlayTexture("correct.png");
+                if (correctTex != null)
+                    AddOverlay(answerObjects[correctIndex], correctTex);
                 bannerText.text = $"WRONG! It was {targetCount}!";
                 bannerText.color = Color.red;
 
@@ -395,6 +405,47 @@ namespace Peak.AP
             _isActive = false;
             PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
             log.LogInfo("[PeakPelago] Pokemon Count trap completed");
+        }
+
+        private static Texture2D LoadOverlayTexture(string filename)
+        {
+            try
+            {
+                string resourceName = $"PeakArchipelagoPlugin.pkmns.{filename}";
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null) return null;
+                    byte[] fileData = new byte[stream.Length];
+                    stream.Read(fileData, 0, fileData.Length);
+                    Texture2D tex = new Texture2D(2, 2);
+                    tex.LoadImage(fileData);
+                    return tex;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError($"[PeakPelago] Error loading overlay texture: {ex.Message}");
+            }
+            return null;
+        }
+
+        private static void AddOverlay(GameObject target, Texture2D texture)
+        {
+            var overlayObj = new GameObject("Overlay");
+            overlayObj.transform.SetParent(target.transform, false);
+            var overlayRect = overlayObj.AddComponent<RectTransform>();
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.offsetMin = Vector2.zero;
+            overlayRect.offsetMax = Vector2.zero;
+
+            var overlayImage = overlayObj.AddComponent<Image>();
+            overlayImage.sprite = Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f));
+            overlayImage.preserveAspect = true;
         }
 
         private static Texture2D LoadPokemonTexture(PokemonTriviaTrapEffect.Pokemon pokemon)

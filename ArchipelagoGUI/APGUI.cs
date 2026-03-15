@@ -1,217 +1,227 @@
 using UnityEngine;
-using System;
-using Photon.Pun;
+using UnityEngine.UI;
+using System.Reflection;
+using TMPro;
 
 namespace Peak.AP
 {
     public class ArchipelagoUI : MonoBehaviour
     {
-        private const int BACKGROUND_RECT_X_COORD = 10;
-        private const int BACKGROUND_RECT_Y_COORD = 30;
-
-        private string _serverUrl = "archipelago.gg";
-        private string _port = "38281";
-        private string _slotName = string.Empty;
-        private string _password = string.Empty;
-        private int _fontSize = 12;
-
         private PeakArchipelagoPlugin _plugin;
 
-        // PlayerPrefs keys
-        private const string PREFS_SERVER = "PeakPelago_ServerUrl";
-        private const string PREFS_PORT = "PeakPelago_Port";
-        private const string PREFS_SLOT = "PeakPelago_SlotName";
-        private const string PREFS_PASSWORD = "PeakPelago_Password";
-        private const string PREFS_FONTSIZE = "PeakPelago_FontSize";
+        // Icon textures loaded from embedded resources
+        private Texture2D _whiteIcon;
+        private Texture2D _colorIcon;
+
+        // Icon layout
+        private const int ICON_SIZE = 32;
+        private const int ICON_MARGIN = 10;
+
+        // UI elements on our canvas
+        private GameObject _canvasObject;
+        private RawImage _iconImage;
+        private TextMeshProUGUI _versionTMP;
+        private TextMeshProUGUI _statusTMP;
+        private bool _setupAttempted;
+
+        // Spin state
+        private RectTransform _iconRect;
 
         public void Initialize(PeakArchipelagoPlugin plugin)
         {
             _plugin = plugin;
-            LoadSettings();
+            LoadIcons();
         }
 
-        private void LoadSettings()
+        private void LoadIcons()
         {
-            // Load saved values or use defaults
-            _serverUrl = PlayerPrefs.GetString(PREFS_SERVER, "archipelago.gg");
-            _port = PlayerPrefs.GetString(PREFS_PORT, "38281");
-            _slotName = PlayerPrefs.GetString(PREFS_SLOT, string.Empty);
-            _password = PlayerPrefs.GetString(PREFS_PASSWORD, string.Empty);
-            _fontSize = PlayerPrefs.GetInt(PREFS_FONTSIZE, 12);
+            _whiteIcon = LoadEmbeddedTexture("PeakArchipelagoPlugin.white-icon.png");
+            _colorIcon = LoadEmbeddedTexture("PeakArchipelagoPlugin.color-icon.png");
         }
 
-        private void SaveSettings()
+        private Texture2D LoadEmbeddedTexture(string resourceName)
         {
-            PlayerPrefs.SetString(PREFS_SERVER, _serverUrl);
-            PlayerPrefs.SetString(PREFS_PORT, _port);
-            PlayerPrefs.SetString(PREFS_SLOT, _slotName);
-            PlayerPrefs.SetString(PREFS_PASSWORD, _password);
-            PlayerPrefs.SetInt(PREFS_FONTSIZE, _fontSize);
-            PlayerPrefs.Save();
-        }
-
-        private void OnGUI()
-        {
-
-            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-            bool isInAirport = currentScene.Contains("Airport");
-            bool isHost = PhotonNetwork.IsMasterClient; //|| !PhotonNetwork.IsConnected;
-            
-            if (!isInAirport || !isHost)
+            try
             {
-                return;
+                var assembly = Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null) return null;
+                    byte[] data = new byte[stream.Length];
+                    stream.Read(data, 0, data.Length);
+                    var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    tex.LoadImage(data);
+                    tex.filterMode = FilterMode.Bilinear;
+                    return tex;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void SetupUI()
+        {
+            if (_setupAttempted) return;
+
+            // Find the game's VersionString to clone its font
+            var versionString = FindFirstObjectByType<VersionString>();
+            if (versionString == null) return;
+
+            var sourceText = versionString.GetComponent<TextMeshProUGUI>();
+            if (sourceText == null) return;
+
+            _setupAttempted = true;
+
+            // Create screen-space overlay canvas
+            _canvasObject = new GameObject("PeakPelagoOverlay");
+            var canvas = _canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            _canvasObject.AddComponent<CanvasScaler>();
+
+            var iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(_canvasObject.transform, false);
+            _iconImage = iconObj.AddComponent<RawImage>();
+            _iconImage.texture = _whiteIcon;
+            _iconImage.raycastTarget = false;
+
+            _iconRect = iconObj.GetComponent<RectTransform>();
+            _iconRect.anchorMin = new Vector2(0f, 0f);
+            _iconRect.anchorMax = new Vector2(0f, 0f);
+            _iconRect.pivot = new Vector2(0.5f, 0.5f);
+            _iconRect.anchoredPosition = new Vector2(ICON_MARGIN + ICON_SIZE * 0.5f, ICON_MARGIN + ICON_SIZE * 0.5f);
+            _iconRect.sizeDelta = new Vector2(ICON_SIZE, ICON_SIZE);
+            var textObj = new GameObject("VersionText");
+            textObj.transform.SetParent(_canvasObject.transform, false);
+
+            _versionTMP = textObj.AddComponent<TextMeshProUGUI>();
+            _versionTMP.font = sourceText.font;
+            _versionTMP.fontSize = sourceText.fontSize;
+            _versionTMP.fontStyle = sourceText.fontStyle;
+            _versionTMP.color = sourceText.color;
+            _versionTMP.alignment = TextAlignmentOptions.MidlineLeft;
+            _versionTMP.text = "v" + _plugin.Info.Metadata.Version;
+            _versionTMP.raycastTarget = false;
+
+            var textRect = textObj.GetComponent<RectTransform>();
+            textRect.anchorMin = new Vector2(0f, 0f);
+            textRect.anchorMax = new Vector2(0f, 0f);
+            textRect.pivot = new Vector2(0f, 0f);
+            textRect.anchoredPosition = new Vector2(ICON_MARGIN + ICON_SIZE + 4, ICON_MARGIN);
+            textRect.sizeDelta = new Vector2(200f, ICON_SIZE);
+
+            var statusObj = new GameObject("StatusText");
+            statusObj.transform.SetParent(_canvasObject.transform, false);
+
+            _statusTMP = statusObj.AddComponent<TextMeshProUGUI>();
+            _statusTMP.font = sourceText.font;
+            _statusTMP.fontSize = sourceText.fontSize * 0.85f;
+            _statusTMP.color = Color.white;
+            _statusTMP.alignment = TextAlignmentOptions.BottomLeft;
+            _statusTMP.text = "";
+            _statusTMP.raycastTarget = false;
+
+            var statusRect = statusObj.GetComponent<RectTransform>();
+            statusRect.anchorMin = new Vector2(0f, 0f);
+            statusRect.anchorMax = new Vector2(0f, 0f);
+            statusRect.pivot = new Vector2(0f, 0f);
+            statusRect.anchoredPosition = new Vector2(ICON_MARGIN, ICON_MARGIN + ICON_SIZE + 4);
+            statusRect.sizeDelta = new Vector2(300f, 40f);
+        }
+
+        private void Update()
+        {
+            if (_plugin == null) return;
+
+            // Re-attempt setup if canvas was destroyed (e.g. scene change)
+            if (_canvasObject == null)
+            {
+                _setupAttempted = false;
+                SetupUI();
             }
 
-            GUIStyle labelStyle = new GUIStyle(GUI.skin.label);
-            GUIStyle buttonStyle = new GUIStyle(GUI.skin.button);
-            GUIStyle textFieldStyle = new GUIStyle(GUI.skin.textField);
-            
-            _setFontSize(labelStyle, buttonStyle, textFieldStyle);
-            labelStyle.normal.textColor = Color.white;
+            if (_iconImage == null) return;
 
-            int rectWidth = (int) Mathf.RoundToInt(320f * ((float)_fontSize / 12f));
-            int rowHeight = _fontSize + 8;
-            int xPos = 16;
-            int yPos = 10;
-            int labelWidth = rectWidth / 2;
             bool isConnected = _plugin.Status == "Connected";
-            bool inMultiplayer = PhotonNetwork.IsConnected && PhotonNetwork.CurrentRoom != null;
-            bool isReconnecting = _plugin != null && _plugin.IsReconnecting;
-            int reconnectAttempts = _plugin != null ? _plugin._reconnectAttempts : 0;
-            int maxReconnectAttempts = _plugin != null ? PeakArchipelagoPlugin.MAX_RECONNECT_ATTEMPTS : 10;
-            int offlineCheckCount = _plugin != null ? _plugin.OfflineCheckCount : 0;
-            /*
-            if (isConnected && GUI.Button(new Rect(xPos, yPos + rowHeight * 2, 120, rowHeight), "TEST: Disconnect"))
+            bool isConnecting = _plugin._isConnecting;
+            bool isReconnecting = _plugin.IsReconnecting;
+
+            // Update icon texture and alpha
+            float alpha;
+            bool spin;
+
+            if (isConnected)
             {
-                _plugin._log.LogInfo("[PeakPelago] Disconnect button clicked");
-                _plugin.Session.Socket.Disconnect();
-                _plugin._log.LogInfo("[PeakPelago] Disconnect() called");
-                _plugin._status = "Disconnected";
-            }*/
-            if (!isConnected)
+                _iconImage.texture = _colorIcon ?? _whiteIcon;
+                alpha = 1f;
+                spin = false;
+            }
+            else if (isConnecting || isReconnecting)
             {
-                if (isReconnecting && (isHost || !inMultiplayer))
-                {
-                    int totalHeight = 12 + rowHeight * 2;
-                    _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
-                    
-                    GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), 
-                        $"Reconnecting... (Attempt {reconnectAttempts}/{maxReconnectAttempts})", 
-                        labelStyle);
-                    yPos += rowHeight;
-                    
-                    if (offlineCheckCount > 0)
-                    {
-                        GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), 
-                            $"{offlineCheckCount} checks queued", 
-                            labelStyle);
-                    }
-                }
-                else if (!isReconnecting && (isHost || !inMultiplayer))
-                {
-                    int totalHeight = 12 + rowHeight * 6;
-                    _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
-
-                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "PeakPelago font size: ", labelStyle);
-                    if (GUI.Button(new Rect(xPos + labelWidth, yPos, _fontSize * 2, rowHeight), "-", buttonStyle))
-                    {
-                        _fontSize = Mathf.Max(8, _fontSize - 1);
-                        SaveSettings();
-                    }
-                    if (GUI.Button(new Rect(xPos + labelWidth + _fontSize * 2 + 8, yPos, _fontSize * 2, rowHeight), "+", buttonStyle))
-                    {
-                        _fontSize = Mathf.Min(24, _fontSize + 1);
-                        SaveSettings();
-                    }
-                    yPos += rowHeight;
-
-                    Cursor.lockState = CursorLockMode.Confined;
-                    Cursor.visible = true;
-
-                    int fieldWidth = rectWidth - labelWidth;
-                    bool enterPressed = Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return;
-
-                    // Track if any field changed
-                    string oldServerUrl = _serverUrl;
-                    string oldPort = _port;
-                    string oldSlotName = _slotName;
-                    string oldPassword = _password;
-
-                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Server: ", labelStyle);
-                    _serverUrl = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _serverUrl, textFieldStyle);
-                    yPos += rowHeight;
-
-                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Port: ", labelStyle);
-                    _port = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _port, textFieldStyle);
-                    yPos += rowHeight;
-
-                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Slot Name: ", labelStyle);
-                    _slotName = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _slotName, textFieldStyle);
-                    yPos += rowHeight;
-
-                    GUI.Label(new Rect(xPos, yPos, labelWidth, rowHeight), "Password: ", labelStyle);
-                    _password = GUI.TextField(new Rect(labelWidth, yPos, fieldWidth, rowHeight), _password, textFieldStyle);
-                    yPos += rowHeight;
-
-                    // Save settings if any field changed
-                    if (_serverUrl != oldServerUrl || _port != oldPort || _slotName != oldSlotName || _password != oldPassword)
-                    {
-                        SaveSettings();
-                    }
-
-                    if (enterPressed && Event.current.type == EventType.KeyDown)
-                    {
-                        enterPressed = false;
-                    }
-
-                    if ((GUI.Button(new Rect(xPos, yPos, 76 + _fontSize * 2, rowHeight), "Connect", buttonStyle) || enterPressed) 
-                        && !string.IsNullOrEmpty(_serverUrl) 
-                        && !string.IsNullOrEmpty(_slotName))
-                    {
-                        SaveSettings();
-                        _plugin.SetConnectionDetails(_serverUrl, _port, _slotName, _password);
-                        _plugin.Connect();
-                    }
-                }
-                else
-                {
-                    int totalHeight = 12 + rowHeight;
-                    _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
-                    GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), "Archipelago: Connected to Host", labelStyle);
-                }
+                _iconImage.texture = _whiteIcon;
+                alpha = 1f;
+                spin = true;
             }
             else
             {
-                int totalHeight = 12 + rowHeight;
-                _drawShadedRectangle(new Rect(BACKGROUND_RECT_X_COORD, yPos - 6, rectWidth, totalHeight));
-                
-                string message;
-                if (isHost || !inMultiplayer)
+                _iconImage.texture = _whiteIcon;
+                alpha = 0.75f;
+                spin = false;
+            }
+
+            _iconImage.color = new Color(1f, 1f, 1f, alpha);
+
+            // Spin the icon when connecting
+            if (spin)
+            {
+                float angle = Time.unscaledTime * 90f % 360f;
+                _iconRect.localRotation = Quaternion.Euler(0, 0, -angle);
+            }
+            else
+            {
+                _iconRect.localRotation = Quaternion.identity;
+            }
+
+            if (_versionTMP != null)
+            {
+                Color c = _versionTMP.color;
+                _versionTMP.color = new Color(c.r, c.g, c.b, alpha);
+            }
+            if (_statusTMP != null)
+            {
+                if (isReconnecting)
                 {
-                    message = "Archipelago configured.";
+                    int attempts = _plugin._reconnectAttempts;
+                    int max = PeakArchipelagoPlugin.MAX_RECONNECT_ATTEMPTS;
+                    int offline = _plugin.OfflineCheckCount;
+
+                    string text = isConnecting
+                        ? $"Connecting... (Attempt {attempts}/{max})"
+                        : $"Waiting to reconnect... ({attempts}/{max})";
+
+                    if (offline > 0)
+                        text += $"\n{offline} checks queued";
+
+                    _statusTMP.text = text;
+                }
+                else if (isConnecting)
+                {
+                    _statusTMP.text = "Connecting...";
                 }
                 else
                 {
-                    message = "Archipelago connected through host.";
+                    _statusTMP.text = "";
                 }
-
-                GUI.Label(new Rect(xPos, yPos, rectWidth, rowHeight), message, labelStyle);
             }
         }
 
-        private void _drawShadedRectangle(Rect rect)
+        private void OnDestroy()
         {
-            Color originalColor = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.5f);
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = originalColor;
-        }
-
-        private void _setFontSize(params GUIStyle[] styles)
-        {
-            foreach (var style in styles)
+            if (_canvasObject != null)
             {
-                style.fontSize = _fontSize;
+                Destroy(_canvasObject);
             }
         }
     }

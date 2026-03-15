@@ -589,23 +589,19 @@ namespace Peak.AP
                 {
                     ActivateTrap(_priorityTrap, fromTrapLink: true);
                     _lastTrapActivation = Time.time;
+                    _priorityTrap = null;
                 }
-                else
-                {
-                    _log.LogDebug($"[PeakPelago] Priority trap '{_priorityTrap}' not activatable, discarding");
-                }
-
-                _priorityTrap = null;
+                // If not activatable yet, keep it as priority and wait
                 return;
             }
 
             if (_trapQueue.Count > 0)
             {
                 string trap = _trapQueue.First.Value;
-                _trapQueue.RemoveFirst();
 
                 if (CanActivateTrap(trap))
                 {
+                    _trapQueue.RemoveFirst();
                     ActivateTrap(trap, fromTrapLink: false);
                     _lastTrapActivation = Time.time;
                 }
@@ -620,6 +616,8 @@ namespace Peak.AP
             if (Character.localCharacter == null) return false;
             if (Character.localCharacter.data.dead) return false;
             if (Character.localCharacter.data.fullyPassedOut) return false;
+            if (Character.localCharacter.data.passedOutOnTheBeach > 0f) return false;
+            if (LoadingScreenHandler.loading) return false;
 
             return true;
         }

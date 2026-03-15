@@ -100,7 +100,7 @@ namespace Peak.AP
             _isActive = true;
             float duration = 10f;
 
-            // --- Screen effect via curseSVFX (same as Blackout trap) ---
+            // --- Screen effect via curseSVFX ---
             ScreenVFX curseSVFX = null;
             if (GUIManager.instance != null)
             {
@@ -125,64 +125,21 @@ namespace Peak.AP
                 overlay.Initialize(duration);
             }
 
-            // --- Freeze character in place (all ragdoll parts) ---
-            var character = Character.localCharacter;
-            float originalMovementModifier = 0f;
-            var savedPartStates = new System.Collections.Generic.List<(Bodypart part, bool wasKinematic, Vector3 pos, Quaternion rot)>();
+            // --- Freeze everything via timeScale ---
+            Time.timeScale = 0f;
+            log.LogInfo($"[PeakPelago] Chaos Control: Time frozen for {duration} seconds");
 
-            if (character != null && character.refs.movement != null && character.refs.ragdoll != null)
-            {
-                originalMovementModifier = character.refs.movement.movementModifier;
-                character.refs.movement.movementModifier = -1f;
-
-                // Freeze every ragdoll part rigidbody
-                foreach (var part in character.refs.ragdoll.partList)
-                {
-                    if (part != null && part.Rig != null)
-                    {
-                        savedPartStates.Add((part, part.Rig.isKinematic, part.Rig.position, part.Rig.rotation));
-                        part.Rig.linearVelocity = Vector3.zero;
-                        part.Rig.angularVelocity = Vector3.zero;
-                        part.Rig.isKinematic = true;
-                    }
-                }
-
-                log.LogInfo($"[PeakPelago] Chaos Control: Player frozen ({savedPartStates.Count} ragdoll parts)");
-            }
-
-            log.LogInfo($"[PeakPelago] Chaos Control active for {duration} seconds");
-
-            // Hold frozen for duration, keeping all parts locked each frame
+            // Wait using real time since timeScale is 0
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                foreach (var state in savedPartStates)
-                {
-                    if (state.part != null && state.part.Rig != null)
-                    {
-                        state.part.Rig.position = state.pos;
-                        state.part.Rig.rotation = state.rot;
-                    }
-                }
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 yield return null;
             }
 
-            // --- Restore movement ---
-            if (character != null && character.refs.movement != null)
-            {
-                character.refs.movement.movementModifier = originalMovementModifier;
-
-                foreach (var state in savedPartStates)
-                {
-                    if (state.part != null && state.part.Rig != null)
-                    {
-                        state.part.Rig.isKinematic = state.wasKinematic;
-                    }
-                }
-
-                log.LogInfo("[PeakPelago] Chaos Control: Player unfrozen");
-            }
+            // --- Restore time ---
+            Time.timeScale = 1f;
+            log.LogInfo("[PeakPelago] Chaos Control: Time restored");
 
             // --- Clean up screen effect ---
             if (curseSVFX != null)
@@ -204,7 +161,7 @@ namespace Peak.AP
 
     /// <summary>
     /// MonoBehaviour attached to the camera that draws a centered countdown timer.
-    /// Screen effect is handled by curseSVFX.
+    /// Uses unscaledDeltaTime since timeScale is 0 during Chaos Control.
     /// </summary>
     public class ChaosControlOverlay : MonoBehaviour
     {
@@ -225,7 +182,7 @@ namespace Peak.AP
         {
             if (!_initialized) return;
 
-            _timeRemaining -= Time.deltaTime;
+            _timeRemaining -= Time.unscaledDeltaTime;
             if (_timeRemaining <= 0f)
             {
                 Destroy(this);

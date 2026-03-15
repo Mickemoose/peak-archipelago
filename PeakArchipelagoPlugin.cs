@@ -22,11 +22,12 @@ using ExitGames.Client.Photon;
 using Zorro.Core;
 using static CharacterAfflictions;
 using System.Collections.Concurrent;
+using System.Threading;
 using UnityEngine.UI;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.8")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.9")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -40,7 +41,7 @@ namespace Peak.AP
         private ConfigEntry<string> cfgPassword;
         private ConfigEntry<string> cfgCustomTriviaFolder;
         private ConfigEntry<bool> cfgIncludeStandardTrivia;
-        private ConfigEntry<bool> cfgDeathLinkEnabled;
+        public ConfigEntry<bool> cfgDeathLinkEnabled;
         private ConfigEntry<bool> cfgSpawnXItemsAtStart;
         private ConfigEntry<int> cfgSpawnItemCount;
 
@@ -60,7 +61,7 @@ namespace Peak.AP
             public int PlayerSlot { get; set; }
         }
         public string _status = "Disconnected";
-        private bool _isConnecting;
+        public bool _isConnecting;
         private bool _wantReconnect;
         private string _currentPort = "";
         // ===== Reconnection =====
@@ -69,7 +70,7 @@ namespace Peak.AP
         public int _reconnectAttempts = 0;
         public const int MAX_RECONNECT_ATTEMPTS = 10;
         private readonly HashSet<long> OfflineChecks = [];
-        public bool IsReconnecting => _wantReconnect && !_isConnecting;
+        public bool IsReconnecting => _wantReconnect;
         public int OfflineCheckCount => _stateData.OfflineChecks.Count;
         private bool _wasConnected = false;
 
@@ -104,18 +105,18 @@ namespace Peak.AP
         private int _progressiveMountainCount = 0;
 
         // ===== AP Link Management =====
-        private RingLinkService _ringLinkService;
-        private HardRingLinkService _hardRingLinkService;
+        public RingLinkService _ringLinkService;
+        public HardRingLinkService _hardRingLinkService;
         public TrapLinkService _trapLinkService;
-        private DeathLinkService _deathLinkService;
-        private BreathLinkService _breathLinkService;
-        private EnergyLinkService _energyLinkService;
-        private bool _ringLinkEnabled = false;
-        private bool _hardRingLinkEnabled = false;
-        private bool _trapLinkEnabled = false;
+        public DeathLinkService _deathLinkService;
+        public BreathLinkService _breathLinkService;
+        public EnergyLinkService _energyLinkService;
+        public bool _ringLinkEnabled = false;
+        public bool _hardRingLinkEnabled = false;
+        public bool _trapLinkEnabled = false;
         public bool energyLinkEnabled = false;
-        private bool _breathLinkEnabled = false;
-        private bool _deathLinkEnabled = false;
+        public bool _breathLinkEnabled = false;
+        public bool _deathLinkEnabled = false;
         private HashSet<string> _enabledTraps = new HashSet<string>();
         private string _energyLinkTeamName = "0";
         private const int BUNDLE_COST = 400000000; // Same as AP_Links/EnergyLinkStore.cs
@@ -3946,8 +3947,6 @@ namespace Peak.AP
                 // Check for port changes before connecting
                 string host = cfgServer.Value;
                 string url = host.Contains(":") ? host : (host + ":" + cfgPort.Value);
-                //LoadState();
-                
 
                 _session = ArchipelagoSessionFactory.CreateSession(url);
 
@@ -3958,32 +3957,92 @@ namespace Peak.AP
                 {
                     _log.LogWarning("[PeakPelago] Socket closed: " + reason);
                     _status = "Disconnected";
-                    
+
                     if (_intentionalDisconnect)
                     {
-                        
+
                         _intentionalDisconnect = false;
                         return;
                     }
-                    
+
                     _wantReconnect = true;
                     _reconnectAttempts = 0;
                     _reconnectAttemptTime = Time.time + RECONNECT_DELAY;
-                    
+
                 };
 
-                // Use TryConnectAndLogin instead of ConnectAsync/LoginAsync
-                var result = _session.TryConnectAndLogin(
-                    "PEAK",
-                    cfgSlot.Value,
-                    ItemsHandlingFlags.AllItems,
-                    null,
-                    null,
-                    null,                        // uuid
-                    string.IsNullOrEmpty(cfgPassword.Value) ? null : cfgPassword.Value,
-                    true                         // requestSlotData
-                );
+                // Capture values for the background thread
+                string slotName = cfgSlot.Value;
+                string password = string.IsNullOrEmpty(cfgPassword.Value) ? null : cfgPassword.Value;
 
+                // Run the blocking TryConnectAndLogin on a background thread to avoid freezing the game
+                new Thread(() =>
+                {
+                    try
+                    {
+                        var result = _session.TryConnectAndLogin(
+                            "PEAK",
+                            slotName,
+                            ItemsHandlingFlags.AllItems,
+                            null,
+                            null,
+                            null,                        // uuid
+                            password,
+                            true                         // requestSlotData
+                        );
+
+                        // Marshal all post-login work back to the main thread
+                        _mainThreadActions.Enqueue(() => OnConnectResult(result, slotName));
+                    }
+                    catch (Exception ex)
+                    {
+                        _mainThreadActions.Enqueue(() =>
+                        {
+                            _status = "Error";
+                            _log.LogError("[PeakPelago] Connect error: " + ex.GetBaseException().Message);
+                            TryCloseSession();
+                            _isConnecting = false;
+                        });
+                    }
+                }) { IsBackground = true, Name = "PeakPelago-Connect" }.Start();
+            }
+            catch (Exception ex)
+            {
+                _status = "Error";
+                _log.LogError("[PeakPelago] Connect error: " + ex.GetBaseException().Message);
+                TryCloseSession();
+                _isConnecting = false;
+            }
+        }
+
+        public void SendUpdatedLinkTags()
+        {
+            if (_session == null) return;
+            var tags = new List<string>();
+            if (_deathLinkEnabled && cfgDeathLinkEnabled.Value) tags.Add("DeathLink");
+            if (_ringLinkEnabled) tags.Add("RingLink");
+            if (_hardRingLinkEnabled) tags.Add("HardRingLink");
+            if (energyLinkEnabled) tags.Add("EnergyLink");
+            if (_breathLinkEnabled) tags.Add("BreathLink");
+            if (_trapLinkEnabled) tags.Add("TrapLink");
+
+            var updatePacket = new ConnectUpdatePacket { Tags = tags.ToArray() };
+            _session.Socket.SendPacket(updatePacket);
+            _log.LogInfo($"[PeakPelago] Updated link tags: [{string.Join(", ", tags)}]");
+        }
+
+        public void CancelReconnect()
+        {
+            _wantReconnect = false;
+            _reconnectAttempts = 0;
+            _status = "Disconnected";
+            _log.LogInfo("[PeakPelago] Reconnection cancelled by user.");
+        }
+
+        private void OnConnectResult(LoginResult result, string slotName)
+        {
+            try
+            {
                 if (!result.Successful)
                 {
                     string msg = (result is LoginFailure lf) ? lf.Errors?.FirstOrDefault() ?? "Login failed." : "Login failed.";
@@ -3996,14 +4055,14 @@ namespace Peak.AP
                 // Ask for datapackage for our game so helper name<->id lookups work
                 _session.Socket.SendPacket(new GetDataPackagePacket { Games = new[] { "PEAK" } });
                 _deathLinkService = _session.CreateDeathLinkService();
-                
+
                 _deathLinkService.OnDeathLinkReceived += (deathLink) =>
                 {
                     try
                     {
-                        
 
-                        if (deathLink.Source == cfgSlot.Value)
+
+                        if (deathLink.Source == slotName)
                         {
                             _log.LogDebug("[PeakPelago] Ignoring own death link");
                             return;
@@ -4025,7 +4084,7 @@ namespace Peak.AP
                         string itemName = helper.GetItemName(info.ItemId, info.ItemGame) ?? ("Item " + info.ItemId);
                         int currentIndex = helper.Index - 1;
                         bool isTrap = IsTrapItem(itemName);
-                        
+
                         _mainThreadActions.Enqueue(() =>
                         {
                             try
@@ -4033,7 +4092,7 @@ namespace Peak.AP
                                 if (currentIndex >= _stateData.LastProcessedItemIndex)
                                 {
                                     _itemQueue.Enqueue((itemName, isTrap, currentIndex));
-                                    
+
                                 }
                                 else
                                 {
@@ -4058,7 +4117,7 @@ namespace Peak.AP
                     try
                     {
                         _session.Locations.CompleteLocationChecks(_stateData.ReportedChecks.ToArray());
-                        
+
                     }
                     catch (Exception ex)
                     {
@@ -4079,14 +4138,14 @@ namespace Peak.AP
                             _stateData.LastProcessedItemIndex = actualItemCount;
                         }
                     }
-                    
 
-                    
+
+
                     foreach (var kvp in loginResult.SlotData)
                     {
-                        
+
                     }
-                    
+
 
                     bool progressiveEnabled = false;
                     bool additionalEnabled = false;
@@ -4152,7 +4211,7 @@ namespace Peak.AP
                         if (energyLinkEnabled)
                         {
                             tags.Add("EnergyLink");
-                            
+
                             // Get team name
                             if (loginResult.SlotData.ContainsKey("team"))
                             {
@@ -4274,7 +4333,7 @@ namespace Peak.AP
                     _trapLinkService.Initialize(
                         _session,
                         _trapLinkEnabled,
-                        cfgSlot.Value,
+                        slotName,
                         _enabledTraps,
                         ApplyItemEffect
                     );
@@ -4294,14 +4353,14 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["badge_count"];
                         _slotRequiredBadges = Convert.ToInt32(value);
-                        
+
                     }
 
                     if (loginResult.SlotData.ContainsKey("death_link_behavior"))
                     {
                         var value = loginResult.SlotData["death_link_behavior"];
                         _deathLinkBehavior = Convert.ToInt32(value);
-                        
+
                     }
                     else
                     {
@@ -4311,7 +4370,7 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["death_link_send_behavior"];
                         _deathLinkSendBehavior = Convert.ToInt32(value);
-                        
+
                     }
                     else
                     {
@@ -4341,7 +4400,7 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["item_sanity"];
                         _itemSanityEnabled = Convert.ToInt32(value) != 0;
-                        
+
                     }
 
                     LoadOfflineChecks();
@@ -4355,9 +4414,9 @@ namespace Peak.AP
                     RecoverAscentUnlocks();
                     RecoverProgressiveMountain();
                     RecoverEnduranceUpgrades();
-                    
+
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
-                    
+
 
                 }
                 else
@@ -4372,11 +4431,11 @@ namespace Peak.AP
                 _notifications.ShowConnected();
                 if (LootData.AllSpawnWeightData != null)
                 {
-                    
+
                     UnlockedItemsManager.RefreshLootTables();
                 }
 
-                
+
             }
             catch (Exception ex)
             {
@@ -4875,7 +4934,7 @@ namespace Peak.AP
                 UnlockedItemsManager.CheckDeferredRefresh();
             }
     
-            if (_itemQueue.IsEmpty)
+            if (_itemQueue.IsEmpty || LoadingScreenHandler.loading)
             {
                 return;
             }

@@ -180,7 +180,7 @@ The Python world code follows Archipelago's world API:
 
 ## Version
 
-Current Version: **0.5.8**
+Current Version: **0.5.9**
 
 ## Links
 

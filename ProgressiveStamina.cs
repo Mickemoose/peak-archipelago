@@ -479,38 +479,24 @@ namespace Peak.AP
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
 
-                if (statusSum < baseMaxStamina && Time.time - __instance.data.lastPassedOut > 3f)
+                // Only intervene when base max > 1.0 and afflictions are between 1.0 and baseMax.
+                // In that range, vanilla would un-pass-out (statusSum < 1f) but we should stay passed out.
+                // For all other cases, let vanilla handle everything (failsafe, zombie, checkpoint, death).
+                if (baseMaxStamina > 1.0f && statusSum >= 1.0f && statusSum < baseMaxStamina)
                 {
-                    if (!__instance.photonView.IsMine)
+                    // Vanilla would think we should un-pass-out, but we shouldn't yet.
+                    // Skip the un-pass-out check by not running vanilla, but still handle death.
+                    if (__instance.data.deathTimer > 1f)
                     {
-                        return false;
+                        // Let vanilla handle the death/zombie/checkpoint path
+                        return true;
                     }
-                    
-                    __instance.photonView.RPC("RPCA_UnPassOut", RpcTarget.All);
-                }
-                
-                if (__instance.data.deathTimer > 1f)
-                {
-                    __instance.refs.items.EquipSlot(Optionable<byte>.None);
-                    
-                    if (__instance.refs.afflictions.GetCurrentStatus(CharacterAfflictions.STATUSTYPE.Spores) >= 0.5f 
-                        && !__instance.data.zombified)
-                    {
-                        if (!PhotonNetwork.IsMasterClient)
-                        {
-                            __instance.data.zombified = true;
-                        }
-                        __instance.photonView.RPC("RPCA_Zombify", RpcTarget.MasterClient, 
-                            __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
-                    }
-                    else
-                    {
-                        __instance.photonView.RPC("RPCA_Die", RpcTarget.All, 
-                            __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
-                    }
+                    // Block vanilla's un-pass-out, nothing else to do
+                    return false;
                 }
 
-                return false;
+                // All other cases: let vanilla run normally
+                return true;
             }
             catch (Exception ex)
             {
@@ -548,16 +534,11 @@ namespace Peak.AP
                 {
                     if (shouldPassOut)
                     {
-                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
-                        if (__instance.data.passOutValue > 0.999f)
+                        if (!__instance.TryCheckpoint())
                         {
-                            __instance.photonView.RPC("RPCA_Die", RpcTarget.All, 
+                            __instance.photonView.RPC("RPCA_Die", RpcTarget.All,
                                 __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
                         }
-                    }
-                    else
-                    {
-                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 0f, Time.deltaTime / 5f);
                     }
                 }
                 else
@@ -611,6 +592,12 @@ namespace Peak.AP
 
                 float baseMax = _staminaManager.GetBaseMaxStamina(__instance.character);
                 if (baseMax <= 1.0f) return;
+
+                // Vanilla blocks all status additions (except Curse) when invincible.
+                // Without this check, we'd misinterpret the blocked add as vanilla clamping
+                // and force-set the value anyway.
+                if (__instance.character.data.isInvincible && statusType != CharacterAfflictions.STATUSTYPE.Curse)
+                    return;
 
                 float afterAdd = __instance.GetCurrentStatus(statusType);
                 float desired = __state + amount;
