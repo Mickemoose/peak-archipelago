@@ -312,7 +312,7 @@ namespace Peak.AP
                 StandardTraps.Ice, StandardTraps.IceFloor);
 
             Register("Hot Trap", StandardTraps.Fire,
-                StandardTraps.Fire, StandardTraps.IcyHotPants);
+                StandardTraps.Fire, StandardTraps.IcyHotPants, StandardTraps.Burn);
 
             Register("Injury Trap", StandardTraps.Damage,
                 StandardTraps.Damage, StandardTraps.DoubleDamage, StandardTraps.Electrocution);

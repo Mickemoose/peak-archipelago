@@ -53,7 +53,7 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
 
 3. **Launch the Game**:
    - Start PEAK - the plugin will create a configuration file on first run
-   - Connect using the in game UI
+   - Connect using the in game pause menu
 
 ## Archipelago World Installation
 
@@ -69,16 +69,18 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
 
 2. **Start PEAK**:
    - Launch the game with the mod installed
-   - The in-game UI will show connection status
+   - If you're hosting, host a lobby, otherwise join someone.
 
 3. **Connect to Archipelago**:
-   - Use the in-game menu in the top left
-   - Fill in the connection details and click Connect or hit Enter
+   - As the host, press Pause/ESC and click Archipelago.
+   - Fill in the connection details and click Connect.
+   - Optionally toggle some of the DeathLink/TrapLink/RingLink options if applicable.
+   - During gameplay the Archipelago icon on the bottom left will be colored if connected, uncolored if not connected.
 
 4. **Play the Game**:
    - Ascents are initially locked - unlock them by receiving items
    - Collecting items and completing objectives sends checks to other players
-   - Receive items from other players as they complete their objectives
+   - Receive some item unlocks or progressive items from other players as they complete their objectives
    - Work together (or compete) to complete your goals!
 
 ## Multiplayer
@@ -125,6 +127,11 @@ Most items are 100J of energy, while some have unique values.
 
 With TrapLink enabled, any Traps you receive or find will send out to TrapLinked games that are able to accept them. When linked games do the same, you
 will receive a linked trap as well based on the type of trap.
+
+### BreathLink
+
+With BreathLink enabled, any time a player loses all of their stamina other BreathLinked games will lose all of their stamina (or equivalent).
+When a linked game sends a BreathLink, all players will lose all their stamina.
 
 
 ## Custom Trivia Trap
