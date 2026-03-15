@@ -1,4 +1,13 @@
 ## v0.5.9
+<ul>
+    <li>Items being locked and randomized spawns is now an option in the yaml called ItemSanity</li>
+    <li>Experimental BreathLink Support: Complete loss of Stamina linked to other BreathLinked games</li>
+    <li>Trap Queue system to reduce trap spam</li>
+    <li>Connection UI moved into pause menu under Archipelago button</li>
+    <li>Archipelago Settings in game now includes toggling DeathLink, TrapLink, RingLink/HardRingLink, BreathLink on the fly</li>
+    <li>Small handful of new traps</li>
+    <li>In Game Items as Items severely reduced to reduce potential crashing. Instead theres a handful of filler items so not every item can be sent to you.</li>
+</ul>
 
 ## v0.5.8
 <ul>
