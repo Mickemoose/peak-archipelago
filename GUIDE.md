@@ -15,6 +15,7 @@ Also available on Thunderstore: https://thunderstore.io/c/peak/p/PeakArchipelago
 - [Archipelago World Installation](#archipelago-world-installation)
 - [How to Play](#how-to-play)
 - [Multiplayer](#multiplayer)
+- [Checks](#checks)
 - [Links](#links)
   - [DeathLink](#deathlink)
   - [RingLink/HardRingLink](#ringlinkhardringlink)
@@ -90,6 +91,17 @@ All players just need to download the PEAKPELAGO Mod for their PEAK Game and joi
 The AP Connection UI will update to show that it's connected via the host
 
 If someone joining the Host has their AP connection set to their own slot, anything connected to AP will likely only affect the Host's AP slot.
+
+## Checks
+
+### What checks are there in PEAK?
+- Each Ascent completion
+- Each completed Biome on each Ascent
+- Majority of the Badges (Some may be disabled by the player's YAML or may be disabled due to ongoing issues)
+- Picking up each item in the game is a check
+- Opening various numbers of luggage in total
+- Opening various numbers of luggage in 1 run
+- Scoring basketball shots
 
 ## Links
 
