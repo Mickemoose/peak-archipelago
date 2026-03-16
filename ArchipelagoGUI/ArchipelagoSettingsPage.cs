@@ -1,8 +1,12 @@
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using Zorro.UI;
 using Zorro.ControllerSupport;
+using Archipelago.MultiClient.Net.Enums;
 
 namespace Peak.AP
 {
@@ -358,45 +362,12 @@ namespace Peak.AP
 
             _linksContent.gameObject.SetActive(false);
 
-            // --- Tracker tab content ---
+            // --- Tracker tab content (built lazily on first tab switch) ---
             _trackerContent = CreateChild(content, "TrackerParent");
             _trackerContent.anchorMin = Vector2.zero;
             _trackerContent.anchorMax = Vector2.one;
             _trackerContent.anchoredPosition = new Vector2(0f, -30.92f);
             _trackerContent.sizeDelta = new Vector2(0f, -61.85f);
-            var trackerVLG = _trackerContent.gameObject.AddComponent<VerticalLayoutGroup>();
-            trackerVLG.spacing = 4;
-            trackerVLG.childAlignment = TextAnchor.UpperCenter;
-            trackerVLG.childControlWidth = true;
-            trackerVLG.childControlHeight = false;
-            trackerVLG.childForceExpandWidth = true;
-            trackerVLG.childForceExpandHeight = false;
-            trackerVLG.padding = new RectOffset(10, 10, 10, 10);
-
-            var trackerScroll = _trackerContent.gameObject.AddComponent<ScrollRect>();
-            var trackerScrollContent = CreateChild(_trackerContent, "ScrollContent");
-            trackerScrollContent.anchorMin = new Vector2(0f, 1f);
-            trackerScrollContent.anchorMax = new Vector2(1f, 1f);
-            trackerScrollContent.pivot = new Vector2(0.5f, 1f);
-            var scrollVLG = trackerScrollContent.gameObject.AddComponent<VerticalLayoutGroup>();
-            scrollVLG.spacing = 4;
-            scrollVLG.childControlWidth = true;
-            scrollVLG.childControlHeight = false;
-            scrollVLG.childForceExpandWidth = true;
-            scrollVLG.childForceExpandHeight = false;
-            var scrollFitter = trackerScrollContent.gameObject.AddComponent<ContentSizeFitter>();
-            scrollFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            trackerScroll.content = trackerScrollContent;
-            trackerScroll.vertical = true;
-            trackerScroll.horizontal = false;
-            trackerScroll.viewport = _trackerContent;
-            _trackerContent.gameObject.AddComponent<RectMask2D>();
-
-            // Remove the VLG from _trackerContent since ScrollRect handles layout
-            UnityEngine.Object.DestroyImmediate(trackerVLG);
-
-            BuildTrackerContent(trackerScrollContent);
-
             _trackerContent.gameObject.SetActive(false);
 
             // Wire tab buttons
@@ -729,86 +700,419 @@ namespace Peak.AP
         }
 
         private RectTransform _trackerScrollContent;
+        private TextMeshProUGUI _trackerTooltip;
+
+        // Hint cache: maps AP unlock item name -> hint display string (e.g. "Player's Game: Location")
+        private Dictionary<string, string> _hintCache = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
 
         private static readonly string[] BiomeNames = { "Shore", "Tropics / Roots", "Mesa / Alpine", "Caldera", "Kiln" };
 
-        private void BuildTrackerContent(RectTransform scrollContent)
+        private void EnsureTrackerScroll()
         {
-            _trackerScrollContent = scrollContent;
-            var noDataLabel = CreateLabel(scrollContent, "NoData", "Connect to a server to see loot assignments", 20, TextAlignmentOptions.Center);
-            var le = noDataLabel.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = 50;
+            if (_trackerScrollContent != null) return;
+
+            var viewport = CreateChild(_trackerContent, "Viewport");
+            viewport.anchorMin = Vector2.zero;
+            viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = Vector2.zero;
+            viewport.offsetMax = Vector2.zero;
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var vpImage = viewport.gameObject.AddComponent<Image>();
+            vpImage.color = new Color(0, 0, 0, 0.01f);
+            vpImage.raycastTarget = true;
+
+            _trackerScrollContent = CreateChild(viewport, "ScrollContent");
+            _trackerScrollContent.anchorMin = new Vector2(0f, 1f);
+            _trackerScrollContent.anchorMax = new Vector2(1f, 1f);
+            _trackerScrollContent.pivot = new Vector2(0.5f, 1f);
+            _trackerScrollContent.offsetMin = Vector2.zero;
+            _trackerScrollContent.offsetMax = Vector2.zero;
+            var vlg = _trackerScrollContent.gameObject.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = 6;
+            vlg.padding = new RectOffset(10, 10, 5, 10);
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = false;
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            var fitter = _trackerScrollContent.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var scroll = _trackerContent.gameObject.AddComponent<ScrollRect>();
+            scroll.content = _trackerScrollContent;
+            scroll.viewport = viewport;
+            scroll.vertical = true;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 30f;
+
+            // Floating tooltip — separate bg and text children
+            var tooltipObj = CreateChild(_trackerContent, "Tooltip");
+            _tooltipRoot = tooltipObj;
+            tooltipObj.anchorMin = Vector2.zero;
+            tooltipObj.anchorMax = Vector2.zero;
+            tooltipObj.pivot = new Vector2(0.5f, 0f);
+            tooltipObj.sizeDelta = new Vector2(200f, 30f);
+
+            var tooltipBgRect = CreateChild(tooltipObj, "Bg");
+            tooltipBgRect.anchorMin = Vector2.zero;
+            tooltipBgRect.anchorMax = Vector2.one;
+            tooltipBgRect.offsetMin = Vector2.zero;
+            tooltipBgRect.offsetMax = Vector2.zero;
+            var tooltipBg = tooltipBgRect.gameObject.AddComponent<Image>();
+            tooltipBg.color = new Color(0.1f, 0.07f, 0.05f, 0.95f);
+            tooltipBg.raycastTarget = false;
+
+            var tooltipTextRect = CreateChild(tooltipObj, "Text");
+            tooltipTextRect.anchorMin = Vector2.zero;
+            tooltipTextRect.anchorMax = Vector2.one;
+            tooltipTextRect.offsetMin = Vector2.zero;
+            tooltipTextRect.offsetMax = Vector2.zero;
+            _trackerTooltip = tooltipTextRect.gameObject.AddComponent<TextMeshProUGUI>();
+            _trackerTooltip.fontSize = 16;
+            _trackerTooltip.alignment = TextAlignmentOptions.Center;
+            _trackerTooltip.color = Color.white;
+            _trackerTooltip.raycastTarget = false;
+            if (_font != null) _trackerTooltip.font = _font;
+            tooltipObj.gameObject.SetActive(false);
+        }
+
+        private HashSet<string> GetAcquiredLocationNames()
+        {
+            var acquired = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin == null) return acquired;
+
+            var stateData = plugin._stateData;
+            if (stateData == null) return acquired;
+
+            var session = plugin._session;
+            if (session == null) return acquired;
+
+            foreach (long checkId in stateData.ReportedChecks)
+            {
+                string locName = session.Locations.GetLocationNameFromId(checkId);
+                if (locName != null)
+                    acquired.Add(locName);
+            }
+            return acquired;
+        }
+
+        private HashSet<string> GetUnlockedItemNames()
+        {
+            var unlocked = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin?._session == null) return unlocked;
+
+            foreach (var item in plugin._session.Items.AllItemsReceived)
+            {
+                string itemName = plugin._session.Items.GetItemName(item.ItemId, item.ItemGame);
+                if (itemName != null)
+                    unlocked.Add(itemName);
+            }
+            return unlocked;
+        }
+
+        private void CreateBiomeHeader(RectTransform parent, string biomeName)
+        {
+            var row = CreateChild(parent, biomeName + "_Header");
+            var le = row.gameObject.AddComponent<LayoutElement>();
+            le.preferredHeight = 36;
+            var bg = row.gameObject.AddComponent<Image>();
+            bg.color = new Color(0.3f, 0.2f, 0.15f, 0.85f);
+            bg.raycastTarget = false;
+
+            var textChild = CreateChild(row, "Label");
+            textChild.anchorMin = Vector2.zero;
+            textChild.anchorMax = Vector2.one;
+            textChild.offsetMin = new Vector2(10f, 0f);
+            textChild.offsetMax = Vector2.zero;
+            var tmp = textChild.gameObject.AddComponent<TextMeshProUGUI>();
+            tmp.text = biomeName;
+            tmp.fontSize = 22;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
+            tmp.color = Color.white;
+            tmp.raycastTarget = false;
+            if (_font != null) tmp.font = _font;
+        }
+
+        private void CreateIconGrid(RectTransform parent, List<string> acquireLocNames,
+            HashSet<string> acquired, HashSet<string> unlocked, bool itemSanity)
+        {
+            var gridRow = CreateChild(parent, "IconGrid");
+            var le = gridRow.gameObject.AddComponent<LayoutElement>();
+
+            var grid = gridRow.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(56, 56);
+            grid.spacing = new Vector2(4, 4);
+            grid.padding = new RectOffset(8, 8, 4, 4);
+            grid.childAlignment = TextAnchor.UpperLeft;
+            grid.constraint = GridLayoutGroup.Constraint.Flexible;
+
+            var gridFitter = gridRow.gameObject.AddComponent<ContentSizeFitter>();
+            gridFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            int count = 0;
+            foreach (var acquireLoc in acquireLocNames)
+            {
+                string itemName = acquireLoc.StartsWith("Acquire ") ? acquireLoc.Substring(8) : acquireLoc;
+                string unlockName = itemName + " Unlock";
+
+                // Get the internal name and item ID
+                string internalName = null;
+                ushort itemId = 0;
+                if (ItemIdMappings.ApNameToInternalName.TryGetValue(unlockName, out string intName))
+                {
+                    internalName = intName;
+                    ItemIdMappings.NameToId.TryGetValue(internalName, out itemId);
+                }
+
+                bool isAcquired = acquired.Contains(acquireLoc);
+                bool isUnlocked = !itemSanity || unlocked.Contains(unlockName);
+
+                Texture2D icon = null;
+                if (internalName != null && ItemDatabase.TryGetItem(itemId, out Item gameItem))
+                {
+                    icon = gameItem.UIData?.icon;
+                }
+
+                var cell = CreateChild(gridRow.GetComponent<RectTransform>(), itemName + "_Icon");
+
+                // Background
+                var cellBg = cell.gameObject.AddComponent<Image>();
+                cellBg.color = isAcquired ? new Color(0.2f, 0.35f, 0.2f, 0.7f)
+                             : new Color(0.15f, 0.12f, 0.1f, 0.6f);
+
+                // Icon
+                if (icon != null)
+                {
+                    var iconChild = CreateChild(cell, "Icon");
+                    iconChild.anchorMin = new Vector2(0.1f, 0.1f);
+                    iconChild.anchorMax = new Vector2(0.9f, 0.9f);
+                    iconChild.offsetMin = Vector2.zero;
+                    iconChild.offsetMax = Vector2.zero;
+                    var rawImg = iconChild.gameObject.AddComponent<RawImage>();
+                    rawImg.texture = icon;
+                    rawImg.raycastTarget = false;
+
+                    if (!isAcquired && itemSanity && !isUnlocked)
+                        rawImg.color = new Color(0, 0, 0, 0.8f); // silhouette
+                    else if (!isAcquired)
+                        rawImg.color = new Color(0.3f, 0.3f, 0.3f, 0.7f); // grayed
+                    else
+                        rawImg.color = Color.white;
+                }
+
+                // Tooltip + hint interaction
+                bool isLocked = !isAcquired && itemSanity && !isUnlocked;
+                string capturedUnlockName = unlockName;
+                string capturedItemName = itemName;
+
+                var trigger = cell.gameObject.AddComponent<EventTrigger>();
+                var enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+                enterEntry.callback.AddListener((_) =>
+                {
+                    if (isLocked && _hintCache.TryGetValue(capturedUnlockName, out string hintStr))
+                        ShowTrackerTooltip(hintStr);
+                    else if (isLocked)
+                        ShowTrackerTooltip(GetHintCostText());
+                    else
+                        ShowTrackerTooltip(capturedItemName);
+                });
+                trigger.triggers.Add(enterEntry);
+                var exitEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+                exitEntry.callback.AddListener((_) => HideTrackerTooltip());
+                trigger.triggers.Add(exitEntry);
+
+                if (isLocked)
+                {
+                    var clickEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
+                    clickEntry.callback.AddListener((_) => OnLockedItemClicked(capturedUnlockName));
+                    trigger.triggers.Add(clickEntry);
+                }
+
+                count++;
+            }
+
+            // Estimate rows for height
+            float gridWidth = 800f;
+            int cols = Mathf.Max(1, Mathf.FloorToInt((gridWidth - 16) / 60));
+            int rows = Mathf.CeilToInt((float)count / cols);
+            le.preferredHeight = rows * 60 + 8;
+        }
+
+        private RectTransform _tooltipRoot;
+
+        private void ShowTrackerTooltip(string text)
+        {
+            if (_trackerTooltip == null || _tooltipRoot == null) return;
+            _trackerTooltip.text = text;
+            _tooltipRoot.gameObject.SetActive(true);
+            StartCoroutine(FollowMouseTooltip());
+        }
+
+        private void HideTrackerTooltip()
+        {
+            if (_tooltipRoot == null) return;
+            _tooltipRoot.gameObject.SetActive(false);
+        }
+
+        private string GetHintCostText()
+        {
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin?._session == null) return "Not connected";
+            try
+            {
+                int cost = plugin._session.RoomState.HintCost;
+                int points = plugin._session.RoomState.HintPoints;
+                return $"Click to hint ({cost} pts, you have {points})";
+            }
+            catch
+            {
+                return "Click to hint";
+            }
+        }
+
+        private void OnLockedItemClicked(string unlockName)
+        {
+            if (_hintCache.ContainsKey(unlockName)) return; // Already hinted
+
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin?._session == null) return;
+
+            try
+            {
+                int cost = plugin._session.RoomState.HintCost;
+                int points = plugin._session.RoomState.HintPoints;
+                if (points < cost)
+                {
+                    ShowTrackerTooltip($"Not enough points ({points}/{cost})");
+                    return;
+                }
+            }
+            catch { }
+
+            // Find the location ID for this unlock item on our slot
+            long locationId = -1;
+            int player = plugin._session.ConnectionInfo.Slot;
+            foreach (var kvp in plugin._lootBiomeAssignments)
+            {
+                string acquireLoc = kvp.Key;
+                string expectedUnlock = acquireLoc.StartsWith("Acquire ") ? acquireLoc.Substring(8) + " Unlock" : "";
+                if (string.Equals(expectedUnlock, unlockName, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    locationId = plugin._session.Locations.GetLocationIdFromName(plugin._session.ConnectionInfo.Game, acquireLoc);
+                    break;
+                }
+            }
+
+            if (locationId < 0)
+            {
+                ShowTrackerTooltip("Location not found");
+                return;
+            }
+
+            ShowTrackerTooltip("Hinting...");
+            StartCoroutine(RequestHintAsync(unlockName, locationId, player));
+        }
+
+        private System.Collections.IEnumerator RequestHintAsync(string unlockName, long locationId, int player)
+        {
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin?._session == null) yield break;
+
+            // CreateHints is fire-and-forget (void)
+            try
+            {
+                plugin._session.Hints.CreateHints(player, HintStatus.Unspecified, locationId);
+            }
+            catch (System.Exception ex)
+            {
+                ShowTrackerTooltip("Hint failed");
+                plugin._log?.LogWarning($"[PeakPelago] Hint request failed: {ex.Message}");
+                yield break;
+            }
+
+            yield return new WaitForSeconds(1.5f);
+
+            // Query hints via callback
+            string capturedUnlock = unlockName;
+            long capturedLocId = locationId;
+            int capturedPlayer = player;
+
+            plugin._session.Hints.GetHintsAsync((hints) =>
+            {
+                string result = null;
+                if (hints != null)
+                {
+                    foreach (var h in hints)
+                    {
+                        if (h.LocationId == capturedLocId && h.ReceivingPlayer == capturedPlayer)
+                        {
+                            string findingPlayerName = plugin._session.Players.GetPlayerName(h.FindingPlayer);
+                            string findingGame = plugin._session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
+                            string locName = plugin._session.Locations.GetLocationNameFromId(h.LocationId);
+                            result = $"{findingPlayerName}'s {findingGame}: {locName}";
+                            break;
+                        }
+                    }
+                }
+                _hintCache[capturedUnlock] = result ?? "Hinted (check !hint)";
+                ShowTrackerTooltip(_hintCache[capturedUnlock]);
+            });
+        }
+
+        private System.Collections.IEnumerator FollowMouseTooltip()
+        {
+            var canvas = GetComponentInParent<Canvas>();
+            var canvasRect = canvas?.GetComponent<RectTransform>();
+            if (canvasRect == null) yield break;
+            while (_tooltipRoot != null && _tooltipRoot.gameObject.activeSelf)
+            {
+                Vector2 localPoint;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect, Input.mousePosition, canvas.worldCamera, out localPoint);
+                _tooltipRoot.position = canvasRect.TransformPoint(localPoint + new Vector2(0f, 25f));
+                yield return null;
+            }
         }
 
         private void RefreshTrackerContent()
         {
-            if (_trackerScrollContent == null) return;
+            EnsureTrackerScroll();
 
-            // Clear existing children
             for (int i = _trackerScrollContent.childCount - 1; i >= 0; i--)
                 Destroy(_trackerScrollContent.GetChild(i).gameObject);
 
             var plugin = PeakArchipelagoPlugin._instance;
             if (plugin == null || plugin._lootBiomeAssignments == null || plugin._lootBiomeAssignments.Count == 0)
             {
-                var noDataLabel = CreateLabel(_trackerScrollContent, "NoData", "Connect to a server to see loot assignments", 20, TextAlignmentOptions.Center);
-                var le = noDataLabel.gameObject.AddComponent<LayoutElement>();
-                le.preferredHeight = 50;
+                CreateBiomeHeader(_trackerScrollContent, "Connect to a server to see loot assignments");
                 return;
             }
 
-            // Group items by biome level
-            var biomeGroups = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<string>>();
+            bool itemSanity = plugin._itemSanityEnabled;
+            var acquired = GetAcquiredLocationNames();
+            var unlocked = GetUnlockedItemNames();
+
+            // Group acquire locations by biome level
+            var biomeGroups = new Dictionary<int, List<string>>();
             foreach (var kvp in plugin._lootBiomeAssignments)
             {
                 if (!biomeGroups.ContainsKey(kvp.Value))
-                    biomeGroups[kvp.Value] = new System.Collections.Generic.List<string>();
-                string itemName = kvp.Key;
-                if (itemName.StartsWith("Acquire "))
-                    itemName = itemName.Substring(8);
-                biomeGroups[kvp.Value].Add(itemName);
+                    biomeGroups[kvp.Value] = new List<string>();
+                biomeGroups[kvp.Value].Add(kvp.Key);
             }
 
             for (int level = 0; level < BiomeNames.Length; level++)
             {
                 if (!biomeGroups.ContainsKey(level)) continue;
 
-                var items = biomeGroups[level];
-                items.Sort();
+                var locs = biomeGroups[level];
+                locs.Sort();
 
-                // Biome header
-                var headerRow = CreateChild(_trackerScrollContent, BiomeNames[level] + "_Header");
-                var headerLE = headerRow.gameObject.AddComponent<LayoutElement>();
-                headerLE.preferredHeight = 40;
-                var headerBg = headerRow.gameObject.AddComponent<Image>();
-                headerBg.color = new Color(0.3f, 0.2f, 0.15f, 0.8f);
-                ApplyBlurSprite(headerBg);
-                var headerLabel = CreateLabel(headerRow, "Label", BiomeNames[level].ToUpper(), 24, TextAlignmentOptions.MidlineLeft);
-                var headerLabelRect = headerLabel.GetComponent<RectTransform>();
-                headerLabelRect.anchorMin = Vector2.zero;
-                headerLabelRect.anchorMax = Vector2.one;
-                headerLabelRect.offsetMin = new Vector2(15f, 0f);
-                headerLabelRect.offsetMax = Vector2.zero;
-
-                // Item rows
-                for (int i = 0; i < items.Count; i++)
-                {
-                    var itemRow = CreateChild(_trackerScrollContent, items[i] + "_Row");
-                    var itemLE = itemRow.gameObject.AddComponent<LayoutElement>();
-                    itemLE.preferredHeight = 30;
-                    if (i % 2 == 0)
-                    {
-                        var rowBg = itemRow.gameObject.AddComponent<Image>();
-                        rowBg.color = new Color(0.15f, 0.1f, 0.07f, 0.4f);
-                    }
-                    var itemLabel = CreateLabel(itemRow, "Label", items[i], 18, TextAlignmentOptions.MidlineLeft);
-                    itemLabel.color = new Color(0.9f, 0.85f, 0.8f, 1f);
-                    var itemLabelRect = itemLabel.GetComponent<RectTransform>();
-                    itemLabelRect.anchorMin = Vector2.zero;
-                    itemLabelRect.anchorMax = Vector2.one;
-                    itemLabelRect.offsetMin = new Vector2(30f, 0f);
-                    itemLabelRect.offsetMax = Vector2.zero;
-                }
+                CreateBiomeHeader(_trackerScrollContent, BiomeNames[level].ToUpper());
+                CreateIconGrid(_trackerScrollContent, locs, acquired, unlocked, itemSanity);
             }
         }
 

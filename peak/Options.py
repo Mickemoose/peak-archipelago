@@ -397,6 +397,12 @@ class ChaosControlTrapWeight(BaseTrapWeight):
     """
     display_name = "Chaos Control Trap Weight"
 
+class EmergencyRescueTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which summons the run-ending helicopter, immediately ending the current run for all players
+    """
+    display_name = "Emergency Rescue Trap Weight"
+
 class TrapPercentage(Range):
     """
     Replace a percentage of junk items in the item pool with random traps
@@ -594,3 +600,4 @@ class PeakOptions(PerGameCommonOptions):
     inverted_mouse_trap_weight: InvertedMouseTrapWeight
     stamina_drain_trap_weight: StaminaDrainTrapWeight
     chaos_control_trap_weight: ChaosControlTrapWeight
+    emergency_rescue_trap_weight: EmergencyRescueTrapWeight

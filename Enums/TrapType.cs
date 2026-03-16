@@ -46,6 +46,7 @@ namespace Peak.AP
         InvertedMouseTrap,
         StaminaDrainTrap,
         ChaosControlTrap,
+        EmergencyRescueTrap,
     }
 
     public static class TrapTypeExtensions
@@ -91,6 +92,7 @@ namespace Peak.AP
             { TrapType.InvertedMouseTrap, "Inverted Mouse Trap" },
             { TrapType.StaminaDrainTrap, "Stamina Drain Trap" },
             { TrapType.ChaosControlTrap, "Chaos Control Trap" },
+            { TrapType.EmergencyRescueTrap, "Emergency Rescue Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

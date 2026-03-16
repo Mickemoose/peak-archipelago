@@ -46,10 +46,10 @@ namespace Peak.AP
         private ConfigEntry<int> cfgSpawnItemCount;
 
         // ===== Session =====
-        private ArchipelagoSession _session;
+        public ArchipelagoSession _session;
         public ArchipelagoSession Session => _session;
         private StateManager _stateManager;
-        private StateData _stateData;
+        public StateData _stateData;
         public StateData State => _stateData;
         public bool _intentionalDisconnect = false;
         public class MountainHint
@@ -101,9 +101,9 @@ namespace Peak.AP
         private int _slotGoalType = 0;
         private int _slotRequiredAscent = 0;
         private int _slotRequiredBadges = 20;
-        private bool _itemSanityEnabled = false;
+        public bool _itemSanityEnabled = false;
         private int _lootSanityMode = 0; // 0=None, 1=Luggage, 2=Trees/Bushes, 3=All
-        private Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
+        public Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
         private bool _logicalScoutStatue = false;
         private int _progressiveMountainCount = 0;
 
@@ -1910,7 +1910,8 @@ namespace Peak.AP
                 { "Scoutmaster Trap", () => ScoutmasterTrapEffect.TriggerScoutmasterTrap(_log)},
                 { "Inverted Mouse Trap", () => InvertedMouseTrapEffect.ApplyInvertedMouseTrap(_log)},
                 { "Stamina Drain Trap", () => StaminaDrainTrapEffect.ApplyStaminaDrainTrap(_log)},
-                { "Chaos Control Trap", () => ChaosControlTrapEffect.ApplyChaosControlTrap(_log)}
+                { "Chaos Control Trap", () => ChaosControlTrapEffect.ApplyChaosControlTrap(_log)},
+                { "Emergency Rescue Trap", () => EmergencyRescueTrapEffect.ApplyEmergencyRescueTrap(_log)}
 
             };
 
@@ -2006,8 +2007,25 @@ namespace Peak.AP
         [PunRPC]
         public void StartGustTrapRPC()
         {
-            
+
             GustTrapEffect.ActivateGustLocal(_log);
+        }
+
+        [PunRPC]
+        public void StartEmergencyRescueRPC()
+        {
+            try
+            {
+                if (Zorro.Core.Singleton<PeakHandler>.Instance != null && !Zorro.Core.Singleton<PeakHandler>.Instance.summonedHelicopter)
+                {
+                    _log.LogInfo("[PeakPelago] Emergency Rescue RPC - summoning helicopter!");
+                    Zorro.Core.Singleton<PeakHandler>.Instance.SummonHelicopter();
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartEmergencyRescueRPC: {ex.Message}");
+            }
         }
 
         [PunRPC]

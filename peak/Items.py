@@ -204,6 +204,7 @@ trap_table = {
     "Inverted Mouse Trap":        ItemData(77125, ItemClassification.trap),
     "Stamina Drain Trap":         ItemData(77126, ItemClassification.trap),
     "Chaos Control Trap":         ItemData(77127, ItemClassification.trap),
+    "Emergency Rescue Trap":      ItemData(77128, ItemClassification.trap),
 }
 
 # All items that have "Acquire X" locations need unlock versions for logic

@@ -180,6 +180,7 @@ class PeakWorld(World):
         trap_weights += (["Inverted Mouse Trap"] * self.options.inverted_mouse_trap_weight.value)
         trap_weights += (["Stamina Drain Trap"] * self.options.stamina_drain_trap_weight.value)
         trap_weights += (["Chaos Control Trap"] * self.options.chaos_control_trap_weight.value)
+        trap_weights += (["Emergency Rescue Trap"] * self.options.emergency_rescue_trap_weight.value)
 
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -246,6 +247,7 @@ class PeakWorld(World):
         trap_data["inverted_mouse_trap"] = self.options.inverted_mouse_trap_weight.value
         trap_data["stamina_drain_trap"] = self.options.stamina_drain_trap_weight.value
         trap_data["chaos_control_trap"] = self.options.chaos_control_trap_weight.value
+        trap_data["emergency_rescue_trap"] = self.options.emergency_rescue_trap_weight.value
 
         return trap_data
 

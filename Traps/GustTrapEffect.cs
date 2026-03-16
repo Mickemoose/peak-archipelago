@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Linq;
 using BepInEx.Logging;
 using Photon.Pun;
 using UnityEngine;
@@ -9,32 +8,22 @@ namespace Peak.AP
 {
     public static class GustTrapEffect
     {
+        private static readonly float Duration = 10f;
+        private static readonly float GustForce = 20f;
+        private static readonly float ForceRadius = 2f;
+
         public static void ApplyGustTrap(ManualLogSource log)
         {
             try
             {
-                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
+                if (Character.localCharacter == null)
                 {
-                    log.LogWarning("[PeakPelago] Cannot apply Gust Trap - no characters found");
+                    log.LogWarning("[PeakPelago] Cannot apply Gust Trap - no local character");
                     return;
                 }
 
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead &&
-                    !c.data.fullyPassedOut
-                ).ToList();
+                log.LogInfo("[PeakPelago] Applying Gust Trap! Wind will blow for 10 seconds");
 
-                if (validCharacters.Count == 0)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply Gust Trap - no valid characters found");
-                    return;
-                }
-
-                log.LogInfo($"[PeakPelago] Applying Gust Trap! Wind will blow for 10 seconds");
-
-                // Send RPC to all clients
                 if (PeakArchipelagoPlugin._instance != null && PeakArchipelagoPlugin._instance.PhotonView != null)
                 {
                     PeakArchipelagoPlugin._instance.PhotonView.RPC("StartGustTrapRPC", RpcTarget.All);
@@ -53,80 +42,135 @@ namespace Peak.AP
 
         public static void ActivateGustLocal(ManualLogSource log)
         {
-            PeakArchipelagoPlugin._instance.StartCoroutine(ActivateGustCoroutine(log));
+            PeakArchipelagoPlugin._instance.StartCoroutine(GustCoroutine(log));
         }
 
-        private static IEnumerator ActivateGustCoroutine(ManualLogSource log)
+        private static IEnumerator GustCoroutine(ManualLogSource log)
         {
-            // Find any WindStorm template (active or inactive) and spawn our own copy
-            GameObject template = null;
-
-            // Check active objects first
-            template = GameObject.Find("WindStorm");
-
-            if (template == null)
+            var zone = WindChillZone.instance;
+            if (zone == null)
             {
-                foreach (var obj in Resources.FindObjectsOfTypeAll<GameObject>())
+                log.LogWarning("[PeakPelago] WindChillZone.instance is null, applying force-only gust");
+                yield return PeakArchipelagoPlugin._instance.StartCoroutine(ForceOnlyCoroutine(log));
+                yield break;
+            }
+
+            bool origWindActive = zone.windActive;
+            Vector3 origWindDirection = zone.currentWindDirection;
+            Bounds origBounds = zone.windZoneBounds;
+            float origUntilSwitch = GetUntilSwitch(zone);
+            float origTimeUntilNextWind = GetTimeUntilNextWind(zone);
+
+            Vector3 windDir = RandomWindDirection();
+            zone.windActive = true;
+            zone.currentWindDirection = windDir;
+            zone.windZoneBounds = new Bounds(Vector3.zero, Vector3.one * 100000f);
+            SetUntilSwitch(zone, Duration + 5f);
+            SetTimeUntilNextWind(zone, Duration + 5f);
+
+            log.LogInfo($"[PeakPelago] Gust Trap hijacking WindChillZone, direction: {windDir}");
+
+            float elapsed = 0f;
+            while (elapsed < Duration)
+            {
+                elapsed += Time.deltaTime;
+
+                zone.windActive = true;
+                SetUntilSwitch(zone, Duration - elapsed + 1f);
+                zone.windZoneBounds = new Bounds(Vector3.zero, Vector3.one * 100000f);
+
+                var character = Character.localCharacter;
+                if (character != null && !character.data.dead && !character.data.fullyPassedOut
+                    && character.data.currentClimbHandle == null)
                 {
-                    if (obj.name == "WindStorm" && obj.scene.IsValid())
-                    {
-                        template = obj;
-                        break;
-                    }
+                    float intensity = Mathf.Sin(Mathf.PI * elapsed / Duration);
+                    character.AddForceAtPosition(
+                        windDir * GustForce * intensity,
+                        character.Center,
+                        ForceRadius);
                 }
+
+                yield return null;
             }
 
-            if (template == null)
-            {
-                log.LogError("[PeakPelago] Could not find any WindStorm template!");
-                yield break;
-            }
+            zone.windActive = false;
+            zone.windZoneBounds = origBounds;
+            zone.hasBeenActiveFor = 0f;
+            Shader.SetGlobalFloat("GlobalWind", 0f);
 
-            Vector3 spawnPos = Character.localCharacter.transform.position;
-            bool wasTemplateActive = template.activeSelf;
-            template.SetActive(false);
-            var windStorm = UnityEngine.Object.Instantiate(template, spawnPos, Quaternion.identity);
-            if (wasTemplateActive) template.SetActive(true);
-            windStorm.name = "GustTrap_WindStorm";
+            if (Character.localCharacter != null)
+                Character.localCharacter.refs.climbing.climbingStamMinimumMultiplier = 1f;
 
-            foreach (var pv in windStorm.GetComponentsInChildren<PhotonView>(true))
-                UnityEngine.Object.DestroyImmediate(pv);
+            yield return new WaitForSeconds(3f);
 
-            windStorm.SetActive(true);
-            log.LogInfo("[PeakPelago] Spawned GustTrap WindStorm");
+            zone.windActive = origWindActive;
+            zone.currentWindDirection = origWindDirection;
+            SetUntilSwitch(zone, origUntilSwitch);
+            SetTimeUntilNextWind(zone, origTimeUntilNextWind);
 
-            yield return new WaitForSeconds(10f);
-
-            if (windStorm == null)
-            {
-                log.LogWarning("[PeakPelago] WindStorm was destroyed during gust trap");
-                yield break;
-            }
-
-            foreach (var ps in windStorm.GetComponentsInChildren<ParticleSystem>())
-                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-            foreach (var audio in windStorm.GetComponentsInChildren<AudioSource>())
-                audio.Stop();
-
-            yield return null;
-
-            UnityEngine.Object.Destroy(windStorm);
-            log.LogInfo("[PeakPelago] Gust Trap complete!");
+            log.LogInfo("[PeakPelago] Gust Trap complete, WindChillZone restored");
         }
-    }
-}
 
-public static class TransformExtensions
-{
-    public static string GetFullPath(this Transform transform)
-    {
-        string path = transform.name;
-        Transform parent = transform.parent;
-        while (parent != null)
+        private static IEnumerator ForceOnlyCoroutine(ManualLogSource log)
         {
-            path = parent.name + "/" + path;
-            parent = parent.parent;
+            Vector3 windDir = RandomWindDirection();
+            float elapsed = 0f;
+
+            while (elapsed < Duration)
+            {
+                elapsed += Time.fixedDeltaTime;
+
+                var character = Character.localCharacter;
+                if (character != null && !character.data.dead && !character.data.fullyPassedOut
+                    && character.data.currentClimbHandle == null)
+                {
+                    float intensity = Mathf.Sin(Mathf.PI * elapsed / Duration);
+                    character.AddForceAtPosition(
+                        windDir * GustForce * intensity,
+                        character.Center,
+                        ForceRadius);
+                }
+
+                yield return new WaitForFixedUpdate();
+            }
+
+            log.LogInfo("[PeakPelago] Gust Trap (force-only) complete");
         }
-        return path;
+
+        private static float GetUntilSwitch(WindChillZone zone)
+        {
+            var field = typeof(WindChillZone).GetField("untilSwitch",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            return (float)field.GetValue(zone);
+        }
+
+        private static void SetUntilSwitch(WindChillZone zone, float value)
+        {
+            var field = typeof(WindChillZone).GetField("untilSwitch",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            field.SetValue(zone, value);
+        }
+
+        private static float GetTimeUntilNextWind(WindChillZone zone)
+        {
+            var field = typeof(WindChillZone).GetField("timeUntilNextWind",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            return (float)field.GetValue(zone);
+        }
+
+        private static void SetTimeUntilNextWind(WindChillZone zone, float value)
+        {
+            var field = typeof(WindChillZone).GetField("timeUntilNextWind",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            field.SetValue(zone, value);
+        }
+
+        private static Vector3 RandomWindDirection()
+        {
+            return Vector3.Lerp(
+                Vector3.right * (UnityEngine.Random.value > 0.5f ? 1f : -1f),
+                Vector3.forward,
+                0.2f).normalized;
+        }
     }
 }
