@@ -12,7 +12,7 @@ This mod connects PEAK to the [Archipelago](https://archipelago.gg/) multiworld 
 
 Nothing is randomized per say in this mod as PEAK is already slightly random at its core. Yes there are some checks that rely on the biomes that can be locked each day. There are mods that can potentially allow you to pick which biome is played, but I have not tested any of these myself so do so at your own risk.
 
-With **Item Sanity** on, each item type must be unlocked via Archipelago before it can appear in loot pools. With **Loot Sanity**, you can control which pools (Luggage, Trees/Bushes, or both) get their contents shuffled so any unlocked item can drop from any affected source. **Logical Scout Statue** makes the Respawn Coffin only drop items you haven't acquired yet.
+With **Item Sanity** on, each item type must be unlocked via Archipelago before it can appear in loot pools. With **Loot Sanity**, you can control which pools (Luggage, Trees/Bushes, or both) get their contents shuffled so any unlocked item can drop from any affected source. **Logical Scout Statue** makes the Scout Statue only drop items you haven't acquired yet.
 
 The multiplayer exclusive items are added to the regular pool of items to allow full singleplayer play.
 
@@ -89,8 +89,8 @@ When generating an Archipelago game, the following PEAK-specific options are ava
 - **Required Ascent Count**: Number of ascents needed to complete (0-7, default: 4)
 - **Required Badge Count**: Number of badges needed for badge completion goal (10-50, default: 20)
 - **Item Sanity**: When enabled, items must be unlocked via Archipelago before they can appear in loot pools. "Acquire" checks require the unlock item. Works independently from Loot Sanity.
-- **Loot Sanity**: Controls which loot pools get shuffled (None, Luggage, Trees and Bushes, or All). Affected pools have all available items added at equal weight. Does not affect the Respawn Coffin.
-- **Logical Scout Statue**: When enabled, the Respawn Coffin only drops items you haven't sent an "Acquire" check for, filtered by biome access and item unlocks.
+- **Loot Sanity**: Controls which loot pools get shuffled (None, Luggage, Trees and Bushes, or All). Affected pools have all available items added at equal weight. Does not affect the Scout Statue.
+- **Logical Scout Statue**: When enabled, the Scout Statue only drops items you haven't sent an "Acquire" check for, filtered by biome access and item unlocks.
 - **Progressive Stamina**: Start with 25% Stamina and require finding Progressive Stamina Bars to reach 100%
 - **Additional Stamina**: With Progressive Stamina enabled, find 4 extra Stamina Bars to reach a total of 200% Stamina
 - **Trap Weigh Percent**: Determine the amount of filler items to get replaced with traps.

@@ -58,109 +58,59 @@ namespace Peak.AP
 
         private static IEnumerator ActivateGustCoroutine(ManualLogSource log)
         {
-            GameObject windStormObject = null;
-            bool wasActive = false;
-            bool weSpawnedIt = false;
+            // Find any WindStorm template (active or inactive) and spawn our own copy
+            GameObject template = null;
 
-            // First, try to find an existing WindStorm in the scene
-            windStormObject = GameObject.Find("WindStorm");
-            
-            if (windStormObject != null)
+            // Check active objects first
+            template = GameObject.Find("WindStorm");
+
+            if (template == null)
             {
-                log.LogInfo("[PeakPelago] Found existing WindStorm in scene");
-                wasActive = windStormObject.activeSelf;
-            }
-            else
-            {
-                // If no WindStorm exists, search ALL objects including inactive ones
-                log.LogInfo("[PeakPelago] No WindStorm in current biome, searching all objects including inactive...");
-                
-                GameObject[] allWindStorms = Resources.FindObjectsOfTypeAll<GameObject>();
-                
-                foreach (var obj in allWindStorms)
+                foreach (var obj in Resources.FindObjectsOfTypeAll<GameObject>())
                 {
                     if (obj.name == "WindStorm" && obj.scene.IsValid())
                     {
-                        log.LogInfo($"[PeakPelago] Found WindStorm: {obj.name} in scene, active: {obj.activeInHierarchy}");
-                        
-                        //instantiate a copy
-                        Vector3 spawnPos = Character.localCharacter.transform.position;
-                        windStormObject = UnityEngine.Object.Instantiate(obj, spawnPos, Quaternion.identity);
-                        windStormObject.name = "GustTrap_WindStorm";
-                        weSpawnedIt = true;
-                        wasActive = false;
+                        template = obj;
                         break;
                     }
                 }
-                
-                if (windStormObject == null)
-                {
-                    log.LogError("[PeakPelago] Could not find any WindStorm object!");
-                    yield break;
-                }
             }
 
-            // Activate the WindStorm
-            if (!wasActive)
+            if (template == null)
             {
-                log.LogInfo("[PeakPelago] Activating WindStorm...");
-                windStormObject.SetActive(true);
-            }
-            else
-            {
-                log.LogInfo("[PeakPelago] WindStorm already active, extending duration...");
-            }
-
-            yield return new WaitForSeconds(10f);
-
-            if (windStormObject == null)
-            {
-                log.LogWarning("[PeakPelago] WindStorm object was destroyed during gust trap");
+                log.LogError("[PeakPelago] Could not find any WindStorm template!");
                 yield break;
             }
 
-            if (weSpawnedIt)
+            Vector3 spawnPos = Character.localCharacter.transform.position;
+            bool wasTemplateActive = template.activeSelf;
+            template.SetActive(false);
+            var windStorm = UnityEngine.Object.Instantiate(template, spawnPos, Quaternion.identity);
+            if (wasTemplateActive) template.SetActive(true);
+            windStorm.name = "GustTrap_WindStorm";
+
+            foreach (var pv in windStorm.GetComponentsInChildren<PhotonView>(true))
+                UnityEngine.Object.DestroyImmediate(pv);
+
+            windStorm.SetActive(true);
+            log.LogInfo("[PeakPelago] Spawned GustTrap WindStorm");
+
+            yield return new WaitForSeconds(10f);
+
+            if (windStorm == null)
             {
-                log.LogInfo("[PeakPelago] Destroying spawned WindStorm");
-
-                ParticleSystem[] particles = windStormObject.GetComponentsInChildren<ParticleSystem>();
-                foreach (var ps in particles)
-                {
-                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                }
-
-                AudioSource[] audioSources = windStormObject.GetComponentsInChildren<AudioSource>();
-                foreach (var audio in audioSources)
-                {
-                    audio.Stop();
-                }
-
-                yield return null;
-
-                UnityEngine.Object.Destroy(windStormObject);
-            }
-            else
-            {
-                log.LogInfo("[PeakPelago] Deactivating WindStorm");
-
-                ParticleSystem[] particles = windStormObject.GetComponentsInChildren<ParticleSystem>();
-                foreach (var ps in particles)
-                {
-                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                }
-
-                AudioSource[] audioSources = windStormObject.GetComponentsInChildren<AudioSource>();
-                foreach (var audio in audioSources)
-                {
-                    audio.Stop();
-                }
-
-                if (!wasActive)
-                {
-                    windStormObject.SetActive(false);
-                }
+                log.LogWarning("[PeakPelago] WindStorm was destroyed during gust trap");
+                yield break;
             }
 
+            foreach (var ps in windStorm.GetComponentsInChildren<ParticleSystem>())
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            foreach (var audio in windStorm.GetComponentsInChildren<AudioSource>())
+                audio.Stop();
+
+            yield return null;
+
+            UnityEngine.Object.Destroy(windStorm);
             log.LogInfo("[PeakPelago] Gust Trap complete!");
         }
     }

@@ -19,8 +19,10 @@ namespace Peak.AP
         private Button _backButton;
         private Button _connectionTabBtn;
         private Button _linksTabBtn;
+        private Button _trackerTabBtn;
         private RectTransform _connectionContent;
         private RectTransform _linksContent;
+        private RectTransform _trackerContent;
 
         private const string PREFS_SERVER = "PeakPelago_ServerUrl";
         private const string PREFS_PORT = "PeakPelago_Port";
@@ -260,6 +262,7 @@ namespace Peak.AP
 
             _connectionTabBtn = CreateTabButton(tabsRect, "CONNECTION");
             _linksTabBtn = CreateTabButton(tabsRect, "LINKS");
+            _trackerTabBtn = CreateTabButton(tabsRect, "TRACKER");
 
             // --- Connection tab content ---
             _connectionContent = layoutParent;
@@ -355,13 +358,55 @@ namespace Peak.AP
 
             _linksContent.gameObject.SetActive(false);
 
+            // --- Tracker tab content ---
+            _trackerContent = CreateChild(content, "TrackerParent");
+            _trackerContent.anchorMin = Vector2.zero;
+            _trackerContent.anchorMax = Vector2.one;
+            _trackerContent.anchoredPosition = new Vector2(0f, -30.92f);
+            _trackerContent.sizeDelta = new Vector2(0f, -61.85f);
+            var trackerVLG = _trackerContent.gameObject.AddComponent<VerticalLayoutGroup>();
+            trackerVLG.spacing = 4;
+            trackerVLG.childAlignment = TextAnchor.UpperCenter;
+            trackerVLG.childControlWidth = true;
+            trackerVLG.childControlHeight = false;
+            trackerVLG.childForceExpandWidth = true;
+            trackerVLG.childForceExpandHeight = false;
+            trackerVLG.padding = new RectOffset(10, 10, 10, 10);
+
+            var trackerScroll = _trackerContent.gameObject.AddComponent<ScrollRect>();
+            var trackerScrollContent = CreateChild(_trackerContent, "ScrollContent");
+            trackerScrollContent.anchorMin = new Vector2(0f, 1f);
+            trackerScrollContent.anchorMax = new Vector2(1f, 1f);
+            trackerScrollContent.pivot = new Vector2(0.5f, 1f);
+            var scrollVLG = trackerScrollContent.gameObject.AddComponent<VerticalLayoutGroup>();
+            scrollVLG.spacing = 4;
+            scrollVLG.childControlWidth = true;
+            scrollVLG.childControlHeight = false;
+            scrollVLG.childForceExpandWidth = true;
+            scrollVLG.childForceExpandHeight = false;
+            var scrollFitter = trackerScrollContent.gameObject.AddComponent<ContentSizeFitter>();
+            scrollFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            trackerScroll.content = trackerScrollContent;
+            trackerScroll.vertical = true;
+            trackerScroll.horizontal = false;
+            trackerScroll.viewport = _trackerContent;
+            _trackerContent.gameObject.AddComponent<RectMask2D>();
+
+            // Remove the VLG from _trackerContent since ScrollRect handles layout
+            UnityEngine.Object.DestroyImmediate(trackerVLG);
+
+            BuildTrackerContent(trackerScrollContent);
+
+            _trackerContent.gameObject.SetActive(false);
+
             // Wire tab buttons
-            _connectionTabBtn.onClick.AddListener(() => SwitchTab(true));
-            _linksTabBtn.onClick.AddListener(() => SwitchTab(false));
+            _connectionTabBtn.onClick.AddListener(() => SwitchTab("connection"));
+            _linksTabBtn.onClick.AddListener(() => SwitchTab("links"));
+            _trackerTabBtn.onClick.AddListener(() => SwitchTab("tracker"));
             _connectButtonText = _connectButton.GetComponentInChildren<TextMeshProUGUI>();
 
-            // Start on Connection tab (must be after both content panels exist)
-            SwitchTab(true);
+            // Start on Connection tab (must be after all content panels exist)
+            SwitchTab("connection");
         }
 
         private void LoadSettings()
@@ -653,25 +698,118 @@ namespace Peak.AP
             updater.Initialize(dropdown, getCurrent);
         }
 
-        private void SwitchTab(bool connectionTab)
+        private void SwitchTab(string tab)
         {
-            _connectionContent.gameObject.SetActive(connectionTab);
-            _linksContent.gameObject.SetActive(!connectionTab);
+            bool conn = tab == "connection";
+            bool links = tab == "links";
+            bool tracker = tab == "tracker";
 
-            var activeContent = connectionTab ? _connectionContent : _linksContent;
+            _connectionContent.gameObject.SetActive(conn);
+            _linksContent.gameObject.SetActive(links);
+            _trackerContent.gameObject.SetActive(tracker);
+
+            var activeContent = conn ? _connectionContent : links ? _linksContent : _trackerContent;
             StartCoroutine(AnimateRowsIn(activeContent));
 
-            // Toggle the "Selected" child on each tab
             var connSelected = _connectionTabBtn?.transform.Find("Selected");
             var linksSelected = _linksTabBtn?.transform.Find("Selected");
-            if (connSelected != null) connSelected.gameObject.SetActive(connectionTab);
-            if (linksSelected != null) linksSelected.gameObject.SetActive(!connectionTab);
+            var trackerSelected = _trackerTabBtn?.transform.Find("Selected");
+            if (connSelected != null) connSelected.gameObject.SetActive(conn);
+            if (linksSelected != null) linksSelected.gameObject.SetActive(links);
+            if (trackerSelected != null) trackerSelected.gameObject.SetActive(tracker);
 
-            // Change text color — dark when selected (white bg), white when not
             var connText = _connectionTabBtn?.GetComponentInChildren<TextMeshProUGUI>(true);
             var linksText = _linksTabBtn?.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (connText != null) connText.color = connectionTab ? Color.black : Color.white;
-            if (linksText != null) linksText.color = !connectionTab ? Color.black : Color.white;
+            var trackerText = _trackerTabBtn?.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (connText != null) connText.color = conn ? Color.black : Color.white;
+            if (linksText != null) linksText.color = links ? Color.black : Color.white;
+            if (trackerText != null) trackerText.color = tracker ? Color.black : Color.white;
+
+            if (tracker) RefreshTrackerContent();
+        }
+
+        private RectTransform _trackerScrollContent;
+
+        private static readonly string[] BiomeNames = { "Shore", "Tropics / Roots", "Mesa / Alpine", "Caldera", "Kiln" };
+
+        private void BuildTrackerContent(RectTransform scrollContent)
+        {
+            _trackerScrollContent = scrollContent;
+            var noDataLabel = CreateLabel(scrollContent, "NoData", "Connect to a server to see loot assignments", 20, TextAlignmentOptions.Center);
+            var le = noDataLabel.gameObject.AddComponent<LayoutElement>();
+            le.preferredHeight = 50;
+        }
+
+        private void RefreshTrackerContent()
+        {
+            if (_trackerScrollContent == null) return;
+
+            // Clear existing children
+            for (int i = _trackerScrollContent.childCount - 1; i >= 0; i--)
+                Destroy(_trackerScrollContent.GetChild(i).gameObject);
+
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin == null || plugin._lootBiomeAssignments == null || plugin._lootBiomeAssignments.Count == 0)
+            {
+                var noDataLabel = CreateLabel(_trackerScrollContent, "NoData", "Connect to a server to see loot assignments", 20, TextAlignmentOptions.Center);
+                var le = noDataLabel.gameObject.AddComponent<LayoutElement>();
+                le.preferredHeight = 50;
+                return;
+            }
+
+            // Group items by biome level
+            var biomeGroups = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<string>>();
+            foreach (var kvp in plugin._lootBiomeAssignments)
+            {
+                if (!biomeGroups.ContainsKey(kvp.Value))
+                    biomeGroups[kvp.Value] = new System.Collections.Generic.List<string>();
+                string itemName = kvp.Key;
+                if (itemName.StartsWith("Acquire "))
+                    itemName = itemName.Substring(8);
+                biomeGroups[kvp.Value].Add(itemName);
+            }
+
+            for (int level = 0; level < BiomeNames.Length; level++)
+            {
+                if (!biomeGroups.ContainsKey(level)) continue;
+
+                var items = biomeGroups[level];
+                items.Sort();
+
+                // Biome header
+                var headerRow = CreateChild(_trackerScrollContent, BiomeNames[level] + "_Header");
+                var headerLE = headerRow.gameObject.AddComponent<LayoutElement>();
+                headerLE.preferredHeight = 40;
+                var headerBg = headerRow.gameObject.AddComponent<Image>();
+                headerBg.color = new Color(0.3f, 0.2f, 0.15f, 0.8f);
+                ApplyBlurSprite(headerBg);
+                var headerLabel = CreateLabel(headerRow, "Label", BiomeNames[level].ToUpper(), 24, TextAlignmentOptions.MidlineLeft);
+                var headerLabelRect = headerLabel.GetComponent<RectTransform>();
+                headerLabelRect.anchorMin = Vector2.zero;
+                headerLabelRect.anchorMax = Vector2.one;
+                headerLabelRect.offsetMin = new Vector2(15f, 0f);
+                headerLabelRect.offsetMax = Vector2.zero;
+
+                // Item rows
+                for (int i = 0; i < items.Count; i++)
+                {
+                    var itemRow = CreateChild(_trackerScrollContent, items[i] + "_Row");
+                    var itemLE = itemRow.gameObject.AddComponent<LayoutElement>();
+                    itemLE.preferredHeight = 30;
+                    if (i % 2 == 0)
+                    {
+                        var rowBg = itemRow.gameObject.AddComponent<Image>();
+                        rowBg.color = new Color(0.15f, 0.1f, 0.07f, 0.4f);
+                    }
+                    var itemLabel = CreateLabel(itemRow, "Label", items[i], 18, TextAlignmentOptions.MidlineLeft);
+                    itemLabel.color = new Color(0.9f, 0.85f, 0.8f, 1f);
+                    var itemLabelRect = itemLabel.GetComponent<RectTransform>();
+                    itemLabelRect.anchorMin = Vector2.zero;
+                    itemLabelRect.anchorMax = Vector2.one;
+                    itemLabelRect.offsetMin = new Vector2(30f, 0f);
+                    itemLabelRect.offsetMax = Vector2.zero;
+                }
+            }
         }
 
         private Button CreateTabButton(RectTransform parent, string label)
@@ -828,23 +966,65 @@ namespace Peak.AP
                     var textArea = existingInput.transform.Find("Text Area");
                     if (textArea != null)
                     {
-                        existingInput.textViewport = textArea.GetComponent<RectTransform>();
+                        var textAreaRect = textArea.GetComponent<RectTransform>();
+                        textAreaRect.anchorMin = Vector2.zero;
+                        textAreaRect.anchorMax = Vector2.one;
+                        textAreaRect.offsetMin = new Vector2(10f, 0f);
+                        textAreaRect.offsetMax = new Vector2(-10f, 0f);
+
+                        existingInput.textViewport = textAreaRect;
                         var textChild = textArea.Find("Text");
-                        if (textChild != null) existingInput.textComponent = textChild.GetComponent<TextMeshProUGUI>();
+                        if (textChild != null)
+                        {
+                            var textRect = textChild.GetComponent<RectTransform>();
+                            textRect.anchorMin = Vector2.zero;
+                            textRect.anchorMax = Vector2.one;
+                            textRect.offsetMin = Vector2.zero;
+                            textRect.offsetMax = Vector2.zero;
+                            existingInput.textComponent = textChild.GetComponent<TextMeshProUGUI>();
+                            existingInput.textComponent.alignment = TextAlignmentOptions.MidlineLeft;
+                        }
                         var placeholder = textArea.Find("Placeholder");
-                        if (placeholder != null) existingInput.placeholder = placeholder.GetComponent<TextMeshProUGUI>();
+                        if (placeholder != null)
+                        {
+                            var phRect = placeholder.GetComponent<RectTransform>();
+                            phRect.anchorMin = Vector2.zero;
+                            phRect.anchorMax = Vector2.one;
+                            phRect.offsetMin = Vector2.zero;
+                            phRect.offsetMax = Vector2.zero;
+                            existingInput.placeholder = placeholder.GetComponent<TextMeshProUGUI>();
+                            ((TextMeshProUGUI)existingInput.placeholder).alignment = TextAlignmentOptions.MidlineLeft;
+                        }
                     }
 
                     existingInput.text = defaultValue;
                     existingInput.contentType = TMP_InputField.ContentType.Standard;
 
-                    // Widen since we removed the slider — stretch to fill InputParent
+                    // Stretch the input field's parent container (InputParent) to fill the row
+                    var inputParent = existingInput.transform.parent;
+                    if (inputParent != null && inputParent != clone.transform)
+                    {
+                        var parentRect = inputParent.GetComponent<RectTransform>();
+                        if (parentRect != null)
+                        {
+                            parentRect.anchorMin = new Vector2(0f, 0f);
+                            parentRect.anchorMax = new Vector2(1f, 1f);
+                            parentRect.offsetMin = Vector2.zero;
+                            parentRect.offsetMax = Vector2.zero;
+                        }
+                        var parentLayout = inputParent.GetComponent<LayoutElement>();
+                        if (parentLayout != null) DestroyImmediate(parentLayout);
+                        var hlg = inputParent.GetComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+                        if (hlg != null) DestroyImmediate(hlg);
+                    }
+
+                    // Stretch the input field itself
                     var fieldRect = existingInput.GetComponent<RectTransform>();
-                    fieldRect.anchorMin = new Vector2(0f, 0.5f);
-                    fieldRect.anchorMax = new Vector2(1f, 0.5f);
+                    fieldRect.anchorMin = new Vector2(0f, 0f);
+                    fieldRect.anchorMax = new Vector2(1f, 1f);
                     fieldRect.anchoredPosition = Vector2.zero;
-                    fieldRect.offsetMin = new Vector2(20f, -25f);
-                    fieldRect.offsetMax = new Vector2(-20f, 25f);
+                    fieldRect.offsetMin = new Vector2(10f, 5f);
+                    fieldRect.offsetMax = new Vector2(-10f, -5f);
                 }
 
                 var inputField = existingInput;
@@ -907,13 +1087,16 @@ namespace Peak.AP
             var textArea = CreateChild(fieldRect, "Text Area");
             textArea.anchorMin = Vector2.zero;
             textArea.anchorMax = Vector2.one;
-            textArea.anchoredPosition = new Vector2(0f, -2.3f);
-            textArea.sizeDelta = new Vector2(-20f, 0f);
+            textArea.anchoredPosition = Vector2.zero;
+            textArea.offsetMin = new Vector2(10f, 2f);
+            textArea.offsetMax = new Vector2(-10f, -2f);
             textArea.gameObject.AddComponent<RectMask2D>();
 
             var placeholderRect = CreateChild(textArea, "Placeholder");
             placeholderRect.anchorMin = Vector2.zero;
             placeholderRect.anchorMax = Vector2.one;
+            placeholderRect.offsetMin = Vector2.zero;
+            placeholderRect.offsetMax = Vector2.zero;
             var placeholderTMP = placeholderRect.gameObject.AddComponent<TextMeshProUGUI>();
             placeholderTMP.text = label + "...";
             placeholderTMP.fontSize = 24;
@@ -925,11 +1108,20 @@ namespace Peak.AP
             var textChildRect = CreateChild(textArea, "Text");
             textChildRect.anchorMin = Vector2.zero;
             textChildRect.anchorMax = Vector2.one;
+            textChildRect.offsetMin = Vector2.zero;
+            textChildRect.offsetMax = Vector2.zero;
             var textTMP = textChildRect.gameObject.AddComponent<TextMeshProUGUI>();
             textTMP.fontSize = 24;
             textTMP.color = Color.black;
             textTMP.alignment = TextAlignmentOptions.MidlineLeft;
             if (_font != null) textTMP.font = _font;
+
+            var caret = CreateChild(textArea, "Caret");
+            caret.anchorMin = Vector2.zero;
+            caret.anchorMax = Vector2.one;
+            caret.offsetMin = Vector2.zero;
+            caret.offsetMax = Vector2.zero;
+            caret.gameObject.AddComponent<CanvasRenderer>();
 
             var inputField = fieldRect.gameObject.AddComponent<TMP_InputField>();
             inputField.textViewport = textArea;
@@ -937,8 +1129,10 @@ namespace Peak.AP
             inputField.placeholder = placeholderTMP;
             inputField.text = defaultValue;
             inputField.caretColor = Color.black;
+            inputField.customCaretColor = true;
             inputField.selectionColor = new Color(0.3f, 0.5f, 1f, 0.4f);
             inputField.caretWidth = 2;
+            inputField.caretBlinkRate = 0.85f;
             return inputField;
         }
 

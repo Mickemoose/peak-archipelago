@@ -164,7 +164,7 @@ namespace Peak.AP
         {
             if (_energyLinkService?.IsEnabled() != true) return;
 
-            var campfires = UnityEngine.Object.FindObjectsOfType<Campfire>();
+            var campfires = UnityEngine.Object.FindObjectsByType<Campfire>(FindObjectsSortMode.None);
             foreach (var campfire in campfires)
             {
                 if (campfire != null && campfire.gameObject.activeInHierarchy)

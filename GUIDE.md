@@ -124,13 +124,13 @@ Item Sanity works independently from Loot Sanity — it controls **whether** ite
 | Trees and Bushes | Natural sources: berry bushes, mushroom clusters, coconut trees, willow trees, vines, winterberry trees, nests, cacti, and redwoods. |
 | All | Both luggage and natural source pools. |
 
-The Respawn Coffin (Scout Statue) is never affected by Loot Sanity — see Logical Scout Statue below.
+The Scout Statue is never affected by Loot Sanity — see Logical Scout Statue below.
 
 If **Item Sanity** is also enabled, only unlocked items will appear in the shuffled pools. If Item Sanity is off, all items are available in the affected pools.
 
 ### Logical Scout Statue
 
-When **Logical Scout Statue** is enabled, the Respawn Coffin (Scout Statue) acts as a helpful guide. It will only drop items that you haven't sent an "Acquire" check for yet. As you pick up new items and complete Acquire checks, the Scout Statue's pool shrinks — nudging you toward items you still need.
+When **Logical Scout Statue** is enabled, the Scout Statue acts as a helpful guide. It will only drop items that you haven't sent an "Acquire" check for yet. As you pick up new items and complete Acquire checks, the Scout Statue's pool shrinks — nudging you toward items you still need.
 
 The pool is also filtered by:
 - **Biome access**: Items from biomes you haven't reached yet (based on Progressive Mountain count) won't appear.

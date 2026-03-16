@@ -78,7 +78,7 @@ class LootSanity(Choice):
 
     All: Both luggage and natural source pools are shuffled.
 
-    The Respawn Coffin (Scout Statue) is never affected by this option — see Logical Scout Statue instead.
+    The Scout Statue is never affected by this option — see Logical Scout Statue instead.
     """
     display_name = "Loot Sanity"
     option_none = 0
@@ -89,7 +89,7 @@ class LootSanity(Choice):
 
 class LogicalScoutStatue(Toggle):
     """
-    When enabled, the Respawn Coffin (Scout Statue) will only drop items that
+    When enabled, the Scout Statue will only drop items that
     you haven't sent an "Acquire" check for yet.
 
     The available items are filtered by your current biome access (Progressive Mountain count)
@@ -537,6 +537,14 @@ class PeakOptions(PerGameCommonOptions):
     progressive_stamina: ProgressiveStamina
     additional_stamina_bars: AdditionalStaminaBars
 
+    item_sanity: ItemSanity
+    loot_sanity: LootSanity
+    logical_scout_statue: LogicalScoutStatue
+
+    disable_multiplayer_badges: DisableMultiplayerBadges
+    disable_hard_badges: DisableHardBadges
+    disable_biome_badges: DisableBiomeBadges
+
     ring_link: RingLink
     hard_ring_link: HardRingLink
     energy_link: EnergyLink
@@ -586,11 +594,3 @@ class PeakOptions(PerGameCommonOptions):
     inverted_mouse_trap_weight: InvertedMouseTrapWeight
     stamina_drain_trap_weight: StaminaDrainTrapWeight
     chaos_control_trap_weight: ChaosControlTrapWeight
-
-    item_sanity: ItemSanity
-    loot_sanity: LootSanity
-    logical_scout_statue: LogicalScoutStatue
-
-    disable_multiplayer_badges: DisableMultiplayerBadges
-    disable_hard_badges: DisableHardBadges
-    disable_biome_badges: DisableBiomeBadges
