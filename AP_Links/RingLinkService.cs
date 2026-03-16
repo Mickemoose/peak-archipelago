@@ -66,8 +66,29 @@ namespace Peak.AP
         /// </summary>
         public void SendRingLink(int amount)
         {
-            if (_session == null || !_isEnabled)
+            if (!_isEnabled) return;
+
+            // Client mode: forward to host via RPC
+            if (_session == null)
             {
+                try
+                {
+                    var plugin = PeakArchipelagoPlugin._instance;
+                    if (plugin != null && plugin.PhotonView != null && Photon.Pun.PhotonNetwork.IsConnected)
+                    {
+                        plugin.PhotonView.RPC("RPC_SendRingLink", Photon.Pun.RpcTarget.MasterClient, amount);
+                        string ringType = amount > 0 ? "positive" : "negative";
+                        _log.LogInfo($"[PeakPelago] Client forwarded Ring Link to host: {amount} rings ({ringType})");
+                        if (ringType == "positive")
+                            _notifications.ShowRingLinkNotification($"RingLink: Sent +{amount} ring(s)");
+                        else
+                            _notifications.ShowRingLinkNotification($"RingLink: Sent -{amount} ring(s)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError($"[PeakPelago] Failed to forward Ring Link to host: {ex.Message}");
+                }
                 return;
             }
 
@@ -87,7 +108,7 @@ namespace Peak.AP
                 };
 
                 _session.Socket.SendPacket(bouncePacket);
-                
+
                 string ringType = amount > 0 ? "positive" : "negative";
                 _log.LogInfo($"[PeakPelago] Sent Ring Link: {amount} rings ({ringType})");
                 if (ringType == "positive")

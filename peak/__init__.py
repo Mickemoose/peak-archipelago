@@ -51,7 +51,6 @@ class PeakWorld(World):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.excluded_locations = set()
 
     def validate_ids(self):
         """Ensure that item and location IDs are unique."""
@@ -88,42 +87,11 @@ class PeakWorld(World):
     def create_items(self):
         """Create the initial item pool based on the location table."""
         
-        # Calculate total locations, accounting for excluded ascent levels
         goal_type = self.options.goal.value
         required_ascent = self.options.ascent_count.value
-        
-        # Start with all locations in LOCATION_TABLE
-        total_locations = len(LOCATION_TABLE)
-        
-        # Add event locations
-        #total_locations += 15  # 7 Ascent Completed + Mesa/Roots/Alpine/Tropics/Caldera/Kiln Access + Idol Dunked + All Badges Collected
-        
-        # Subtract excluded ascent locations if goal is Reach Peak
-        if goal_type == 0 or goal_type == 3: # Reach Peak goal or Peak and Badges goal
-            excluded_ascent_count = 7 - required_ascent  # Number of ascents to exclude
-            # Each excluded ascent has 6 badge locations (Beachcomber, Trailblazer, Alpinist, Volcanology, Nomad, Forestry)
-            # Plus 1 Scout Sashe location
-            # Plus 1 Ascent Completed event
-            locations_per_ascent = 7
-            total_locations -= (excluded_ascent_count * locations_per_ascent)
-            
-            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {excluded_ascent_count} ascent levels, removing {excluded_ascent_count * locations_per_ascent} locations")
-        if self.options.disable_multiplayer_badges.value:
-            multiplayer_badge_count = 10
-            total_locations -= multiplayer_badge_count
-            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {multiplayer_badge_count} multiplayer badges")
-        
-        if self.options.disable_hard_badges.value:
-            hard_badge_count = 5
-            total_locations -= hard_badge_count
-            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {hard_badge_count} hard badges")
 
-        if self.options.disable_biome_badges.value:
-            biome_badge_count = 10
-            total_locations -= biome_badge_count
-            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Excluding {biome_badge_count} biome specific badges")
-    
-        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total locations after exclusions: {total_locations}")
+        total_locations = sum(1 for loc in self.multiworld.get_locations(self.player) if loc.address is not None)
+        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total locations from created regions: {total_locations}")
         
         item_pool = []
         
@@ -399,15 +367,8 @@ class PeakWorld(World):
                 def biome_rule_3(item):
                     if item.player != player:
                         return True
-                    if item.name == "Progressive Mountain":
-                        if "napberry" not in location.name.lower():
-                            if ("berry" in location.name.lower() or 
-                                "conch" in location.name.lower() or 
-                                "binoculars" in location.name.lower() or 
-                                "guidebook" in location.name.lower()):
-                                return False
-                        mountains_in_pool = sum(1 for i in self.multiworld.itempool if i.player == player and i.name == "Progressive Mountain")
-                        return mountains_in_pool >= 4  # Need all 4 in pool to place 1 here
+                    if item.classification & ItemClassification.progression:
+                        return False
                     return True
                 location.item_rule = biome_rule_3
 
@@ -415,8 +376,7 @@ class PeakWorld(World):
                 def biome_rule_kiln(item):
                     if item.player != player:
                         return True
-                    # NEVER place Progressive Mountain in Kiln locations
-                    if item.name == "Progressive Mountain":
+                    if item.classification & ItemClassification.progression:
                         return False
                     return True
                 location.item_rule = biome_rule_kiln
@@ -531,8 +491,11 @@ class PeakWorld(World):
             "death_link_send_behavior": self.options.death_link_send_behavior.value,
             "active_traps": self.output_active_traps(),
             "item_sanity": self.options.item_sanity.value,
+            "loot_sanity": self.options.loot_sanity.value,
+            "logical_scout_statue": self.options.logical_scout_statue.value,
             "session_id": session_id,
-            "mountain_hints": mountain_hints
+            "mountain_hints": mountain_hints,
+            "loot_biome_assignments": getattr(self, "loot_biome_assignments", {})
         }
         
         # Log what we're sending

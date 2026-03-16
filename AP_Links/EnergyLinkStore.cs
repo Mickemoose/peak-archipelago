@@ -123,33 +123,56 @@ namespace Peak.AP
                 _log?.LogDebug("[CampfireSpawner] EnergyLink not enabled, skipping store spawn");
                 return;
             }
-            
+
+            SpawnStoreOnCampfire(__instance);
+        }
+
+        private static void SpawnStoreOnCampfire(Campfire campfire)
+        {
             if (modelPrefab == null)
             {
                 _log?.LogWarning("[CampfireSpawner] Model prefab not loaded!");
                 return;
             }
 
+            if (spawnedModels.ContainsKey(campfire))
+                return;
+
             GameObject model = UnityEngine.Object.Instantiate(modelPrefab);
             model.SetActive(true);
-            model.name = $"APCampfireModel_{__instance.GetInstanceID()}";
+            model.name = $"APCampfireModel_{campfire.GetInstanceID()}";
             ApplyPeakShaderToModel(model);
 
-            Vector3 campfirePos = __instance.transform.position;
+            Vector3 campfirePos = campfire.transform.position;
             Vector3 offset = new Vector3(6f, -0.25f, 2f);
             model.transform.position = campfirePos + offset;
             model.transform.LookAt(campfirePos);
             Vector3 currentRotation = model.transform.eulerAngles;
             model.transform.eulerAngles = new Vector3(0f, currentRotation.y, 0f);
             model.transform.localScale = Vector3.one * 2f;
-            model.transform.SetParent(__instance.transform, worldPositionStays: true);
-            
+            model.transform.SetParent(campfire.transform, worldPositionStays: true);
+
             var interactable = model.AddComponent<EnergyLinkStoreInteractable>();
             interactable.Initialize(_log, _energyLinkService, null);
-            
-            spawnedModels[__instance] = model;
+
+            spawnedModels[campfire] = model;
 
             _log?.LogInfo($"[CampfireSpawner] Spawned model at {model.transform.position}");
+        }
+
+        public static void SpawnOnExistingCampfires()
+        {
+            if (_energyLinkService?.IsEnabled() != true) return;
+
+            var campfires = UnityEngine.Object.FindObjectsOfType<Campfire>();
+            foreach (var campfire in campfires)
+            {
+                if (campfire != null && campfire.gameObject.activeInHierarchy)
+                {
+                    SpawnStoreOnCampfire(campfire);
+                }
+            }
+            _log?.LogInfo($"[CampfireSpawner] Checked {campfires.Length} existing campfires for store spawning");
         }
 
         public static void CleanupAllModels()

@@ -102,6 +102,9 @@ namespace Peak.AP
         private int _slotRequiredAscent = 0;
         private int _slotRequiredBadges = 20;
         private bool _itemSanityEnabled = false;
+        private int _lootSanityMode = 0; // 0=None, 1=Luggage, 2=Trees/Bushes, 3=All
+        private Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
+        private bool _logicalScoutStatue = false;
         private int _progressiveMountainCount = 0;
 
         // ===== AP Link Management =====
@@ -478,6 +481,7 @@ namespace Peak.AP
                 {
                     _energyLinkService.Initialize(null, true, energyTeam, this);
                     CampfireModelSpawner.SetEnergyLinkService(_energyLinkService);
+                    CampfireModelSpawner.SpawnOnExistingCampfires();
                 }
                 
             }
@@ -627,6 +631,24 @@ namespace Peak.AP
         private void ShowDeathLinkRPC(string cause, string source)
         {
             _notifications?.ReceiveDeathLinkRPC(cause, source);
+        }
+
+        [PunRPC]
+        private void RPC_SendRingLink(int amount)
+        {
+            if (PhotonNetwork.IsMasterClient && _ringLinkService != null)
+            {
+                _ringLinkService.SendRingLink(amount);
+            }
+        }
+
+        [PunRPC]
+        private void RPC_SendHardRingLink(int amount)
+        {
+            if (PhotonNetwork.IsMasterClient && _hardRingLinkService != null)
+            {
+                _hardRingLinkService.SendHardRingLink(amount);
+            }
         }
 
         [PunRPC]
@@ -1702,6 +1724,21 @@ namespace Peak.AP
             };
         }
 
+        public Dictionary<ushort, string> GetItemIdToLocationMapping()
+        {
+            return _itemIdToLocationMapping;
+        }
+
+        public string GetLocationNameById(long locationId)
+        {
+            foreach (var kvp in _locationCache)
+            {
+                if (kvp.Value == locationId)
+                    return kvp.Key;
+            }
+            return null;
+        }
+
         private void InitializeItemEffectHandlers()
         {
             _itemEffectHandlers = new Dictionary<string, Action>
@@ -2192,6 +2229,7 @@ namespace Peak.AP
                 }
                 
                 _notifications.ShowSimpleMessage($"Mountain Progress {mountainCount}/4!");
+                UnlockedItemsManager.UpdateMountainCount(_progressiveMountainCount);
             }
             catch (Exception ex)
             {
@@ -2410,20 +2448,15 @@ namespace Peak.AP
 
                 
 
-                foreach (var character in validCharacters)
+                var character = validCharacters[UnityEngine.Random.Range(0, validCharacters.Count)];
+                try
                 {
-                    try
-                    {
-                        Vector3 spawnPosition = character.Center + character.transform.forward * 2f + Vector3.up * 0.5f;
-                        GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
-                        
-                        string characterName = character == Character.localCharacter ? "local player" : character.characterName;
-                        
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.LogError($"[PeakPelago] Error spawning item for character: {ex.Message}");
-                    }
+                    Vector3 spawnPosition = character.Center + character.transform.forward * 2f + Vector3.up * 0.5f;
+                    GameObject spawnedItem = PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError($"[PeakPelago] Error spawning item for character: {ex.Message}");
                 }
             }
             catch (Exception ex)
@@ -2627,8 +2660,12 @@ namespace Peak.AP
             // Check if this item ID has an Archipelago location to report
             if (_itemIdToLocationMapping.TryGetValue(itemId, out string locationName))
             {
-                
+
                 ReportCheckByName(locationName);
+                if (_logicalScoutStatue && locationName.StartsWith("Acquire "))
+                {
+                    UnlockedItemsManager.RefreshScoutStatuePool();
+                }
             }
             else
             {
@@ -3396,8 +3433,21 @@ namespace Peak.AP
                 try
                 {
                     if (_instance == null) return;
-                    
+
                     _instance.ResetRunCounters();
+
+                    if (_instance._staminaManager != null)
+                    {
+                        int upgrades = _instance._staminaManager.GetStaminaUpgradesReceived();
+                        _instance._staminaManager._localStaminaUpgrades = 0;
+                        _instance._staminaManager._localBaseMaxStamina = 0.25f;
+                        for (int i = 0; i < upgrades; i++)
+                        {
+                            _instance._staminaManager.ApplyStaminaUpgrade();
+                        }
+                        _instance.StartCoroutine(_instance.ForceStaminaUIUpdate());
+                        _instance._log.LogInfo($"[PeakPelago] Stamina reset and reloaded {upgrades} upgrades on run start");
+                    }
 
                     // if cfgSpawnXItemsAtStart is enabled, spawn items at start of run
                     if (_instance.cfgSpawnXItemsAtStart.Value)
@@ -4400,7 +4450,37 @@ namespace Peak.AP
                     {
                         var value = loginResult.SlotData["item_sanity"];
                         _itemSanityEnabled = Convert.ToInt32(value) != 0;
-
+                    }
+                    if (loginResult.SlotData.ContainsKey("loot_sanity"))
+                    {
+                        _lootSanityMode = Convert.ToInt32(loginResult.SlotData["loot_sanity"]);
+                    }
+                    if (loginResult.SlotData.ContainsKey("loot_biome_assignments"))
+                    {
+                        try
+                        {
+                            var raw = loginResult.SlotData["loot_biome_assignments"];
+                            if (raw is Newtonsoft.Json.Linq.JObject jObj)
+                            {
+                                _lootBiomeAssignments = jObj.ToObject<Dictionary<string, int>>();
+                                _log.LogInfo($"[PeakPelago] Loaded {_lootBiomeAssignments.Count} loot biome assignments from slot data");
+                            }
+                            else if (raw is Dictionary<string, object> dict)
+                            {
+                                _lootBiomeAssignments = new Dictionary<string, int>();
+                                foreach (var kvp in dict)
+                                    _lootBiomeAssignments[kvp.Key] = Convert.ToInt32(kvp.Value);
+                                _log.LogInfo($"[PeakPelago] Loaded {_lootBiomeAssignments.Count} loot biome assignments from slot data");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogWarning($"[PeakPelago] Failed to parse loot_biome_assignments: {ex.Message}");
+                        }
+                    }
+                    if (loginResult.SlotData.ContainsKey("logical_scout_statue"))
+                    {
+                        _logicalScoutStatue = Convert.ToInt32(loginResult.SlotData["logical_scout_statue"]) != 0;
                     }
 
                     LoadOfflineChecks();
@@ -4427,7 +4507,7 @@ namespace Peak.AP
                 SaveState();
                 _status = "Connected";
                 _wantReconnect = false;
-                UnlockedItemsManager.Initialize(_log, _session, _itemSanityEnabled);
+                UnlockedItemsManager.Initialize(_log, _session, _itemSanityEnabled, _lootSanityMode, _logicalScoutStatue, _progressiveMountainCount, _stateData, _lootBiomeAssignments);
                 _notifications.ShowConnected();
                 if (LootData.AllSpawnWeightData != null)
                 {

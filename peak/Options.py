@@ -47,13 +47,60 @@ class BadgeCount(Range):
 
 class ItemSanity(Toggle):
     """
-    When enabled, items must be unlocked via Archipelago before they appear in the loot pool.
-    "Acquire X" checks require the corresponding unlock item first.
+    Controls whether items need to be unlocked before they can appear in loot pools.
 
-    When disabled, all items are always available in the loot pool.
-    "Acquire X" checks still exist but only require biome access.
+    When enabled, each item type has a corresponding "Unlock" item in the Archipelago pool.
+    You must receive that unlock before the item can spawn in-game.
+    "Acquire" checks also require having the unlock item.
+
+    When disabled, all items are available from the start.
+    "Acquire" checks only require biome access.
+
+    This option works independently from Loot Sanity — Item Sanity controls the unlock gating,
+    while Loot Sanity controls which pools the items get shuffled into.
     """
     display_name = "Item Sanity"
+
+class LootSanity(Choice):
+    """
+    Controls which loot pools have their contents shuffled with all available items.
+
+    Affected pools will have every AP-tracked item added at equal weight,
+    meaning any item can drop from any affected source.
+    Items not yet unlocked (when Item Sanity is on) are excluded.
+
+    None: Loot pools are unchanged. Items only appear in their vanilla pools.
+
+    Luggage: Luggage (suitcases) across all biomes have their contents shuffled.
+
+    Trees and Bushes: Natural sources (berry bushes, mushroom clusters, coconut trees,
+    willow trees, vines, winterberry trees, nests, cacti, redwoods) have their drops shuffled.
+
+    All: Both luggage and natural source pools are shuffled.
+
+    The Respawn Coffin (Scout Statue) is never affected by this option — see Logical Scout Statue instead.
+    """
+    display_name = "Loot Sanity"
+    option_none = 0
+    option_luggage = 1
+    option_trees_and_bushes = 2
+    option_all = 3
+    default = 0
+
+class LogicalScoutStatue(Toggle):
+    """
+    When enabled, the Respawn Coffin (Scout Statue) will only drop items that
+    you haven't sent an "Acquire" check for yet.
+
+    The available items are filtered by your current biome access (Progressive Mountain count)
+    and item unlock status (if Item Sanity is enabled).
+
+    As you pick up new items and send Acquire checks, the Scout Statue's pool shrinks,
+    guiding you toward items you still need.
+
+    When disabled, the Scout Statue uses the default game loot table.
+    """
+    display_name = "Logical Scout Statue"
 
 class ProgressiveStamina(Toggle):
     """
@@ -415,6 +462,8 @@ peak_option_groups = [
     ]),
     OptionGroup("Item Settings", [
         ItemSanity,
+        LootSanity,
+        LogicalScoutStatue,
     ]),
     OptionGroup("Stamina", [
         ProgressiveStamina,
@@ -539,6 +588,8 @@ class PeakOptions(PerGameCommonOptions):
     chaos_control_trap_weight: ChaosControlTrapWeight
 
     item_sanity: ItemSanity
+    loot_sanity: LootSanity
+    logical_scout_statue: LogicalScoutStatue
 
     disable_multiplayer_badges: DisableMultiplayerBadges
     disable_hard_badges: DisableHardBadges

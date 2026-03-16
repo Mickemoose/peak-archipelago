@@ -1,6 +1,7 @@
 ## v0.5.9
 <ul>
-    <li>Items being locked and randomized spawns is now an option in the yaml called ItemSanity</li>
+    <li>Items being locked now an option in the yaml called ItemSanity</li>
+    <li>Item Spawn randomization is now an option called LootSanity</li>
     <li>Experimental BreathLink Support: Complete loss of Stamina linked to other BreathLinked games</li>
     <li>Trap Queue system to reduce trap spam</li>
     <li>Connection UI moved into pause menu under Archipelago button</li>
@@ -10,6 +11,9 @@
     <li>Some badge logic fixed</li>
     <li>Potential fix for Basketball checks</li>
     <li>In Game Items as Items severely reduced to reduce potential crashing. Instead theres a handful of filler items so not every item can be sent to you.</li>
+    <li>Potential band aid to reload stamina upgrades on run start</li>
+    <li>Logic overhaul to account for ItemSanity and LootSanity</li>
+    <li>Happy Camper Badge added to multiplayer badge list so you can disable it</li>
 </ul>
 
 ## v0.5.8

@@ -145,6 +145,27 @@ namespace Peak.AP
                 {
                     _log.LogInfo($"[PeakPelago] CLIENT: Requesting host to contribute {amount} J from {itemName}");
                     _plugin.PhotonView.RPC("RPC_ContributeEnergy", RpcTarget.MasterClient, itemName, amount);
+                    double megajoules = ((double) amount) / 1000000f;
+                    if (megajoules >= 1) {
+                        if (megajoules % 1 == 0) {
+                            _notifications.ShowEnergyLinkNotification(
+                                $"EnergyLink: Contributed {megajoules:F0} MJ from {itemName}"
+                            );
+                        }
+                        else
+                        {
+                            _notifications.ShowEnergyLinkNotification(
+                                $"EnergyLink: Contributed {megajoules:F2} MJ from {itemName}"
+                            );
+                        }
+                    }
+                    else
+                    {
+                        double kilojoules = ((double) amount) / 1000f;
+                        _notifications.ShowEnergyLinkNotification(
+                            $"EnergyLink: Contributed {kilojoules:F0} kJ from {itemName}"
+                        );
+                    }
                 }
                 else
                 {

@@ -113,40 +113,52 @@ namespace Peak.AP
 
             yield return new WaitForSeconds(10f);
 
+            if (windStormObject == null)
+            {
+                log.LogWarning("[PeakPelago] WindStorm object was destroyed during gust trap");
+                yield break;
+            }
+
             if (weSpawnedIt)
             {
                 log.LogInfo("[PeakPelago] Destroying spawned WindStorm");
-                
-                // Disable all child particle systems and audio sources first
+
                 ParticleSystem[] particles = windStormObject.GetComponentsInChildren<ParticleSystem>();
                 foreach (var ps in particles)
                 {
                     ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 }
-                
+
                 AudioSource[] audioSources = windStormObject.GetComponentsInChildren<AudioSource>();
                 foreach (var audio in audioSources)
                 {
                     audio.Stop();
                 }
-                
-                // Wait a frame for particles to clear
+
                 yield return null;
-                
+
                 UnityEngine.Object.Destroy(windStormObject);
             }
-            else if (!wasActive)
+            else
             {
                 log.LogInfo("[PeakPelago] Deactivating WindStorm");
-                
-                // Stop particles before deactivating
+
                 ParticleSystem[] particles = windStormObject.GetComponentsInChildren<ParticleSystem>();
                 foreach (var ps in particles)
                 {
                     ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 }
-                
-                windStormObject.SetActive(false);
+
+                AudioSource[] audioSources = windStormObject.GetComponentsInChildren<AudioSource>();
+                foreach (var audio in audioSources)
+                {
+                    audio.Stop();
+                }
+
+                if (!wasActive)
+                {
+                    windStormObject.SetActive(false);
+                }
             }
 
             log.LogInfo("[PeakPelago] Gust Trap complete!");

@@ -72,10 +72,16 @@ def create_peak_regions(world: "PeakWorld"):
     created_location_count = 0
 
     # Add all regular locations from LOCATION_TABLE
+    yaml_excluded = set(world.options.exclude_locations.value)
+
     for name, loc_id in LOCATION_TABLE.items():
-        # Skip creating locations that should be excluded
         should_skip = False
-        # Check if multiplayer badges should be excluded
+
+        if name in yaml_excluded:
+            should_skip = True
+            excluded_location_count += 1
+            logging.info(f"[Player {world.multiworld.player_name[world.player]}] SKIPPING (exclude_locations): {name}")
+
         if world.options.disable_multiplayer_badges.value and name in multiplayer_badges:
             should_skip = True
             excluded_location_count += 1
