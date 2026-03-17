@@ -1728,7 +1728,8 @@ namespace Peak.AP
                 { 20, "Acquire Red Clusterberry" },
                 { 21, "Acquire Yellow Clusterberry" },
 
-                { 77, "Acquire Scoutmaster's Bugle"}
+                { 77, "Acquire Scoutmaster's Bugle"},
+                { 60, "Acquire Scorchberry"}
 
             };
         }

@@ -235,6 +235,7 @@ _unlock_items = [
     "Yellow Shroomberry", "Purple Shroomberry",
     "Purple Kingberry", "Yellow Kingberry", "Green Kingberry",
     "Black Clusterberry", "Red Clusterberry", "Yellow Clusterberry",
+    "Scorchberry",
 ]
 
 _UNLOCK_ID_START = 78100

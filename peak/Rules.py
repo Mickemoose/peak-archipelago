@@ -30,6 +30,7 @@ TROPICS_LOCATIONS = [
     "Acquire Yellow Berrynana", "Acquire Yellow Berrynana Peel", "Acquire Pink Berrynana Peel",
     "Acquire Honeycomb", "Acquire Beehive", "Arborist Badge", "Foraging Badge",
     "Acquire Blue Berrynana Peel", "Acquire Magic Bean", "Acquire Tick", "Acquire Brown Berrynana Peel",
+    "Acquire Scorchberry",
 ]
 
 MESA_LOCATIONS = [
@@ -221,6 +222,7 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Black Clusterberry": "Black Clusterberry Unlock",
         "Acquire Red Clusterberry": "Red Clusterberry Unlock",
         "Acquire Yellow Clusterberry": "Yellow Clusterberry Unlock",
+        "Acquire Scorchberry": "Scorchberry Unlock",
         "Acquire Scoutmaster's Bugle": "Scoutmaster's Bugle Unlock",
         "Acquire Yellow Berrynana Peel": "Yellow Berrynana Unlock",
         "Acquire Pink Berrynana Peel": "Pink Berrynana Unlock",
