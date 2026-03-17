@@ -834,10 +834,18 @@ namespace Peak.AP
 
                 if (_deathLinkBehavior == 1)
                 {
-                    
-                    
-                    // Get checkpoint position
-                    Vector3 checkpointPos = GetLastCheckpointPosition();
+                    // Use checkpoint flag position if one exists, otherwise fall back to spawn point
+                    Vector3 checkpointPos;
+                    var localFlags = Character.localCharacter?.data.checkpointFlags;
+                    if (localFlags != null && localFlags.Count > 0)
+                    {
+                        var lastFlag = localFlags[localFlags.Count - 1];
+                        checkpointPos = lastFlag.transform.position;
+                    }
+                    else
+                    {
+                        checkpointPos = GetLastCheckpointPosition();
+                    }
                     
                     foreach (var character in validCharacters)
                     {
@@ -1609,6 +1617,7 @@ namespace Peak.AP
                 
                 { 45, "Acquire Magic Bean" },
                 { 98, "Acquire Parasol" },
+                { 164, "Acquire Parasol" },
                 { 105, "Acquire Balloon" },
                 { 37, "Acquire Balloon Bunch" },
                 { 107, "Acquire Scout Cannon" },
