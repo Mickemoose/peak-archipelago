@@ -42,8 +42,8 @@ namespace Peak.AP
         private ConfigEntry<string> cfgCustomTriviaFolder;
         private ConfigEntry<bool> cfgIncludeStandardTrivia;
         public ConfigEntry<bool> cfgDeathLinkEnabled;
-        private ConfigEntry<bool> cfgSpawnXItemsAtStart;
-        private ConfigEntry<int> cfgSpawnItemCount;
+
+
 
         // ===== Session =====
         public ArchipelagoSession _session;
@@ -159,8 +159,8 @@ namespace Peak.AP
                 cfgCustomTriviaFolder = Config.Bind("Custom Trivia", "CustomTriviaFolder", "plugins/PeakArchipelago-PEAKPELAGO/CustomTrivia", "Folder path for custom trivia questions (relative to BepInEx folder)");
                 cfgIncludeStandardTrivia = Config.Bind("Custom Trivia", "IncludeStandardTrivia", true, "Whether to include the standard trivia questions along with custom ones");
                 cfgDeathLinkEnabled = Config.Bind("Archipelago Links", "DeathLinkEnabled", true, "Enable DeathLink (if slot has it enabled)");
-                cfgSpawnXItemsAtStart = Config.Bind("QoL", "SpawnItemsAtStart", false, "Spawn X amount of received items at the start of a run each time");
-                cfgSpawnItemCount = Config.Bind("QoL", "SpawnItemCount", 5, "Number of items to spawn at the start of a run if enabled");
+
+
                 _notifications = new ArchipelagoNotificationManager(_log, cfgSlot.Value);
                 _staminaManager = new ProgressiveStaminaManager(_log);
                 CharacterGetMaxStaminaPatch.SetStaminaManager(_staminaManager);
@@ -2700,95 +2700,8 @@ namespace Peak.AP
             
         }
 
-        public void SpawnItemsAtStart(int itemCount)
-        {
-            
-            
-            // Check scene - must be in a Level scene
-            string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-            if (!currentScene.StartsWith("Level_"))
-            {
-                _log.LogWarning($"[PeakPelago] SpawnItemsAtStart: Not in Level scene (current: {currentScene})");
-                return;
-            }
-            
-            // Check character exists and isn't dead/passed out
-            if (Character.localCharacter == null)
-            {
-                _log.LogWarning("[PeakPelago] SpawnItemsAtStart: localCharacter is null!");
-                return;
-            }
-            
-            if (Character.localCharacter.data.dead)
-            {
-                _log.LogWarning("[PeakPelago] SpawnItemsAtStart: Player is dead!");
-                return;
-            }
-            
-            if (Character.localCharacter.data.fullyPassedOut)
-            {
-                _log.LogWarning("[PeakPelago] SpawnItemsAtStart: Player is fully passed out!");
-                return;
-            }
-            
-            if (Character.localCharacter.data.passedOutOnTheBeach > 0f)
-            {
-                _log.LogWarning("[PeakPelago] SpawnItemsAtStart: Player is passed out on beach!");
-                return;
-            }
-            
-            if (_session == null)
-            {
-                _log.LogWarning("[PeakPelago] SpawnItemsAtStart: _session is null!");
-                return;
-            }
-            
-            if (_session.Items == null)
-            {
-                _log.LogWarning("[PeakPelago] SpawnItemsAtStart: _session.Items is null!");
-                return;
-            }
-            
-            var validItems = _session.Items.AllItemsReceived
-                .Where(item => 
-                {
-                    if (item.Flags.HasFlag(ItemFlags.Trap))
-                        return false;
-                    
-                    string name = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                    if (string.IsNullOrEmpty(name))
-                        return false;
-                    
-                    if (TrapTypeExtensions.IsTrapName(name))
-                        return false;
-                    
-                    if (name.Contains("Progressive"))
-                        return false;
-                    
-                    return true;
-                })
-                .ToList();
-            
-            
-            
-            var skipCount = Mathf.Max(0, validItems.Count - itemCount);
-            var lastItems = validItems.Skip(skipCount).ToList();
-            
-            
-            foreach (var item in lastItems)
-            {
-                string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                if (!string.IsNullOrEmpty(itemName) && _itemEffectHandlers.TryGetValue(itemName, out var handler))
-                {
-                    
-                    handler();
-                }
-                else
-                {
-                    _log.LogWarning($"[PeakPelago] No handler found for item: {itemName}");
-                }
-            }
-        }
+
+
 
         /// <summary>Handle ascent-specific badge awards when reaching peaks</summary>
         public void HandleAscentPeakReached(string peakName)
@@ -3467,12 +3380,8 @@ namespace Peak.AP
                         _instance._log.LogInfo($"[PeakPelago] Stamina reset and reloaded {upgrades} upgrades on run start");
                     }
 
-                    // if cfgSpawnXItemsAtStart is enabled, spawn items at start of run
-                    if (_instance.cfgSpawnXItemsAtStart.Value)
-                    {
-                        // Delay spawning to ensure character is ready
-                        _instance.StartCoroutine(DelayedSpawnItems(_instance.cfgSpawnItemCount.Value));
-                    }
+
+
                 }
                 catch (Exception ex)
                 {
@@ -3483,25 +3392,8 @@ namespace Peak.AP
                 }
             }
             
-            private static System.Collections.IEnumerator DelayedSpawnItems(int itemCount)
-            {
-                // Wait for character to be ready
-                while (Character.localCharacter == null)
-                {
-                    yield return new WaitForSeconds(0.5f);
-                }
-                
-                // Wait until not passed out on beach
-                while (Character.localCharacter.data.passedOutOnTheBeach > 0f)
-                {
-                    yield return new WaitForSeconds(0.5f);
-                }
-                
-                // Extra delay for safety
-                yield return new WaitForSeconds(1f);
-                
-                _instance.SpawnItemsAtStart(itemCount);
-            }
+
+
         }
         [HarmonyPatch(typeof(CharacterItems), "HammerClimbingSpike")]
         public static class CharacterItemsHammerClimbingSpikePatch
@@ -4157,7 +4049,7 @@ namespace Peak.AP
                         {
                             try
                             {
-                                if (currentIndex >= _stateData.LastProcessedItemIndex)
+                                if (currentIndex > _stateData.LastProcessedItemIndex)
                                 {
                                     _itemQueue.Enqueue((itemName, isTrap, currentIndex));
 

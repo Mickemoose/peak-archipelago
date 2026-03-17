@@ -7,6 +7,7 @@ using TMPro;
 using Zorro.UI;
 using Zorro.ControllerSupport;
 using Archipelago.MultiClient.Net.Enums;
+using Archipelago.MultiClient.Net.Packets;
 
 namespace Peak.AP
 {
@@ -975,7 +976,7 @@ namespace Peak.AP
 
         private void OnLockedItemClicked(string unlockName)
         {
-            if (_hintCache.ContainsKey(unlockName)) return; // Already hinted
+            if (_hintCache.ContainsKey(unlockName)) return;
 
             var plugin = PeakArchipelagoPlugin._instance;
             if (plugin?._session == null) return;
@@ -992,39 +993,19 @@ namespace Peak.AP
             }
             catch { }
 
-            // Find the location ID for this unlock item on our slot
-            long locationId = -1;
-            int player = plugin._session.ConnectionInfo.Slot;
-            foreach (var kvp in plugin._lootBiomeAssignments)
-            {
-                string acquireLoc = kvp.Key;
-                string expectedUnlock = acquireLoc.StartsWith("Acquire ") ? acquireLoc.Substring(8) + " Unlock" : "";
-                if (string.Equals(expectedUnlock, unlockName, System.StringComparison.OrdinalIgnoreCase))
-                {
-                    locationId = plugin._session.Locations.GetLocationIdFromName(plugin._session.ConnectionInfo.Game, acquireLoc);
-                    break;
-                }
-            }
-
-            if (locationId < 0)
-            {
-                ShowTrackerTooltip("Location not found");
-                return;
-            }
-
             ShowTrackerTooltip("Hinting...");
-            StartCoroutine(RequestHintAsync(unlockName, locationId, player));
+            StartCoroutine(RequestHintAsync(unlockName));
         }
 
-        private System.Collections.IEnumerator RequestHintAsync(string unlockName, long locationId, int player)
+        private System.Collections.IEnumerator RequestHintAsync(string unlockName)
         {
             var plugin = PeakArchipelagoPlugin._instance;
             if (plugin?._session == null) yield break;
 
-            // CreateHints is fire-and-forget (void)
             try
             {
-                plugin._session.Hints.CreateHints(player, HintStatus.Unspecified, locationId);
+                var sayPacket = new SayPacket { Text = $"!hint {unlockName}" };
+                plugin._session.Socket.SendPacket(sayPacket);
             }
             catch (System.Exception ex)
             {
@@ -1033,12 +1014,10 @@ namespace Peak.AP
                 yield break;
             }
 
-            yield return new WaitForSeconds(1.5f);
+            yield return new WaitForSeconds(2f);
 
-            // Query hints via callback
             string capturedUnlock = unlockName;
-            long capturedLocId = locationId;
-            int capturedPlayer = player;
+            int slot = plugin._session.ConnectionInfo.Slot;
 
             plugin._session.Hints.GetHintsAsync((hints) =>
             {
@@ -1047,7 +1026,10 @@ namespace Peak.AP
                 {
                     foreach (var h in hints)
                     {
-                        if (h.LocationId == capturedLocId && h.ReceivingPlayer == capturedPlayer)
+                        if (h.ReceivingPlayer != slot) continue;
+
+                        string hintItemName = plugin._session.Items.GetItemName(h.ItemId, plugin._session.ConnectionInfo.Game);
+                        if (string.Equals(hintItemName, capturedUnlock, System.StringComparison.OrdinalIgnoreCase))
                         {
                             string findingPlayerName = plugin._session.Players.GetPlayerName(h.FindingPlayer);
                             string findingGame = plugin._session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
