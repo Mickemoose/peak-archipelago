@@ -26,11 +26,17 @@ if (Test-Path "peak.apworld") {
     Remove-Item "peak.apworld"
 }
 
-# Create the zip file
-Compress-Archive -Path "peak" -DestinationPath "peak.zip"
-
-# Rename .zip to .apworld
-Rename-Item -Path "peak.zip" -NewName "peak.apworld"
+# Create the zip file with forward slashes for Linux compatibility
+Add-Type -Assembly System.IO.Compression.FileSystem
+$zipPath = [System.IO.Path]::GetFullPath("peak.apworld")
+$peakDir = [System.IO.Path]::GetFullPath("peak")
+$zip = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
+Get-ChildItem -Path "peak" -Recurse -File | ForEach-Object {
+    $relativePath = $_.FullName.Substring($peakDir.Length + 1).Replace('\', '/')
+    $entryName = "peak/" + $relativePath
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entryName) | Out-Null
+}
+$zip.Dispose()
 
 Write-Host "Successfully created peak.apworld" -ForegroundColor Green
 
