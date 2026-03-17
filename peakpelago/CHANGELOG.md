@@ -14,6 +14,9 @@
     <li>Potential band aid to reload stamina upgrades on run start</li>
     <li>Logic overhaul to account for ItemSanity and LootSanity</li>
     <li>Happy Camper Badge added to multiplayer badge list so you can disable it</li>
+    <li>In Game Item tracker in the Archipelago section in the ESC/Pause menu</li>
+    <li>Item Unlocks able to be hinted in the tracker</li>
+    <li>Potential fixes for multiplayer issues with RingLink & EnergyLink</li>
 </ul>
 
 ## v0.5.8
