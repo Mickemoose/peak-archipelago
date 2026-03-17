@@ -288,7 +288,7 @@ namespace Peak.AP
             Register("Deadly Poison Trap", StandardTraps.Poison);
 
             Register("Tornado Trap", StandardTraps.Meteor,
-                StandardTraps.Meteor);
+                StandardTraps.Meteor, StandardTraps.Whirlpool, StandardTraps.Sandstorm);
 
             Register("Swap Trap", StandardTraps.Swap,
                 StandardTraps.Swap);
@@ -303,7 +303,7 @@ namespace Peak.AP
                 StandardTraps.Gravity, StandardTraps.Bubble, StandardTraps.Spring);
 
             Register("Slip Trap", StandardTraps.Slip,
-                StandardTraps.Slip, StandardTraps.Flip, StandardTraps.FlipVertical);
+                StandardTraps.Slip, StandardTraps.Flip, StandardTraps.FlipVertical, StandardTraps.FlipHorizontal);
 
             Register("Freeze Trap", StandardTraps.Freeze,
                 StandardTraps.Freeze, StandardTraps.Frozen);
@@ -357,7 +357,7 @@ namespace Peak.AP
                 StandardTraps.Fear);
 
             Register("Scoutmaster Trap", StandardTraps.MyTurn,
-                StandardTraps.MyTurn, StandardTraps.FishinBoo, StandardTraps.DisableTag);
+                StandardTraps.MyTurn, StandardTraps.FishinBoo, StandardTraps.DisableTag, StandardTraps.Chaser);
 
             Register("Zoom Trap", StandardTraps.Zoom,
                 StandardTraps.Zoom, StandardTraps.WIDE, StandardTraps.ZoomIn, StandardTraps.ZoomOut);
@@ -372,10 +372,10 @@ namespace Peak.AP
                 StandardTraps.Trap144p, StandardTraps.Pixellation, StandardTraps.Pixelate);
 
             Register("Eruption Trap", StandardTraps.LightUpPath,
-                StandardTraps.LightUpPath, StandardTraps.Explosion);
+                StandardTraps.LightUpPath);
 
             Register("Beetle Horde Trap", StandardTraps.Buyon,
-                StandardTraps.Buyon);
+                StandardTraps.Buyon, StandardTraps.Animal);
 
             Register("Custom Trivia Trap", StandardTraps.Trivia,
                 StandardTraps.Trivia);
@@ -388,6 +388,12 @@ namespace Peak.AP
 
             Register("Inverted Mouse Trap", StandardTraps.InvertedMouse,
                 StandardTraps.ReverseControls, StandardTraps.Reverse, StandardTraps.Reversal, StandardTraps.InvertedMouse);
+
+            Register("Emergency Rescue Trap", StandardTraps.Tutorial,
+                StandardTraps.Tutorial, StandardTraps.Home);
+
+            Register("Explosion Trap", StandardTraps.Explosion,
+                StandardTraps.Explosion, StandardTraps.EnemyBall);
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
         }

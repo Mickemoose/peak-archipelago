@@ -105,7 +105,7 @@ namespace Peak.AP
         private int _lootSanityMode = 0; // 0=None, 1=Luggage, 2=Trees/Bushes, 3=All
         public Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
         private bool _logicalScoutStatue = false;
-        private int _progressiveMountainCount = 0;
+        public int _progressiveMountainCount = 0;
 
         // ===== AP Link Management =====
         public RingLinkService _ringLinkService;
@@ -1911,7 +1911,8 @@ namespace Peak.AP
                 { "Inverted Mouse Trap", () => InvertedMouseTrapEffect.ApplyInvertedMouseTrap(_log)},
                 { "Stamina Drain Trap", () => StaminaDrainTrapEffect.ApplyStaminaDrainTrap(_log)},
                 { "Chaos Control Trap", () => ChaosControlTrapEffect.ApplyChaosControlTrap(_log)},
-                { "Emergency Rescue Trap", () => EmergencyRescueTrapEffect.ApplyEmergencyRescueTrap(_log)}
+                { "Emergency Rescue Trap", () => EmergencyRescueTrapEffect.ApplyEmergencyRescueTrap(_log)},
+                { "Explosion Trap", () => ExplosionTrapEffect.ApplyExplosionTrap(_log)}
 
             };
 
@@ -2012,19 +2013,50 @@ namespace Peak.AP
         }
 
         [PunRPC]
-        public void StartEmergencyRescueRPC()
+        public void StartEmergencyRescueRPC(Vector3 position)
         {
             try
             {
                 if (Zorro.Core.Singleton<PeakHandler>.Instance != null && !Zorro.Core.Singleton<PeakHandler>.Instance.summonedHelicopter)
                 {
                     _log.LogInfo("[PeakPelago] Emergency Rescue RPC - summoning helicopter!");
-                    Zorro.Core.Singleton<PeakHandler>.Instance.SummonHelicopter();
+                    EmergencyRescueTrapEffect.RepositionAndSummon(position);
                 }
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error in StartEmergencyRescueRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        public void StartExplosionTrapRPC(int targetActorNumber)
+        {
+            try
+            {
+                var players = PlayerHandler.GetAllPlayerCharacters();
+                Character target = null;
+                foreach (var p in players)
+                {
+                    if (p.photonView.Owner.ActorNumber == targetActorNumber)
+                    {
+                        target = p;
+                        break;
+                    }
+                }
+
+                if (target == null)
+                {
+                    _log.LogWarning($"[PeakPelago] Explosion Trap RPC - could not find player with actor number {targetActorNumber}");
+                    return;
+                }
+
+                _log.LogInfo($"[PeakPelago] Explosion Trap RPC - spawning explosion on {target.photonView.Owner.NickName}!");
+                ExplosionTrapEffect.SpawnExplosionAt(target.Center, _log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartExplosionTrapRPC: {ex.Message}");
             }
         }
 
@@ -4683,6 +4715,8 @@ namespace Peak.AP
             {
                 switch (msg)
                 {
+                    case HintItemSendLogMessage:
+                        return;
                     case ItemSendLogMessage itemSendMsg:
                         var sender = itemSendMsg.Sender;
                         var receiver = itemSendMsg.Receiver;
@@ -4778,7 +4812,7 @@ namespace Peak.AP
 
             InitTrapQueueStyles();
 
-            float panelWidth = 250f;
+            float panelWidth = 350f;
             float lineHeight = 24f;
             float titleHeight = 30f;
             float padding = 10f;

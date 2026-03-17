@@ -181,6 +181,7 @@ class PeakWorld(World):
         trap_weights += (["Stamina Drain Trap"] * self.options.stamina_drain_trap_weight.value)
         trap_weights += (["Chaos Control Trap"] * self.options.chaos_control_trap_weight.value)
         trap_weights += (["Emergency Rescue Trap"] * self.options.emergency_rescue_trap_weight.value)
+        trap_weights += (["Explosion Trap"] * self.options.explosion_trap_weight.value)
 
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))

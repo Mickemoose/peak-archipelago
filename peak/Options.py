@@ -403,6 +403,12 @@ class EmergencyRescueTrapWeight(BaseTrapWeight):
     """
     display_name = "Emergency Rescue Trap Weight"
 
+class ExplosionTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns an explosion on a random player
+    """
+    display_name = "Explosion Trap Weight"
+
 class TrapPercentage(Range):
     """
     Replace a percentage of junk items in the item pool with random traps
@@ -601,3 +607,4 @@ class PeakOptions(PerGameCommonOptions):
     stamina_drain_trap_weight: StaminaDrainTrapWeight
     chaos_control_trap_weight: ChaosControlTrapWeight
     emergency_rescue_trap_weight: EmergencyRescueTrapWeight
+    explosion_trap_weight: ExplosionTrapWeight

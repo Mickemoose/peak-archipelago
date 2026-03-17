@@ -36,6 +36,7 @@ namespace Peak.AP
 
         // Cached references for styling
         private TMP_FontAsset _font;
+        private TMP_FontAsset _tabFont;
         private ColorBlock _buttonColors;
         private Sprite _buttonSprite;
         private SpriteState _buttonSpriteState;
@@ -268,6 +269,8 @@ namespace Peak.AP
             _connectionTabBtn = CreateTabButton(tabsRect, "CONNECTION");
             _linksTabBtn = CreateTabButton(tabsRect, "LINKS");
             _trackerTabBtn = CreateTabButton(tabsRect, "TRACKER");
+            var tabTMP = _connectionTabBtn?.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tabTMP != null) _tabFont = tabTMP.font;
 
             // --- Connection tab content ---
             _connectionContent = layoutParent;
@@ -791,7 +794,7 @@ namespace Peak.AP
 
             foreach (long checkId in stateData.ReportedChecks)
             {
-                string locName = session.Locations.GetLocationNameFromId(checkId);
+                string locName = session.Locations.GetLocationNameFromId(checkId, "PEAK");
                 if (locName != null)
                     acquired.Add(locName);
             }
@@ -813,13 +816,15 @@ namespace Peak.AP
             return unlocked;
         }
 
-        private void CreateBiomeHeader(RectTransform parent, string biomeName)
+        private static readonly int[] BiomeMountainReq = { 0, 1, 2, 3, 4 };
+
+        private void CreateBiomeHeader(RectTransform parent, string biomeName, bool locked, int mountainsNeeded)
         {
             var row = CreateChild(parent, biomeName + "_Header");
             var le = row.gameObject.AddComponent<LayoutElement>();
             le.preferredHeight = 36;
             var bg = row.gameObject.AddComponent<Image>();
-            bg.color = new Color(0.3f, 0.2f, 0.15f, 0.85f);
+            bg.color = locked ? new Color(0.2f, 0.15f, 0.12f, 0.5f) : new Color(0.3f, 0.2f, 0.15f, 0.85f);
             bg.raycastTarget = false;
 
             var textChild = CreateChild(row, "Label");
@@ -828,20 +833,29 @@ namespace Peak.AP
             textChild.offsetMin = new Vector2(10f, 0f);
             textChild.offsetMax = Vector2.zero;
             var tmp = textChild.gameObject.AddComponent<TextMeshProUGUI>();
-            tmp.text = biomeName;
+            if (locked)
+            {
+                string plural = mountainsNeeded == 1 ? "" : "s";
+                tmp.text = $"Find {mountainsNeeded} Progressive Mountain{plural} to unlock {biomeName}";
+                tmp.color = new Color(0.5f, 0.45f, 0.4f, 0.8f);
+            }
+            else
+            {
+                tmp.text = biomeName;
+                tmp.color = Color.white;
+            }
             tmp.fontSize = 22;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.MidlineLeft;
-            tmp.color = Color.white;
             tmp.raycastTarget = false;
-            if (_font != null) tmp.font = _font;
+            if (_tabFont != null) tmp.font = _tabFont;
+            else if (_font != null) tmp.font = _font;
         }
 
         private void CreateIconGrid(RectTransform parent, List<string> acquireLocNames,
             HashSet<string> acquired, HashSet<string> unlocked, bool itemSanity)
         {
             var gridRow = CreateChild(parent, "IconGrid");
-            var le = gridRow.gameObject.AddComponent<LayoutElement>();
 
             var grid = gridRow.gameObject.AddComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(56, 56);
@@ -934,12 +948,6 @@ namespace Peak.AP
 
                 count++;
             }
-
-            // Estimate rows for height
-            float gridWidth = 800f;
-            int cols = Mathf.Max(1, Mathf.FloorToInt((gridWidth - 16) / 60));
-            int rows = Mathf.CeilToInt((float)count / cols);
-            le.preferredHeight = rows * 60 + 8;
         }
 
         private RectTransform _tooltipRoot;
@@ -956,6 +964,30 @@ namespace Peak.AP
         {
             if (_tooltipRoot == null) return;
             _tooltipRoot.gameObject.SetActive(false);
+        }
+
+        private void LoadExistingHints()
+        {
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin?._session == null) return;
+
+            int slot = plugin._session.ConnectionInfo.Slot;
+            plugin._session.Hints.GetHintsAsync((hints) =>
+            {
+                if (hints == null) return;
+                foreach (var h in hints)
+                {
+                    if (h.ReceivingPlayer != slot) continue;
+                    string receivingGame = plugin._session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? plugin._session.ConnectionInfo.Game;
+                    string itemName = plugin._session.Items.GetItemName(h.ItemId, receivingGame);
+                    if (itemName == null || _hintCache.ContainsKey(itemName)) continue;
+
+                    string findingPlayerName = plugin._session.Players.GetPlayerName(h.FindingPlayer);
+                    string findingGame = plugin._session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
+                    string locName = plugin._session.Locations.GetLocationNameFromId(h.LocationId, findingGame) ?? $"Location {h.LocationId}";
+                    _hintCache[itemName] = $"{findingPlayerName}'s {findingGame}: {locName}";
+                }
+            });
         }
 
         private string GetHintCostText()
@@ -1028,12 +1060,13 @@ namespace Peak.AP
                     {
                         if (h.ReceivingPlayer != slot) continue;
 
-                        string hintItemName = plugin._session.Items.GetItemName(h.ItemId, plugin._session.ConnectionInfo.Game);
+                        string receivingGame = plugin._session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? plugin._session.ConnectionInfo.Game;
+                        string hintItemName = plugin._session.Items.GetItemName(h.ItemId, receivingGame);
                         if (string.Equals(hintItemName, capturedUnlock, System.StringComparison.OrdinalIgnoreCase))
                         {
                             string findingPlayerName = plugin._session.Players.GetPlayerName(h.FindingPlayer);
                             string findingGame = plugin._session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
-                            string locName = plugin._session.Locations.GetLocationNameFromId(h.LocationId);
+                            string locName = plugin._session.Locations.GetLocationNameFromId(h.LocationId, findingGame) ?? $"Location {h.LocationId}";
                             result = $"{findingPlayerName}'s {findingGame}: {locName}";
                             break;
                         }
@@ -1062,6 +1095,7 @@ namespace Peak.AP
         private void RefreshTrackerContent()
         {
             EnsureTrackerScroll();
+            LoadExistingHints();
 
             for (int i = _trackerScrollContent.childCount - 1; i >= 0; i--)
                 Destroy(_trackerScrollContent.GetChild(i).gameObject);
@@ -1069,15 +1103,15 @@ namespace Peak.AP
             var plugin = PeakArchipelagoPlugin._instance;
             if (plugin == null || plugin._lootBiomeAssignments == null || plugin._lootBiomeAssignments.Count == 0)
             {
-                CreateBiomeHeader(_trackerScrollContent, "Connect to a server to see loot assignments");
+                CreateBiomeHeader(_trackerScrollContent, "Connect to a server to see loot assignments", false, 0);
                 return;
             }
 
             bool itemSanity = plugin._itemSanityEnabled;
+            int mountains = plugin._progressiveMountainCount;
             var acquired = GetAcquiredLocationNames();
             var unlocked = GetUnlockedItemNames();
 
-            // Group acquire locations by biome level
             var biomeGroups = new Dictionary<int, List<string>>();
             foreach (var kvp in plugin._lootBiomeAssignments)
             {
@@ -1093,8 +1127,12 @@ namespace Peak.AP
                 var locs = biomeGroups[level];
                 locs.Sort();
 
-                CreateBiomeHeader(_trackerScrollContent, BiomeNames[level].ToUpper());
-                CreateIconGrid(_trackerScrollContent, locs, acquired, unlocked, itemSanity);
+                int req = BiomeMountainReq[level];
+                bool locked = req > 0 && mountains < req;
+
+                CreateBiomeHeader(_trackerScrollContent, BiomeNames[level].ToUpper(), locked, req);
+                if (!locked)
+                    CreateIconGrid(_trackerScrollContent, locs, acquired, unlocked, itemSanity);
             }
         }
 

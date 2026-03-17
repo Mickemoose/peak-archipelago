@@ -47,6 +47,7 @@ namespace Peak.AP
         StaminaDrainTrap,
         ChaosControlTrap,
         EmergencyRescueTrap,
+        ExplosionTrap,
     }
 
     public static class TrapTypeExtensions
@@ -93,6 +94,7 @@ namespace Peak.AP
             { TrapType.StaminaDrainTrap, "Stamina Drain Trap" },
             { TrapType.ChaosControlTrap, "Chaos Control Trap" },
             { TrapType.EmergencyRescueTrap, "Emergency Rescue Trap" },
+            { TrapType.ExplosionTrap, "Explosion Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

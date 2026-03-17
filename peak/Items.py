@@ -205,6 +205,7 @@ trap_table = {
     "Stamina Drain Trap":         ItemData(77126, ItemClassification.trap),
     "Chaos Control Trap":         ItemData(77127, ItemClassification.trap),
     "Emergency Rescue Trap":      ItemData(77128, ItemClassification.trap),
+    "Explosion Trap":             ItemData(77129, ItemClassification.trap),
 }
 
 # All items that have "Acquire X" locations need unlock versions for logic
