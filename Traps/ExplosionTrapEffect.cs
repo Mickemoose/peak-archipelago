@@ -46,7 +46,7 @@ namespace Peak.AP
 
         public static void SpawnExplosionAt(Vector3 position, ManualLogSource log)
         {
-            Dynamite template = UnityEngine.Object.FindObjectOfType<Dynamite>(true);
+            Dynamite template = UnityEngine.Object.FindAnyObjectByType<Dynamite>(FindObjectsInactive.Include);
             if (template == null)
             {
                 var allTemplates = Resources.FindObjectsOfTypeAll<Dynamite>();

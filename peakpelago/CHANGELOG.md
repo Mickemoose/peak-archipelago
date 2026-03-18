@@ -17,6 +17,10 @@
     <li>In Game Item tracker in the Archipelago section in the ESC/Pause menu</li>
     <li>Item Unlocks able to be hinted in the tracker</li>
     <li>Potential fixes for multiplayer issues with RingLink & EnergyLink</li>
+    <li>DeathLink Checkpoint will now check for a Checkpoint Flag first before falling back to the campfire<li>
+    <li>Scorchberry check and item unlock added</li>
+    <li>Progressive Mountain wasn't syncing on receive, just on player joining, should be fixed</li>
+    <li>Parasol check and unlock now considers both variants</li>
 </ul>
 
 ## v0.5.8

@@ -2290,6 +2290,11 @@ namespace Peak.AP
                 
                 _notifications.ShowSimpleMessage($"Mountain Progress {mountainCount}/4!");
                 UnlockedItemsManager.UpdateMountainCount(_progressiveMountainCount);
+
+                if (_photonView != null && PhotonNetwork.IsMasterClient)
+                {
+                    _photonView.RPC("SyncProgressiveMountain", RpcTarget.Others, _progressiveMountainCount);
+                }
             }
             catch (Exception ex)
             {
