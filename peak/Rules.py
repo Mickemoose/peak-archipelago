@@ -295,7 +295,8 @@ def apply_rules(world: "PeakWorld"):
     special_badges = {"Mycology Badge", "Applied Esoterica Badge", "Bouldering Badge",
                       "Calcium Intake Badge", "Competitive Eating Badge",
                       "Cryptogastronomy Badge", "Disaster Response Badge", "Esoterica Badge",
-                      "Toxicology Badge", "Ultimate Badge", "Beachcomber Badge"}
+                      "Toxicology Badge", "Ultimate Badge", "Beachcomber Badge",
+                      "Plunderer Badge"}
     for badge_name in [b for b in regular_badges if b not in special_badges]:
         try:
             set_rule(world.get_location(badge_name), lambda state: True)
@@ -427,6 +428,13 @@ def apply_rules(world: "PeakWorld"):
                      (lvl == 0 or state.has("Progressive Mountain", player, lvl)))
         else:
             set_rule(world.get_location("Esoterica Badge"), _biome_rule(eso_biome))
+    except KeyError:
+        pass
+
+    # Plunderer Badge — requires 1 Progressive Mountain
+    try:
+        set_rule(world.get_location("Plunderer Badge"),
+                 lambda state: state.has("Progressive Mountain", player, 1))
     except KeyError:
         pass
 
