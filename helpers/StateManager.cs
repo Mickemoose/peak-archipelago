@@ -112,11 +112,7 @@ namespace Peak.AP
                     ParseIntSet(lines[3], data.UnlockedAscents, "unlocked ascents");
                 }
 
-                // Line 4: Stamina state
-                if (lines.Length >= 5 && !string.IsNullOrEmpty(lines[4]))
-                {
-                    data.StaminaState = lines[4];
-                }
+                // Line 4: (legacy stamina state, no longer used - stamina is recounted from AP)
 
                 // Line 5: Items cooked
                 if (lines.Length >= 6 && int.TryParse(lines[5].Trim(), out int cooked))
@@ -173,7 +169,7 @@ namespace Peak.AP
             }
         }
 
-        public void Save(StateData data, string staminaState)
+        public void Save(StateData data)
         {
             if (_isSaving) return;
             _isSaving = true;
@@ -184,7 +180,7 @@ namespace Peak.AP
                 string.Join(",", data.ReportedChecks.Select(x => x.ToString())),
                 data.TotalLuggageOpened.ToString(),
                 string.Join(",", data.UnlockedAscents.Select(x => x.ToString())),
-                staminaState ?? "0,1.00",
+                "",
                 data.TotalItemsCooked.ToString(),
                 data.PitonsPlaced.ToString(),
                 data.GlizzysGobbled.ToString(),
@@ -327,7 +323,6 @@ namespace Peak.AP
         public HashSet<long> OfflineChecks { get; } = new HashSet<long>();
         public int TotalLuggageOpened { get; set; } = 0;
         public HashSet<int> UnlockedAscents { get; } = new HashSet<int>();
-        public string StaminaState { get; set; } = "";
         public int TotalItemsCooked { get; set; } = 0;
         public int PitonsPlaced { get; set; } = 0;
         public int GlizzysGobbled { get; set; } = 0;
@@ -342,7 +337,6 @@ namespace Peak.AP
             OfflineChecks.Clear();
             TotalLuggageOpened = 0;
             UnlockedAscents.Clear();
-            StaminaState = "";
             TotalItemsCooked = 0;
             PitonsPlaced = 0;
             GlizzysGobbled = 0;

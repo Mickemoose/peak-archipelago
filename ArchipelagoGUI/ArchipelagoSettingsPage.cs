@@ -232,14 +232,14 @@ namespace Peak.AP
             titleTMP.overflowMode = TextOverflowModes.Overflow;
             titleTMP.textWrappingMode = TextWrappingModes.NoWrap;
             _backButton = CreateBackButton();
-            // Content area — match settings page Content rect exactly
+            // Content area - match settings page Content rect exactly
             var content = CreateChild(transform, "Content");
             content.anchorMin = Vector2.zero;
             content.anchorMax = Vector2.one;
             content.anchoredPosition = new Vector2(148.64f, -19.73f);
             content.sizeDelta = new Vector2(-558.73f, -101.31f);
 
-            // Parent — match settings page Parent (VerticalLayoutGroup inside Content)
+            // Parent - match settings page Parent (VerticalLayoutGroup inside Content)
             var layoutParent = CreateChild(content, "Parent");
             layoutParent.anchorMin = Vector2.zero;
             layoutParent.anchorMax = Vector2.one;
@@ -253,7 +253,7 @@ namespace Peak.AP
             vlg.childForceExpandWidth = true;
             vlg.childForceExpandHeight = false;
 
-            // Tabs — Connection and Links, matching settings page TABS layout
+            // Tabs - Connection and Links, matching settings page TABS layout
             var tabsRect = CreateChild(content, "TABS");
             tabsRect.anchorMin = new Vector2(0f, 1f);
             tabsRect.anchorMax = new Vector2(1f, 1f);
@@ -298,7 +298,7 @@ namespace Peak.AP
             linksVLG.childForceExpandWidth = true;
             linksVLG.childForceExpandHeight = false;
 
-            // Link toggle rows — all always interactable, send ConnectUpdatePacket on change
+            // Link toggle rows - all always interactable, send ConnectUpdatePacket on change
             CreateLinkToggleRow(_linksContent, "DEATH LINK", () =>
             {
                 var p = PeakArchipelagoPlugin._instance;
@@ -517,7 +517,7 @@ namespace Peak.AP
                 inputParent.pivot = new Vector2(1f, 0.5f);
                 inputParent.sizeDelta = new Vector2(468f, 0f);
 
-                // Dropdown — match settings page ENUM DROPDOWN structure
+                // Dropdown - match settings page ENUM DROPDOWN structure
                 var ddRect = CreateChild(inputParent, "Dropdown");
                 ddRect.anchorMin = Vector2.zero;
                 ddRect.anchorMax = Vector2.one;
@@ -706,9 +706,6 @@ namespace Peak.AP
         private RectTransform _trackerScrollContent;
         private TextMeshProUGUI _trackerTooltip;
 
-        // Hint cache: maps AP unlock item name -> hint display string (e.g. "Player's Game: Location")
-        private Dictionary<string, string> _hintCache = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
-
         private static readonly string[] BiomeNames = { "Shore", "Tropics / Roots", "Mesa / Alpine", "Caldera", "Kiln" };
 
         private void EnsureTrackerScroll()
@@ -749,7 +746,7 @@ namespace Peak.AP
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 30f;
 
-            // Floating tooltip — separate bg and text children
+            // Floating tooltip - separate bg and text children
             var tooltipObj = CreateChild(_trackerContent, "Tooltip");
             _tooltipRoot = tooltipObj;
             tooltipObj.anchorMin = Vector2.zero;
@@ -927,7 +924,8 @@ namespace Peak.AP
                 var enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
                 enterEntry.callback.AddListener((_) =>
                 {
-                    if (isLocked && _hintCache.TryGetValue(capturedUnlockName, out string hintStr))
+                    var plugin = PeakArchipelagoPlugin._instance;
+                    if (isLocked && plugin != null && plugin._activeHints.TryGetValue(capturedUnlockName, out string hintStr))
                         ShowTrackerTooltip(hintStr);
                     else if (isLocked)
                         ShowTrackerTooltip(GetHintCostText());
@@ -966,30 +964,6 @@ namespace Peak.AP
             _tooltipRoot.gameObject.SetActive(false);
         }
 
-        private void LoadExistingHints()
-        {
-            var plugin = PeakArchipelagoPlugin._instance;
-            if (plugin?._session == null) return;
-
-            int slot = plugin._session.ConnectionInfo.Slot;
-            plugin._session.Hints.GetHintsAsync((hints) =>
-            {
-                if (hints == null) return;
-                foreach (var h in hints)
-                {
-                    if (h.ReceivingPlayer != slot) continue;
-                    string receivingGame = plugin._session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? plugin._session.ConnectionInfo.Game;
-                    string itemName = plugin._session.Items.GetItemName(h.ItemId, receivingGame);
-                    if (itemName == null || _hintCache.ContainsKey(itemName)) continue;
-
-                    string findingPlayerName = plugin._session.Players.GetPlayerName(h.FindingPlayer);
-                    string findingGame = plugin._session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
-                    string locName = plugin._session.Locations.GetLocationNameFromId(h.LocationId, findingGame) ?? $"Location {h.LocationId}";
-                    _hintCache[itemName] = $"{findingPlayerName}'s {findingGame}: {locName}";
-                }
-            });
-        }
-
         private string GetHintCostText()
         {
             var plugin = PeakArchipelagoPlugin._instance;
@@ -1008,10 +982,9 @@ namespace Peak.AP
 
         private void OnLockedItemClicked(string unlockName)
         {
-            if (_hintCache.ContainsKey(unlockName)) return;
-
             var plugin = PeakArchipelagoPlugin._instance;
             if (plugin?._session == null) return;
+            if (plugin._activeHints.ContainsKey(unlockName)) return;
 
             try
             {
@@ -1025,56 +998,17 @@ namespace Peak.AP
             }
             catch { }
 
-            ShowTrackerTooltip("Hinting...");
-            StartCoroutine(RequestHintAsync(unlockName));
-        }
-
-        private System.Collections.IEnumerator RequestHintAsync(string unlockName)
-        {
-            var plugin = PeakArchipelagoPlugin._instance;
-            if (plugin?._session == null) yield break;
-
             try
             {
                 var sayPacket = new SayPacket { Text = $"!hint {unlockName}" };
                 plugin._session.Socket.SendPacket(sayPacket);
+                ShowTrackerTooltip("Hinting...");
             }
             catch (System.Exception ex)
             {
                 ShowTrackerTooltip("Hint failed");
                 plugin._log?.LogWarning($"[PeakPelago] Hint request failed: {ex.Message}");
-                yield break;
             }
-
-            yield return new WaitForSeconds(2f);
-
-            string capturedUnlock = unlockName;
-            int slot = plugin._session.ConnectionInfo.Slot;
-
-            plugin._session.Hints.GetHintsAsync((hints) =>
-            {
-                string result = null;
-                if (hints != null)
-                {
-                    foreach (var h in hints)
-                    {
-                        if (h.ReceivingPlayer != slot) continue;
-
-                        string receivingGame = plugin._session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? plugin._session.ConnectionInfo.Game;
-                        string hintItemName = plugin._session.Items.GetItemName(h.ItemId, receivingGame);
-                        if (string.Equals(hintItemName, capturedUnlock, System.StringComparison.OrdinalIgnoreCase))
-                        {
-                            string findingPlayerName = plugin._session.Players.GetPlayerName(h.FindingPlayer);
-                            string findingGame = plugin._session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
-                            string locName = plugin._session.Locations.GetLocationNameFromId(h.LocationId, findingGame) ?? $"Location {h.LocationId}";
-                            result = $"{findingPlayerName}'s {findingGame}: {locName}";
-                            break;
-                        }
-                    }
-                }
-                _hintCache[capturedUnlock] = result ?? "Hinted (check !hint)";
-                ShowTrackerTooltip(_hintCache[capturedUnlock]);
-            });
         }
 
         private System.Collections.IEnumerator FollowMouseTooltip()
@@ -1095,7 +1029,6 @@ namespace Peak.AP
         private void RefreshTrackerContent()
         {
             EnsureTrackerScroll();
-            LoadExistingHints();
 
             for (int i = _trackerScrollContent.childCount - 1; i >= 0; i--)
                 Destroy(_trackerScrollContent.GetChild(i).gameObject);
@@ -1167,7 +1100,7 @@ namespace Peak.AP
                 var btn = clone.GetComponent<Button>();
                 if (btn == null)
                 {
-                    // Button was lost — re-add it
+                    // Button was lost - re-add it
                     btn = clone.AddComponent<Button>();
                     var targetImg = clone.transform.Find("Image")?.GetComponent<Image>()
                                    ?? clone.GetComponent<Image>();

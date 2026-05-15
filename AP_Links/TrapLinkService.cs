@@ -567,7 +567,7 @@ namespace Peak.AP
         }
 
         /// <summary>
-        /// Update trap queue processing (always runs — queue works with or without TrapLink)
+        /// Update trap queue processing (always runs - queue works with or without TrapLink)
         /// </summary>
         public void Update()
         {

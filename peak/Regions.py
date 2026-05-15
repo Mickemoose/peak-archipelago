@@ -117,7 +117,7 @@ def create_peak_regions(world: "PeakWorld"):
         mountain_region.locations.append(loc)
         created_location_count += 1
 
-    # Add event locations (no numeric ID) — become progression items when checked
+    # Add event locations (no numeric ID) - become progression items when checked
     event_locations = [
         ("Ascent 1 Completed", "Ascent 1 Completed"),
         ("Ascent 2 Completed", "Ascent 2 Completed"),

@@ -27,7 +27,7 @@ using UnityEngine.UI;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.5.9")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.6.0")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -95,6 +95,8 @@ namespace Peak.AP
         private bool _badgesHidden = false;
         private bool _hasHiddenBadges = false;
         private bool _hasRebuiltBadges = false;
+        private bool _wasInAirport = false;
+        private bool _wasInLevel = false;
 
         // ===== Ascent Management =====
         private int _originalMaxAscent = 0;
@@ -142,6 +144,9 @@ namespace Peak.AP
         private const float NOTIFICATION_COOLDOWN = 0.1f;
         private ConcurrentQueue<Action> _mainThreadActions = new();
         private List<MountainHint> _mountainHints = [];
+
+        public Dictionary<string, string> _activeHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public event Action OnHintsChanged;
 
         private void Awake()
         {
@@ -2658,7 +2663,7 @@ namespace Peak.AP
                 _lastReceivedItemName = itemName;
                 _lastReceivedItemTime = DateTime.Now;
 
-                // Unlock items just add to the loot pool — no physical spawn needed
+                // Unlock items just add to the loot pool - no physical spawn needed
                 if (itemName.EndsWith(" Unlock"))
                 {
                     
@@ -4186,6 +4191,8 @@ namespace Peak.AP
                         }
                     }
 
+                    SeedHintCache();
+
                     if (loginResult.SlotData.ContainsKey("breath_link"))
                     {
                         var value = loginResult.SlotData["breath_link"];
@@ -4336,7 +4343,7 @@ namespace Peak.AP
                         _enabledTraps = TrapTypeExtensions.GetAllTrapNames();
                     }
 
-                    // Always initialize — trap queue works with or without TrapLink
+                    // Always initialize - trap queue works with or without TrapLink
                     _trapLinkService.Initialize(
                         _session,
                         _trapLinkEnabled,
@@ -4453,6 +4460,11 @@ namespace Peak.AP
                     RecoverEnduranceUpgrades();
 
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
+                    _mainThreadActions.Enqueue(() =>
+                    {
+                        _wasInAirport = false;
+                        StartCoroutine(WaitForCharacterAndRebuild());
+                    });
 
 
                 }
@@ -4724,38 +4736,112 @@ namespace Peak.AP
             }
         }
 
+        private void HandleHintMessage(HintItemSendLogMessage hintMsg)
+        {
+            if (!hintMsg.IsRelatedToActivePlayer || _session == null) return;
+            if (hintMsg.Receiver.Slot != _session.ConnectionInfo.Slot) return;
+
+            string receivingGame = _session.ConnectionInfo.Game;
+            string unlockName = _session.Items.GetItemName(hintMsg.Item.ItemId, receivingGame);
+            if (string.IsNullOrEmpty(unlockName)) return;
+
+            bool changed = false;
+            if (hintMsg.IsFound)
+            {
+                changed = _activeHints.Remove(unlockName);
+            }
+            else
+            {
+                string findingPlayerName = _session.Players.GetPlayerName(hintMsg.Sender.Slot);
+                string findingGame = _session.Players.GetPlayerInfo(hintMsg.Sender.Slot)?.Game ?? "???";
+                string locName = _session.Locations.GetLocationNameFromId(hintMsg.Item.LocationId, findingGame) ?? $"Location {hintMsg.Item.LocationId}";
+                string display = $"{findingPlayerName}'s {findingGame}: {locName}";
+                if (!_activeHints.TryGetValue(unlockName, out string existing) || existing != display)
+                {
+                    _activeHints[unlockName] = display;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                _mainThreadActions.Enqueue(() => OnHintsChanged?.Invoke());
+            }
+        }
+
+        private void HandleCollectedItemForHints(ItemSendLogMessage itemMsg)
+        {
+            if (!itemMsg.IsRelatedToActivePlayer || _session == null) return;
+            if (itemMsg.Receiver.Slot != _session.ConnectionInfo.Slot) return;
+
+            string receivingGame = _session.ConnectionInfo.Game;
+            string unlockName = _session.Items.GetItemName(itemMsg.Item.ItemId, receivingGame);
+            if (string.IsNullOrEmpty(unlockName)) return;
+
+            if (_activeHints.Remove(unlockName))
+            {
+                _mainThreadActions.Enqueue(() => OnHintsChanged?.Invoke());
+            }
+        }
+
+        public void SeedHintCache()
+        {
+            if (_session == null) return;
+            _activeHints.Clear();
+            int slot = _session.ConnectionInfo.Slot;
+            _session.Hints.GetHintsAsync((hints) =>
+            {
+                if (hints == null) return;
+                foreach (var h in hints)
+                {
+                    if (h.ReceivingPlayer != slot || h.Found) continue;
+                    string receivingGame = _session.Players.GetPlayerInfo(h.ReceivingPlayer)?.Game ?? _session.ConnectionInfo.Game;
+                    string unlockName = _session.Items.GetItemName(h.ItemId, receivingGame);
+                    if (string.IsNullOrEmpty(unlockName)) continue;
+                    string findingPlayerName = _session.Players.GetPlayerName(h.FindingPlayer);
+                    string findingGame = _session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
+                    string locName = _session.Locations.GetLocationNameFromId(h.LocationId, findingGame) ?? $"Location {h.LocationId}";
+                    _activeHints[unlockName] = $"{findingPlayerName}'s {findingGame}: {locName}";
+                }
+                _mainThreadActions.Enqueue(() => OnHintsChanged?.Invoke());
+            });
+        }
+
         private void OnApMessage(LogMessage msg)
         {
             try
             {
                 switch (msg)
                 {
-                    case HintItemSendLogMessage:
+                    case HintItemSendLogMessage hintMsg:
+                        HandleHintMessage(hintMsg);
                         return;
                     case ItemSendLogMessage itemSendMsg:
+                        HandleCollectedItemForHints(itemSendMsg);
+
                         var sender = itemSendMsg.Sender;
                         var receiver = itemSendMsg.Receiver;
                         var item = itemSendMsg.Item;
-                        
+
                         string senderName = sender.Name ?? $"Player {sender.Slot}";
                         string receiverName = receiver.Name ?? $"Player {receiver.Slot}";
                         string itemName = item.ItemName ?? $"Item {item.ItemId}";
-                        
+
                         if (item.ItemGame != "PEAK" && item.ItemGame != null)
                         {
                             itemName = $"{itemName} ({item.ItemGame})";
                         }
-                        
+
                         var flags = item.Flags;
-                        
+
                         _mainThreadActions.Enqueue(() =>
                         {
                             _notifications?.ShowItemNotification(senderName, receiverName, itemName, flags);
                         });
-                        
-                        
+
+
                         return;
-                        
+
                     default:
                         string msgString = msg.ToString();
                         if (msgString.Contains("Cheat console:")) return;
@@ -4908,14 +4994,20 @@ namespace Peak.AP
                 ProcessItemQueue();
                 CampfireModelSpawner.CleanupDestroyedCampfires();
 
-                if (!_hasRebuiltBadges && _session != null)
                 {
                     string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-                    if (currentScene.Contains("Airport"))
+                    bool isInAirport = currentScene.Contains("Airport");
+                    bool isInLevel = currentScene.StartsWith("Level_");
+                    if (isInAirport && !_wasInAirport && _session != null)
                     {
                         StartCoroutine(WaitForCharacterAndRebuild());
-                        _hasRebuiltBadges = true;
                     }
+                    if (isInLevel && !_wasInLevel && _session != null)
+                    {
+                        StartCoroutine(WaitForCharacterAndCleanShore());
+                    }
+                    _wasInAirport = isInAirport;
+                    _wasInLevel = isInLevel;
                 }
                 if (_stateManager.StateDirty && !_stateManager.IsSaving && Time.time - _stateManager.LastStateSave > _stateManager.SaveInterval)
                 {
@@ -4930,22 +5022,86 @@ namespace Peak.AP
         }
         private System.Collections.IEnumerator WaitForCharacterAndRebuild()
         {
-            
-            
             while (Character.localCharacter == null)
             {
                 yield return new WaitForSeconds(0.5f);
             }
-            
-            
-            
-            // NEW: Sync stamina NOW (Photon is ready)
-            if (_session != null && _staminaManager != null)
+
+            if (_session != null && _staminaManager != null && _staminaManager.IsProgressiveStaminaEnabled())
             {
-                _staminaManager.SyncWithArchipelago(_session);
+                ApplyProgressiveStamina();
             }
-            
-            RebuildCollectedBadgesFromChecks();
+
+            if (!_hasRebuiltBadges)
+            {
+                RebuildCollectedBadgesFromChecks();
+                _hasRebuiltBadges = true;
+            }
+        }
+
+        private System.Collections.IEnumerator WaitForCharacterAndCleanShore()
+        {
+            while (Character.localCharacter == null)
+            {
+                yield return new WaitForSeconds(0.5f);
+            }
+            yield return new WaitForSeconds(1f);
+
+            DestroyLockedHandPlacedItems();
+        }
+
+        private static readonly string[] HandPlacedShoreItems = { "Binoculars", "BingBong", "Guidebook", "Flare", "Compass", "Bugle", "Lantern", "Frisbee", "Shell Big" };
+
+        private void DestroyLockedHandPlacedItems()
+        {
+            try
+            {
+                if (!_itemSanityEnabled) return;
+                if (!PhotonNetwork.IsMasterClient) return;
+                if (_session == null) return;
+
+                HashSet<ushort> unlocked = UnlockedItemsManager.GetUnlockedItemIds();
+
+                var items = UnityEngine.Object.FindObjectsByType<Item>(FindObjectsSortMode.None);
+                int destroyed = 0;
+                foreach (var item in items)
+                {
+                    if (item == null || item.UIData == null) continue;
+                    string itemName = item.UIData.itemName;
+                    if (string.IsNullOrEmpty(itemName)) continue;
+                    if (System.Array.IndexOf(HandPlacedShoreItems, itemName) < 0) continue;
+
+                    if (!ItemIdMappings.TryGetId(itemName, out ushort itemId)) continue;
+                    if (unlocked.Contains(itemId)) continue;
+
+                    try
+                    {
+                        if (item.photonView != null && item.photonView.IsMine)
+                        {
+                            PhotonNetwork.Destroy(item.gameObject);
+                        }
+                        else if (item.photonView == null)
+                        {
+                            UnityEngine.Object.Destroy(item.gameObject);
+                        }
+                        else
+                        {
+                            PhotonNetwork.Destroy(item.gameObject);
+                        }
+                        destroyed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogWarning($"[PeakPelago] Failed to destroy locked item {itemName}: {ex.Message}");
+                    }
+                }
+
+                _log.LogInfo($"[PeakPelago] Destroyed {destroyed} locked hand-placed shore items");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in DestroyLockedHandPlacedItems: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -4978,7 +5134,7 @@ namespace Peak.AP
                 return;
             }
 
-            // Fast-track unlock items — they don't spawn anything, so process them all immediately
+            // Fast-track unlock items - they don't spawn anything, so process them all immediately
             bool processedAnyUnlocks = false;
             while (_itemQueue.TryPeek(out var unlockPeek) && unlockPeek.itemName.EndsWith(" Unlock"))
             {
@@ -5097,14 +5253,13 @@ namespace Peak.AP
         private void LoadState()
         {
             _stateManager.Load(_stateData);
-            _staminaManager?.LoadState(_stateData.StaminaState);
             BasketballHoopScorePatch.SetTotalCount(_stateData.TotalBasketsScored);
         }
         private void SaveState()
         {
             if (!PhotonNetwork.IsMasterClient) return;
             if (_session == null || _session.Socket == null || !_session.Socket.Connected) return;
-            _stateManager.Save(_stateData, _staminaManager?.SaveState());
+            _stateManager.Save(_stateData);
         }
         private void SaveOfflineChecks()
         {

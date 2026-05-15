@@ -339,7 +339,7 @@ namespace Peak.AP
 
                 foreach (var pool in LootData.AllSpawnWeightData.Keys.ToList())
                 {
-                    // Skip RespawnCoffin — handled separately by LogicalScoutStatue
+                    // Skip RespawnCoffin - handled separately by LogicalScoutStatue
                     if (pool == SpawnPool.RespawnCoffin) continue;
 
                     bool isLootSanityPool = lootSanityPools.Contains(pool);
@@ -401,7 +401,7 @@ namespace Peak.AP
                         }
                         else
                         {
-                            // No assignments from server — fall back to adding to all affected pools
+                            // No assignments from server - fall back to adding to all affected pools
                             belongsInPool = true;
                         }
 
@@ -421,7 +421,7 @@ namespace Peak.AP
                         }
                         else
                         {
-                            // Item not allowed or doesn't belong in this pool — remove
+                            // Item not allowed or doesn't belong in this pool - remove
                             if (LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
                             {
                                 LootData.AllSpawnWeightData[pool].Remove(itemId);

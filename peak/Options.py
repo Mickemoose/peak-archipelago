@@ -56,7 +56,7 @@ class ItemSanity(Toggle):
     When disabled, all items are available from the start.
     "Acquire" checks only require biome access.
 
-    This option works independently from Loot Sanity — Item Sanity controls the unlock gating,
+    This option works independently from Loot Sanity - Item Sanity controls the unlock gating,
     while Loot Sanity controls which pools the items get shuffled into.
     """
     display_name = "Item Sanity"
@@ -78,7 +78,7 @@ class LootSanity(Choice):
 
     All: Both luggage and natural source pools are shuffled.
 
-    The Scout Statue is never affected by this option — see Logical Scout Statue instead.
+    The Scout Statue is never affected by this option - see Logical Scout Statue instead.
     """
     display_name = "Loot Sanity"
     option_none = 0

@@ -19,11 +19,7 @@ namespace Peak.AP
         private const string STAMINA_KEY = "AP_Stamina";
         private bool _progressiveStaminaEnabled = false;
         private bool _additionalBarsEnabled = false;
-        
-        // Store the loaded stamina value to apply later when Photon is ready
-        private float? _pendingStaminaLoad = null;
-        
-        // NEW: Track local state to avoid Photon sync delays
+
         public float _localBaseMaxStamina = 0.25f;
         public int _localStaminaUpgrades = 0;
 
@@ -36,23 +32,6 @@ namespace Peak.AP
         {
             _progressiveStaminaEnabled = progressiveStaminaEnabled;
             _additionalBarsEnabled = additionalBarsEnabled;
-
-            // Check if we have a pending stamina load from the state file
-            if (_pendingStaminaLoad.HasValue)
-            {
-                _log.LogInfo($"[PeakPelago] Applying pending stamina load: {_pendingStaminaLoad.Value:F2}");
-                if (PhotonNetwork.LocalPlayer != null)
-                {
-                    SetPlayerStamina(PhotonNetwork.LocalPlayer, _pendingStaminaLoad.Value);
-                    _pendingStaminaLoad = null; 
-                    return;
-                }
-                else
-                {
-                    _log.LogWarning("[PeakPelago] Cannot apply pending load - Photon not connected yet");
-                    return;
-                }
-            }
 
             // Check if player already has stamina set from a previous load
             if (PhotonNetwork.LocalPlayer != null)
@@ -273,50 +252,6 @@ namespace Peak.AP
             }
         }
 
-        public string SaveState()
-        {
-            // Use local state (always accurate)
-            return $"{_localStaminaUpgrades},{_localBaseMaxStamina:F2}";
-        }
-
-        public void LoadState(string stateData)
-        {
-            if (string.IsNullOrEmpty(stateData)) return;
-            if (!PhotonNetwork.IsMasterClient)
-            {
-                _log.LogDebug("[PeakPelago] Skipping load save - is not master client");
-                return;
-            }
-            try
-            {
-                var parts = stateData.Split(',');
-                if (parts.Length >= 2)
-                {
-                    int upgrades = int.Parse(parts[0]);
-                    float stamina = float.Parse(parts[1]);
-                    
-                    // Update local state immediately
-                    _localStaminaUpgrades = upgrades;
-                    _localBaseMaxStamina = stamina;
-                    
-                    // Try to apply to Photon if ready, otherwise store it
-                    if (PhotonNetwork.LocalPlayer != null)
-                    {
-                        SetPlayerStamina(PhotonNetwork.LocalPlayer, stamina);
-                        _log.LogInfo($"[PeakPelago] Loaded stamina state: {upgrades} upgrades, {stamina:F2} max");
-                    }
-                    else
-                    {
-                        _pendingStaminaLoad = stamina;
-                        _log.LogInfo($"[PeakPelago] Stored pending stamina load: {upgrades} upgrades, {stamina:F2} max (will apply when Photon connects)");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Failed to load stamina state: {ex.Message}");
-            }
-        }
     }
 
     // Keep all your existing Harmony patches - they stay the same

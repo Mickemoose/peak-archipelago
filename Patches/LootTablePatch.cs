@@ -123,7 +123,7 @@ namespace PeakArchipelago
     {
         static bool Prefix(ref bool __result)
         {
-            // AP manages the loot tables directly — skip the banInSolo check
+            // AP manages the loot tables directly - skip the banInSolo check
             if (PeakArchipelagoPlugin._instance?.Session != null)
             {
                 __result = true;

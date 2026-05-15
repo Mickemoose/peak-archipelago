@@ -1,3 +1,11 @@
+## v0.6.0
+<ul>
+    <li>Stamina sync improvements</li>
+    <li>Hint tracking/sending improvements</li>
+    <li>Logic improvements</li>
+    <li>The crashed plane items won't appear if their Unlock hasn't been acquired</li>
+</ul>
+
 ## v0.5.9
 <ul>
     <li>Items being locked now an option in the yaml called ItemSanity</li>
