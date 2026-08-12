@@ -19,27 +19,13 @@ namespace Peak.AP
         {
             try
             {
-                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply Eruption Trap - no characters found");
-                    return;
-                }
-
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead &&
-                    !c.data.fullyPassedOut
-                ).ToList();
-
-                if (validCharacters.Count == 0)
+                var randomPlayer = TrapHelpers.GetRandomValidCharacter();
+                if (randomPlayer == null)
                 {
                     log.LogWarning("[PeakPelago] Cannot apply Eruption Trap - no valid characters found");
                     return;
                 }
 
-                // Pick a random player
-                var randomPlayer = validCharacters[UnityEngine.Random.Range(0, validCharacters.Count)];
                 Vector3 targetPosition = randomPlayer.Center;
 
                 string characterName = randomPlayer == Character.localCharacter 

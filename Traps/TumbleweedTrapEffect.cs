@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using BepInEx.Logging;
 using UnityEngine;
 using Photon.Pun;
@@ -12,26 +11,13 @@ namespace Peak.AP
         {
             try
             {
-                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply tumbleweed trap - no characters found");
-                    return;
-                }
+                var targetCharacter = TrapHelpers.GetRandomValidCharacter(excludePassedOut: false);
 
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead
-                ).ToList();
-
-                if (validCharacters.Count == 0)
+                if (targetCharacter == null)
                 {
                     log.LogWarning("[PeakPelago] Cannot apply tumbleweed trap - no valid characters found");
                     return;
                 }
-
-                var random = new System.Random();
-                var targetCharacter = validCharacters[random.Next(validCharacters.Count)];
 
                 string characterName = targetCharacter == Character.localCharacter 
                     ? "local player" 

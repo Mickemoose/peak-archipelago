@@ -102,7 +102,8 @@ namespace Peak.AP
                 {
                     if (bounce.Tags != null && bounce.Tags.Contains("BreathLink") && _isEnabled)
                     {
-                        HandleBreathLinkReceived(bounce.Data);
+                        var data = bounce.Data;
+                        PeakArchipelagoPlugin._instance?.EnqueueMainThread(() => HandleBreathLinkReceived(data));
                     }
                 }
             }

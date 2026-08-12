@@ -1,201 +1,36 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using Archipelago.MultiClient.Net;
-using Archipelago.MultiClient.Net.Packets;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
-using Newtonsoft.Json.Linq;
 
 namespace Peak.AP
 {
-    public class RingLinkService
+    public class RingLinkService : RingLinkServiceBase
     {
-        private readonly ManualLogSource _log;
-        private ArchipelagoSession _session;
-        private bool _isEnabled;
-        private int _connectionId;
-        private Harmony _harmony;
-        private ArchipelagoNotificationManager _notifications;
-
         public RingLinkService(ManualLogSource log, ArchipelagoNotificationManager notifications)
+            : base(log, notifications)
         {
-            _log = log;
-            _connectionId = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
-            _notifications = notifications;
         }
 
-        /// <summary>
-        /// Initialize the Ring Link service with an Archipelago session
-        /// </summary>
-        public void Initialize(ArchipelagoSession session, bool enabled)
-        {
-            _session = session;
-            _isEnabled = enabled;
+        protected override string Tag => "RingLink";
+        protected override string DisplayName => "Ring Link";
+        protected override string HarmonyId => "com.mickemoose.peak.ap.ringlink";
+        protected override string SendRpcName => "RPC_SendRingLink";
 
-            if (_isEnabled)
-            {
-                if (_session != null)
-                {
-                    _session.Socket.PacketReceived += OnPacketReceived;
-                    _log.LogInfo($"[PeakPelago] Ring Link service initialized with session (Connection ID: {_connectionId})");
-                }
-                else
-                {
-                    _log.LogInfo($"[PeakPelago] Ring Link service enabled for client (no session, effects only)");
-                }
-                
-                _harmony = new Harmony("com.mickemoose.peak.ap.ringlink");
-                _harmony.PatchAll(typeof(RingLinkPatches));
-                RingLinkPatches.SetInstance(this);
-            }
-        }
-
-        /// <summary>
-        /// Enable or disable Ring Link
-        /// </summary>
-        public void SetEnabled(bool enabled)
-        {
-            _isEnabled = enabled;
-            _log.LogInfo($"[PeakPelago] Ring Link {(enabled ? "enabled" : "disabled")}");
-        }
+        protected override void ApplyHarmonyPatches() => _harmony.PatchAll(typeof(RingLinkPatches));
+        protected override void SetPatchInstance() => RingLinkPatches.SetInstance(this);
+        protected override void ClearPatchInstance() => RingLinkPatches.SetInstance(null);
 
         /// <summary>
         /// Send a Ring Link packet when rings change (supports negative amounts)
         /// </summary>
-        public void SendRingLink(int amount)
-        {
-            if (!_isEnabled) return;
-
-            // Client mode: forward to host via RPC
-            if (_session == null)
-            {
-                try
-                {
-                    var plugin = PeakArchipelagoPlugin._instance;
-                    if (plugin != null && plugin.PhotonView != null && Photon.Pun.PhotonNetwork.IsConnected)
-                    {
-                        plugin.PhotonView.RPC("RPC_SendRingLink", Photon.Pun.RpcTarget.MasterClient, amount);
-                        string ringType = amount > 0 ? "positive" : "negative";
-                        _log.LogInfo($"[PeakPelago] Client forwarded Ring Link to host: {amount} rings ({ringType})");
-                        if (ringType == "positive")
-                            _notifications.ShowRingLinkNotification($"RingLink: Sent +{amount} ring(s)");
-                        else
-                            _notifications.ShowRingLinkNotification($"RingLink: Sent -{amount} ring(s)");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log.LogError($"[PeakPelago] Failed to forward Ring Link to host: {ex.Message}");
-                }
-                return;
-            }
-
-            try
-            {
-                var ringLinkData = new Dictionary<string, JToken>
-                {
-                    { "time", JToken.FromObject(DateTimeOffset.UtcNow.ToUnixTimeSeconds()) },
-                    { "source", JToken.FromObject(_connectionId) },
-                    { "amount", JToken.FromObject(amount) }
-                };
-
-                var bouncePacket = new BouncePacket
-                {
-                    Tags = new List<string> { "RingLink" },
-                    Data = ringLinkData
-                };
-
-                _session.Socket.SendPacket(bouncePacket);
-
-                string ringType = amount > 0 ? "positive" : "negative";
-                _log.LogInfo($"[PeakPelago] Sent Ring Link: {amount} rings ({ringType})");
-                if (ringType == "positive")
-                {
-                    _notifications.ShowRingLinkNotification($"RingLink: Sent +{amount} ring(s)");
-                }
-                else
-                {
-                    _notifications.ShowRingLinkNotification($"RingLink: Sent -{amount} ring(s)");
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Failed to send Ring Link: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Handle incoming Archipelago packets
-        /// </summary>
-        private void OnPacketReceived(ArchipelagoPacketBase packet)
-        {
-            try
-            {
-                if (packet is BouncePacket bounce)
-                {
-                    if (bounce.Tags != null && bounce.Tags.Contains("RingLink") && _isEnabled)
-                    {
-                        HandleRingLinkReceived(bounce.Data);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error handling Ring Link packet: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Handle incoming Ring Link packets
-        /// </summary>
-        private void HandleRingLinkReceived(Dictionary<string, JToken> data)
-        {
-            try
-            {
-                string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-                if (!currentScene.StartsWith("Level_"))
-                {
-                    return;
-                }
-                // Don't process our own Ring Links
-                if (data.ContainsKey("source"))
-                {
-                    int source = data["source"].ToObject<int>();
-                    if (source == _connectionId)
-                    {
-                        _log.LogDebug("[PeakPelago] Ignoring own Ring Link");
-                        return;
-                    }
-                }
-
-                if (data.ContainsKey("amount"))
-                {
-                    int amount = data["amount"].ToObject<int>();
-                    string ringType = amount > 0 ? "positive" : "negative";
-                    _log.LogInfo($"[PeakPelago] Ring Link received: {amount} rings ({ringType})");
-                    if (ringType == "positive")
-                    {
-                        _notifications.ShowRingLinkNotification($"RingLink: +{amount} ring(s)!");
-                    }
-                    else
-                    {
-                        _notifications.ShowRingLinkNotification($"RingLink: -{amount} ring(s)!");
-                    }
-                    ApplyRingLinkEffect(amount);
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Failed to handle Ring Link: {ex.Message}");
-            }
-        }
+        public void SendRingLink(int amount) => SendRingLinkInternal(amount);
 
         /// <summary>
         /// Apply Ring Link effect to all characters in the lobby
         /// </summary>
-        private void ApplyRingLinkEffect(int amount)
+        protected override void ApplyRingLinkEffect(int amount)
         {
             try
             {
@@ -209,9 +44,9 @@ namespace Peak.AP
                 float staminaValue = amount / 100f;
 
                 // Apply to all valid characters
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
+                var validCharacters = Character.AllCharacters.Where(c =>
+                    c != null &&
+                    c.gameObject.activeInHierarchy &&
                     !c.data.dead
                 ).ToList();
 
@@ -221,13 +56,13 @@ namespace Peak.AP
                     {
                         // Positive: Add to extra stamina, but cap at max (1.0)
                         character.data.extraStamina = Mathf.Min(character.data.extraStamina + staminaValue, 1f);
-                        
+
                         _log.LogInfo($"[PeakPelago] Ring Link added: {staminaValue} stamina (from {amount} rings), capped at 1.0");
                     }
                     else if (staminaValue < 0)
                     {
                         float remainingPenalty = Mathf.Abs(staminaValue);
-                        
+
                         // Negative: Deduct from extra stamina first
                         if (character.data.extraStamina > 0)
                         {
@@ -235,16 +70,16 @@ namespace Peak.AP
                             character.data.extraStamina -= deduction;
                             remainingPenalty -= deduction;
                         }
-                        
+
                         // If there's still penalty left, deduct from regular stamina
                         if (remainingPenalty > 0)
                         {
                             character.data.currentStamina = Mathf.Max(0f, character.data.currentStamina - remainingPenalty);
                         }
-                        
+
                         _log.LogInfo($"[PeakPelago] Ring Link deducted: {Mathf.Abs(staminaValue)} stamina (from {amount} rings)");
                     }
-                    
+
                     // Ensure extra stamina stays within bounds
                     character.data.extraStamina = Mathf.Clamp(character.data.extraStamina, 0f, 1f);
                 }
@@ -255,27 +90,6 @@ namespace Peak.AP
             {
                 _log.LogError($"[PeakPelago] Failed to apply Ring Link: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Clean up when disconnecting
-        /// </summary>
-        public void Cleanup()
-        {
-            if (_session != null)
-            {
-                _session.Socket.PacketReceived -= OnPacketReceived;
-            }
-            
-            if (_harmony != null)
-            {
-                _harmony.UnpatchSelf();
-            }
-
-            RingLinkPatches.SetInstance(null);
-            
-            _session = null;
-            _isEnabled = false;
         }
 
         /// <summary>
@@ -310,7 +124,7 @@ namespace Peak.AP
 
                                 // Calculate ring value based on item (or poison)
                                 int ringValue = CalculateRingValue(__instance);
-                                
+
                                 if (ringValue != 0)
                                 {
                                     string ringType = ringValue > 0 ? "positive" : "negative";
@@ -335,12 +149,12 @@ namespace Peak.AP
 
                     // Check if item has poison effects - if so, return negative rings
                     bool isPoisonous = HasPoisonEffects(item);
-                    
+
                     if (isPoisonous)
                     {
                         // Calculate poison penalty
                         float poisonPenalty = CalculatePoisonPenalty(item);
-                        
+
                         if (poisonPenalty > 0)
                         {
                             _instance._log.LogInfo($"[PeakPelago] Item {name} is poisonous, penalty: {poisonPenalty}");
@@ -555,7 +369,7 @@ namespace Peak.AP
                         }
                         penalty = 0.05f;
                     }
-                    
+
                     if (penalty < 0.01f)
                     {
                         penalty = 0.05f;

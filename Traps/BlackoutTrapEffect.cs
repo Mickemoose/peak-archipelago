@@ -20,18 +20,7 @@ namespace Peak.AP
         {
             try
             {
-                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply Blackout Trap - no characters found");
-                    return;
-                }
-
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead &&
-                    !c.data.fullyPassedOut
-                ).ToList();
+                var validCharacters = TrapHelpers.GetValidCharacters();
 
                 if (validCharacters.Count == 0)
                 {

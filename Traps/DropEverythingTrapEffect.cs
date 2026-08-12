@@ -25,12 +25,7 @@ namespace Peak.AP
                     return;
                 }
 
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead &&
-                    !c.data.fullyPassedOut
-                ).ToList();
+                var validCharacters = TrapHelpers.GetValidCharacters();
 
                 if (validCharacters.Count == 0)
                 {

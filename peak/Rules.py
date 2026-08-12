@@ -318,6 +318,16 @@ def apply_rules(world: "PeakWorld"):
             return lambda state, u=unlock: state.has(u, player)
         return lambda state, u=unlock, l=lvl: state.has(u, player) and state.has("Progressive Mountain", player, l)
 
+    def _apply_single_item_badge(badge_name, unlock_name):
+        try:
+            lvl = unlock_to_biome.get(unlock_name, 0)
+            if item_sanity:
+                set_rule(world.get_location(badge_name), _unlock_and_biome_rule(unlock_name, lvl))
+            else:
+                set_rule(world.get_location(badge_name), _biome_rule(lvl))
+        except KeyError:
+            pass
+
     # All regular badge locations are always accessible
     regular_badges = [
         "Mycology Badge",
@@ -387,15 +397,7 @@ def apply_rules(world: "PeakWorld"):
         pass
 
     # Applied Esoterica Badge - Book of Bones
-    try:
-        app_eso_biome = unlock_to_biome.get("Book of Bones Unlock", 0)
-        if item_sanity:
-            set_rule(world.get_location("Applied Esoterica Badge"),
-                     _unlock_and_biome_rule("Book of Bones Unlock", app_eso_biome))
-        else:
-            set_rule(world.get_location("Applied Esoterica Badge"), _biome_rule(app_eso_biome))
-    except KeyError:
-        pass
+    _apply_single_item_badge("Applied Esoterica Badge", "Book of Bones Unlock")
 
     try:
         if item_sanity:
@@ -413,59 +415,19 @@ def apply_rules(world: "PeakWorld"):
         pass
 
     # Bouldering Badge - Piton
-    try:
-        boulder_biome = unlock_to_biome.get("Piton Unlock", 0)
-        if item_sanity:
-            set_rule(world.get_location("Bouldering Badge"),
-                     _unlock_and_biome_rule("Piton Unlock", boulder_biome))
-        else:
-            set_rule(world.get_location("Bouldering Badge"), _biome_rule(boulder_biome))
-    except KeyError:
-        pass
+    _apply_single_item_badge("Bouldering Badge", "Piton Unlock")
 
     # Calcium Intake Badge - Fortified Milk
-    try:
-        calcium_biome = unlock_to_biome.get("Fortified Milk Unlock", 0)
-        if item_sanity:
-            set_rule(world.get_location("Calcium Intake Badge"),
-                     _unlock_and_biome_rule("Fortified Milk Unlock", calcium_biome))
-        else:
-            set_rule(world.get_location("Calcium Intake Badge"), _biome_rule(calcium_biome))
-    except KeyError:
-        pass
+    _apply_single_item_badge("Calcium Intake Badge", "Fortified Milk Unlock")
 
     # Competitive Eating Badge - Glizzy
-    try:
-        comp_biome = unlock_to_biome.get("Glizzy Unlock", 0)
-        if item_sanity:
-            set_rule(world.get_location("Competitive Eating Badge"),
-                     _unlock_and_biome_rule("Glizzy Unlock", comp_biome))
-        else:
-            set_rule(world.get_location("Competitive Eating Badge"), _biome_rule(comp_biome))
-    except KeyError:
-        pass
+    _apply_single_item_badge("Competitive Eating Badge", "Glizzy Unlock")
 
     # Cryptogastronomy Badge - Mandrake
-    try:
-        crypto_biome = unlock_to_biome.get("Mandrake Unlock", 0)
-        if item_sanity:
-            set_rule(world.get_location("Cryptogastronomy Badge"),
-                     _unlock_and_biome_rule("Mandrake Unlock", crypto_biome))
-        else:
-            set_rule(world.get_location("Cryptogastronomy Badge"), _biome_rule(crypto_biome))
-    except KeyError:
-        pass
+    _apply_single_item_badge("Cryptogastronomy Badge", "Mandrake Unlock")
 
     # Disaster Response Badge - Rescue Claw
-    try:
-        disaster_biome = unlock_to_biome.get("Rescue Claw Unlock", 0)
-        if item_sanity:
-            set_rule(world.get_location("Disaster Response Badge"),
-                     _unlock_and_biome_rule("Rescue Claw Unlock", disaster_biome))
-        else:
-            set_rule(world.get_location("Disaster Response Badge"), _biome_rule(disaster_biome))
-    except KeyError:
-        pass
+    _apply_single_item_badge("Disaster Response Badge", "Rescue Claw Unlock")
 
     # Esoterica Badge - ANY of 11 items; biome = min level among them
     try:
@@ -511,15 +473,7 @@ def apply_rules(world: "PeakWorld"):
         pass
 
     # Ultimate Badge - Flying Disc
-    try:
-        ult_biome = unlock_to_biome.get("Flying Disc Unlock", 0)
-        if item_sanity:
-            set_rule(world.get_location("Ultimate Badge"),
-                     _unlock_and_biome_rule("Flying Disc Unlock", ult_biome))
-        else:
-            set_rule(world.get_location("Ultimate Badge"), _biome_rule(ult_biome))
-    except KeyError:
-        pass
+    _apply_single_item_badge("Ultimate Badge", "Flying Disc Unlock")
 
     try:
         if item_sanity:
@@ -564,13 +518,27 @@ def apply_rules(world: "PeakWorld"):
         except KeyError:
             pass
 
-    for mountains_needed, locations in {**luggage_mountain_gates, **single_run_mountain_gates}.items():
-        for luggage_name in locations:
-            try:
-                set_rule(world.get_location(luggage_name),
-                         lambda state, m=mountains_needed: state.has("Progressive Mountain", player, m))
-            except KeyError:
-                pass
+    for gate_set in (luggage_mountain_gates, single_run_mountain_gates):
+        for mountains_needed, locations in gate_set.items():
+            for luggage_name in locations:
+                try:
+                    set_rule(world.get_location(luggage_name),
+                             lambda state, m=mountains_needed: state.has("Progressive Mountain", player, m))
+                except KeyError:
+                    pass
+
+    try:
+        set_rule(world.get_location("Idol Dunked"),
+                 lambda state: state.has("Kiln Access", player))
+    except KeyError:
+        pass
+    try:
+        set_rule(world.get_location("All Badges Collected"),
+                 lambda state: state.has_all(
+                     ["Roots Access", "Tropics Access", "Mesa Access",
+                      "Alpine Access", "Caldera Access", "Kiln Access"], player))
+    except KeyError:
+        pass
 
     # Biome-locked badges (not in acquire_item_rules)
     # Badges with item requirements use the loot shuffle to determine biome access.
@@ -611,6 +579,7 @@ def apply_rules(world: "PeakWorld"):
                              (state.has("Bugle Unlock", player) or
                               state.has("Scoutmaster's Bugle Unlock", player) or
                               state.has("Bugle of Friendship Unlock", player)) and
+                             state.has("Alpine Access", player) and
                              (lvl == 0 or state.has("Progressive Mountain", player, lvl)))
                 else:
                     set_rule(world.get_location(alpine_item),
@@ -735,40 +704,31 @@ def apply_rules(world: "PeakWorld"):
     if goal_type == 0 or goal_type == 3:  # Peak Goal or Peak and Badges Goal
         max_relevant_ascent = required_ascent
 
+    def _ascent_rule(asc, with_stamina):
+        if asc in [3, 4, 5]:
+            if with_stamina:
+                return lambda state, a=asc: (state.has("Kiln Access", player) and
+                                             state.has("Progressive Ascent", player, a) and
+                                             state.has("Progressive Stamina Bar", player, 3))
+            return lambda state, a=asc: (state.has("Kiln Access", player) and
+                                         state.has("Progressive Ascent", player, a))
+        if asc in [6, 7]:
+            if with_stamina:
+                return lambda state, a=asc: (state.has("Kiln Access", player) and
+                                             state.has("Progressive Ascent", player, a) and
+                                             state.has("Progressive Stamina Bar", player, 3) and
+                                             state.has("Progressive Endurance", player, 4))
+            return lambda state, a=asc: (state.has("Kiln Access", player) and
+                                         state.has("Progressive Ascent", player, a) and
+                                         state.has("Progressive Endurance", player, 4))
+        return lambda state, a=asc: (state.has("Kiln Access", player) and
+                                     state.has("Progressive Ascent", player, a))
+
     # Event locations for ascent completion
     for ascent_num in range(1, max_relevant_ascent + 1):
         try:
-            if ascent_num in [1, 2]:
-                set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
-                         lambda state, asc=ascent_num:
-                         state.has("Kiln Access", player) and
-                         state.has("Progressive Ascent", player, asc))
-            elif ascent_num in [3, 4, 5]:
-                if progressive_stamina_enabled:
-                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
-                             lambda state, asc=ascent_num:
-                             state.has("Kiln Access", player) and
-                             state.has("Progressive Ascent", player, asc) and
-                             state.has("Progressive Stamina Bar", player, 3))
-                else:
-                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
-                             lambda state, asc=ascent_num:
-                             state.has("Kiln Access", player) and
-                             state.has("Progressive Ascent", player, asc))
-            elif ascent_num in [6, 7]:
-                if progressive_stamina_enabled:
-                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
-                             lambda state, asc=ascent_num:
-                             state.has("Kiln Access", player) and
-                             state.has("Progressive Ascent", player, asc) and
-                             state.has("Progressive Stamina Bar", player, 3) and
-                             state.has("Progressive Endurance", player, 4))
-                else:
-                    set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
-                             lambda state, asc=ascent_num:
-                             state.has("Kiln Access", player) and
-                             state.has("Progressive Ascent", player, asc) and
-                             state.has("Progressive Endurance", player, 4))
+            set_rule(world.get_location(f"Ascent {ascent_num} Completed"),
+                     _ascent_rule(ascent_num, progressive_stamina_enabled))
         except KeyError:
             pass
 
@@ -786,24 +746,8 @@ def apply_rules(world: "PeakWorld"):
 
         for ascent_name in ascent_locations:
             try:
-                if ascent_num in [1, 2]:
-                    set_rule(world.get_location(ascent_name),
-                             lambda state, asc=ascent_num:
-                             state.has("Kiln Access", player) and
-                             state.has("Progressive Ascent", player, asc))
-                elif ascent_num in [3, 4, 5]:
-                    set_rule(world.get_location(ascent_name),
-                             lambda state, asc=ascent_num:
-                             state.has("Kiln Access", player) and
-                             state.has("Progressive Ascent", player, asc) and
-                             state.has("Progressive Stamina Bar", player, 3))
-                elif ascent_num in [6, 7]:
-                    set_rule(world.get_location(ascent_name),
-                             lambda state, asc=ascent_num:
-                             state.has("Kiln Access", player) and
-                             state.has("Progressive Ascent", player, asc) and
-                             state.has("Progressive Stamina Bar", player, 3) and
-                             state.has("Progressive Endurance", player, 4))
+                set_rule(world.get_location(ascent_name),
+                         _ascent_rule(ascent_num, progressive_stamina_enabled))
             except KeyError:
                 pass
 
@@ -841,18 +785,18 @@ def apply_rules(world: "PeakWorld"):
                                  state.has("Progressive Mountain", player, 4))
                     elif scout_ascent in [3, 4, 5]:
                         set_rule(world.get_location(scout_name),
-                                 lambda state, reqs=required_ascents, asc=scout_ascent:
+                                 lambda state, reqs=required_ascents, asc=scout_ascent, stam=progressive_stamina_enabled:
                                  all(state.has(ascent, player) for ascent in reqs) and
                                  state.has("Progressive Ascent", player, asc) and
                                  state.has("Progressive Mountain", player, 4) and
-                                 state.has("Progressive Stamina Bar", player, 3))
+                                 (not stam or state.has("Progressive Stamina Bar", player, 3)))
                     elif scout_ascent in [6, 7]:
                         set_rule(world.get_location(scout_name),
-                                 lambda state, reqs=required_ascents, asc=scout_ascent:
+                                 lambda state, reqs=required_ascents, asc=scout_ascent, stam=progressive_stamina_enabled:
                                  all(state.has(ascent, player) for ascent in reqs) and
                                  state.has("Progressive Ascent", player, asc) and
                                  state.has("Progressive Mountain", player, 4) and
-                                 state.has("Progressive Stamina Bar", player, 3) and
+                                 (not stam or state.has("Progressive Stamina Bar", player, 3)) and
                                  state.has("Progressive Endurance", player, 4))
         except KeyError:
             pass

@@ -34,7 +34,8 @@ def create_peak_regions(world: "PeakWorld"):
         "Disaster Response Badge",
         "Applied Esoterica Badge",
         "Needlepoint Badge",
-        "Happy Camper Badge"
+        "Happy Camper Badge",
+        "Mentorship Badge"
     }
 
     biome_badges = {

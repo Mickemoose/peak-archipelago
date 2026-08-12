@@ -51,7 +51,7 @@ namespace Peak.AP
         private StateManager _stateManager;
         public StateData _stateData;
         public StateData State => _stateData;
-        public bool _intentionalDisconnect = false;
+        public volatile bool _intentionalDisconnect = false;
         public class MountainHint
         {
             public string Location { get; set; }
@@ -148,6 +148,11 @@ namespace Peak.AP
         public Dictionary<string, string> _activeHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public event Action OnHintsChanged;
 
+        public void EnqueueMainThread(Action action)
+        {
+            if (action != null) _mainThreadActions.Enqueue(action);
+        }
+
         private void Awake()
         {
             try
@@ -175,7 +180,7 @@ namespace Peak.AP
                 CharacterHandlePassedOutPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionChangeAfflictionPatch.SetStaminaManager(_staminaManager);
-                CharacterAfflictionsAddStatusPatch.SetStaminaManager(_staminaManager);
+                CharacterAfflictionsGetStatusCapPatch.SetStaminaManager(_staminaManager);
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _hardRingLinkService = new HardRingLinkService(_log, _notifications);
                 _breathLinkService = new BreathLinkService(_log, _notifications);
@@ -319,7 +324,7 @@ namespace Peak.AP
                         string.Join(",", _enabledTraps));
                     if (_energyLinkService != null && _energyLinkService.IsEnabled())
                     {
-                        int currentEnergy = _energyLinkService.GetCurrentEnergy();
+                        long currentEnergy = _energyLinkService.GetCurrentEnergy();
                         int maxEnergy = _energyLinkService.GetMaxEnergy();
                         _photonView.RPC("RPC_UpdateEnergy", newPlayer, currentEnergy, maxEnergy);
                     }
@@ -931,85 +936,26 @@ namespace Peak.AP
                     return spawnPos;
                 }
 
-                // Method 2: Use the current segment's campfire position
-                var mapHandler = GetMapHandler();
-                if (mapHandler != null)
+                var mapHandler = Singleton<MapHandler>.Instance;
+                if (mapHandler != null && mapHandler.segments != null)
                 {
-                    // Cast to the actual MapHandler type to access GetCurrentSegment method
-                    var mapHandlerType = mapHandler.GetType();
-                    var getCurrentSegmentMethod = mapHandlerType.GetMethod("GetCurrentSegment");
-                    if (getCurrentSegmentMethod != null)
+                    int currentSegmentIndex = (int)mapHandler.GetCurrentSegment();
+                    if (currentSegmentIndex >= 0 && currentSegmentIndex < mapHandler.segments.Length)
                     {
-                        var currentSegment = getCurrentSegmentMethod.Invoke(mapHandler, null);
-                        var segments = GetMapSegments(mapHandler);
-
-                        if (segments != null && segments is Array segmentsArray && (int)currentSegment < segmentsArray.Length)
+                        var segment = mapHandler.segments[currentSegmentIndex];
+                        if (segment != null)
                         {
-                            var segment = segmentsArray.GetValue((int)currentSegment);
-                            if (segment != null)
+                            if (segment.segmentCampfire != null)
                             {
-                                // Use reflection to get segmentCampfire property
-                                var segmentCampfireField = segment.GetType().GetField("segmentCampfire");
-                                if (segmentCampfireField != null)
-                                {
-                                    var segmentCampfire = segmentCampfireField.GetValue(segment);
-                                    if (segmentCampfire != null)
-                                    {
-                                        var transformProperty = segmentCampfire.GetType().GetProperty("transform");
-                                        if (transformProperty != null)
-                                        {
-                                            var transform = transformProperty.GetValue(segmentCampfire);
-                                            var positionProperty = transform.GetType().GetProperty("position");
-                                            if (positionProperty != null)
-                                            {
-                                                Vector3 campfirePos = (Vector3)positionProperty.GetValue(transform);
-                                                _log.LogDebug("[PeakPelago] Using current segment campfire: " + campfirePos);
-                                                return campfirePos;
-                                            }
-                                        }
-                                    }
-                                }
+                                Vector3 campfirePos = segment.segmentCampfire.transform.position;
+                                _log.LogDebug("[PeakPelago] Using current segment campfire: " + campfirePos);
+                                return campfirePos;
                             }
-                        }
-                    }
-                }
-
-                // Method 3: Use the current segment's reconnect spawn position
-                if (mapHandler != null)
-                {
-                    var mapHandlerType = mapHandler.GetType();
-                    var getCurrentSegmentMethod = mapHandlerType.GetMethod("GetCurrentSegment");
-                    if (getCurrentSegmentMethod != null)
-                    {
-                        var currentSegment = getCurrentSegmentMethod.Invoke(mapHandler, null);
-                        var segments = GetMapSegments(mapHandler);
-
-                        if (segments != null && segments is Array segmentsArray && (int)currentSegment < segmentsArray.Length)
-                        {
-                            var segment = segmentsArray.GetValue((int)currentSegment);
-                            if (segment != null)
+                            if (segment.reconnectSpawnPos != null)
                             {
-                                // Use reflection to get reconnectSpawnPos property
-                                var reconnectSpawnPosField = segment.GetType().GetField("reconnectSpawnPos");
-                                if (reconnectSpawnPosField != null)
-                                {
-                                    var reconnectSpawnPos = reconnectSpawnPosField.GetValue(segment);
-                                    if (reconnectSpawnPos != null)
-                                    {
-                                        var transformProperty = reconnectSpawnPos.GetType().GetProperty("transform");
-                                        if (transformProperty != null)
-                                        {
-                                            var transform = transformProperty.GetValue(reconnectSpawnPos);
-                                            var positionProperty = transform.GetType().GetProperty("position");
-                                            if (positionProperty != null)
-                                            {
-                                                Vector3 reconnectPos = (Vector3)positionProperty.GetValue(transform);
-                                                _log.LogDebug("[PeakPelago] Using reconnect spawn position: " + reconnectPos);
-                                                return reconnectPos;
-                                            }
-                                        }
-                                    }
-                                }
+                                Vector3 reconnectPos = segment.reconnectSpawnPos.transform.position;
+                                _log.LogDebug("[PeakPelago] Using reconnect spawn position: " + reconnectPos);
+                                return reconnectPos;
                             }
                         }
                     }
@@ -1031,53 +977,6 @@ namespace Peak.AP
                 _log.LogError("[PeakPelago] Error getting checkpoint position: " + ex.Message);
                 return Vector3.zero;
             }
-        }
-
-        /// <summary>Get the MapHandler singleton using reflection</summary>
-        private object GetMapHandler()
-        {
-            try
-            {
-                var singletonType = typeof(UnityEngine.Object).Assembly.GetType("Zorro.Core.Singleton`1");
-                if (singletonType != null)
-                {
-                    var mapHandlerType = typeof(UnityEngine.Object).Assembly.GetType("MapHandler");
-                    if (mapHandlerType != null)
-                    {
-                        var genericType = singletonType.MakeGenericType(mapHandlerType);
-                        var instanceProperty = genericType.GetProperty("Instance");
-                        if (instanceProperty != null)
-                        {
-                            return instanceProperty.GetValue(null);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError("[PeakPelago] Failed to get MapHandler: " + ex.Message);
-            }
-            return null;
-        }
-
-        /// <summary>Get the map segments array using reflection</summary>
-        private object GetMapSegments(object mapHandler)
-        {
-            try
-            {
-                if (mapHandler == null) return null;
-
-                var segmentsField = mapHandler.GetType().GetField("segments");
-                if (segmentsField != null)
-                {
-                    return segmentsField.GetValue(mapHandler);
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError("[PeakPelago] Failed to get map segments: " + ex.Message);
-            }
-            return null;
         }
 
         // ===== Badge Hiding Methods =====
@@ -1181,9 +1080,16 @@ namespace Peak.AP
 
         // ===== Badge Achievement Mapping =====
 
+        private static Dictionary<ACHIEVEMENTTYPE, string> _badgeToLocationMapping;
+
         private Dictionary<ACHIEVEMENTTYPE, string> GetBadgeToLocationMapping()
         {
-            return new Dictionary<ACHIEVEMENTTYPE, string>
+            if (_badgeToLocationMapping != null)
+            {
+                return _badgeToLocationMapping;
+            }
+
+            _badgeToLocationMapping = new Dictionary<ACHIEVEMENTTYPE, string>
             {
                 { ACHIEVEMENTTYPE.BeachcomberBadge, "Beachcomber Badge" },
                 { ACHIEVEMENTTYPE.TrailblazerBadge, "Trailblazer Badge" },
@@ -1240,6 +1146,8 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.MycoacrobaticsBadge, "Mycoacrobatics Badge" },
                 { ACHIEVEMENTTYPE.CryptogastronomyBadge, "Cryptogastronomy Badge" },
             };
+
+            return _badgeToLocationMapping;
         }
 
         // ===== Luggage Achievement Checking =====
@@ -1966,7 +1874,7 @@ namespace Peak.AP
         }
 
         [PunRPC]
-        private void RPC_UpdateEnergy(int current, int max)
+        private void RPC_UpdateEnergy(long current, int max)
         {
             try
             {
@@ -2534,33 +2442,33 @@ namespace Peak.AP
                 _log.LogError($"[PeakPelago] Error spawning physical item {itemName}: {ex.Message}");
             }
         }
+        private void RebuildAscentUnlocks()
+        {
+            if (_session == null) return;
+
+            int progressiveAscentCount = _session.Items.AllItemsReceived.Count(item =>
+            {
+                string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                return itemName?.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase) ?? false;
+            });
+
+            progressiveAscentCount = Mathf.Min(progressiveAscentCount, 7);
+
+            _stateData.UnlockedAscents.Clear();
+            for (int i = 1; i <= progressiveAscentCount; i++)
+            {
+                _stateData.UnlockedAscents.Add(i);
+            }
+        }
+
         private void UnlockAscent()
         {
             try
             {
                 if (_session == null) return;
 
-                int progressiveAscentCount = _session.Items.AllItemsReceived.Count(item =>
-                {
-                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                    return itemName?.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase) ?? false;
-                });
+                RebuildAscentUnlocks();
 
-                progressiveAscentCount = Mathf.Min(progressiveAscentCount, 7);
-
-                
-
-                _stateData.UnlockedAscents.Clear();
-                for (int i = 1; i <= progressiveAscentCount; i++)
-                {
-                    _stateData.UnlockedAscents.Add(i);
-
-                    var ascentsType = Type.GetType("Ascents") ?? typeof(Character).Assembly.GetType("Ascents");
-                    var unlockMethod = ascentsType?.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                    unlockMethod?.Invoke(null, [i]);
-                }
-
-                
                 SaveState();
             }
             catch (Exception ex)
@@ -2600,19 +2508,7 @@ namespace Peak.AP
 
                 // Clear all status effects from the character
                 var afflictions = Character.localCharacter.refs.afflictions;
-
-                // Use reflection to access and clear all afflictions
-                var afflictionsType = afflictions.GetType();
-                var clearAllMethod = afflictionsType.GetMethod("ClearAll", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                if (clearAllMethod != null)
-                {
-                    clearAllMethod.Invoke(afflictions, null);
-                    
-                }
-                else
-                {
-                    _log.LogWarning("[PeakPelago] Could not find ClearAll method for afflictions");
-                }
+                afflictions.ClearAllStatus(excludeCurse: false);
             }
             catch (Exception ex)
             {
@@ -3376,6 +3272,7 @@ namespace Peak.AP
                 {
                     _instance._log?.LogInfo("[PeakPelago] Disconnecting from Archipelago (quit to menu)");
                     _instance._intentionalDisconnect = true;
+                    _instance.CancelReconnect();
                     _instance._session.Socket.Disconnect();
                     _instance._status = "Disconnected";
                 }
@@ -3952,7 +3849,10 @@ namespace Peak.AP
             if (_isConnecting) return;
 
             _isConnecting = true;
+            _intentionalDisconnect = false;
             _status = "Connecting...";
+
+            while (_itemQueue.TryDequeue(out _)) { }
 
             try
             {
@@ -3973,13 +3873,15 @@ namespace Peak.AP
                     if (_intentionalDisconnect)
                     {
 
-                        _intentionalDisconnect = false;
                         return;
                     }
 
-                    _wantReconnect = true;
-                    _reconnectAttempts = 0;
-                    _reconnectAttemptTime = Time.time + RECONNECT_DELAY;
+                    _mainThreadActions.Enqueue(() =>
+                    {
+                        _wantReconnect = true;
+                        _reconnectAttempts = 0;
+                        _reconnectAttemptTime = Time.time + RECONNECT_DELAY;
+                    });
 
                 };
 
@@ -4029,7 +3931,7 @@ namespace Peak.AP
 
         public void SendUpdatedLinkTags()
         {
-            if (_session == null) return;
+            if (_session?.Socket == null || !_session.Socket.Connected) return;
             var tags = new List<string>();
             if (_deathLinkEnabled && cfgDeathLinkEnabled.Value) tags.Add("DeathLink");
             if (_ringLinkEnabled) tags.Add("RingLink");
@@ -4038,9 +3940,16 @@ namespace Peak.AP
             if (_breathLinkEnabled) tags.Add("BreathLink");
             if (_trapLinkEnabled) tags.Add("TrapLink");
 
-            var updatePacket = new ConnectUpdatePacket { Tags = tags.ToArray() };
-            _session.Socket.SendPacket(updatePacket);
-            _log.LogInfo($"[PeakPelago] Updated link tags: [{string.Join(", ", tags)}]");
+            try
+            {
+                var updatePacket = new ConnectUpdatePacket { Tags = tags.ToArray() };
+                _session.Socket.SendPacket(updatePacket);
+                _log.LogInfo($"[PeakPelago] Updated link tags: [{string.Join(", ", tags)}]");
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning("[PeakPelago] Failed to send link tags: " + ex.Message);
+            }
         }
 
         public void CancelReconnect()
@@ -4049,6 +3958,16 @@ namespace Peak.AP
             _reconnectAttempts = 0;
             _status = "Disconnected";
             _log.LogInfo("[PeakPelago] Reconnection cancelled by user.");
+        }
+
+        private static bool ReadBoolOption(LoginSuccessful result, string key, bool def = false)
+        {
+            return result.SlotData.ContainsKey(key) ? Convert.ToInt32(result.SlotData[key]) != 0 : def;
+        }
+
+        private static int ReadIntOption(LoginSuccessful result, string key, int def = 0)
+        {
+            return result.SlotData.ContainsKey(key) ? Convert.ToInt32(result.SlotData[key]) : def;
         }
 
         private void OnConnectResult(LoginResult result, string slotName)
@@ -4080,7 +3999,9 @@ namespace Peak.AP
                             return;
                         }
 
-                        HandleDeathLinkReceived(deathLink.Cause ?? "Death Link", deathLink.Source);
+                        string cause = deathLink.Cause ?? "Death Link";
+                        string source = deathLink.Source;
+                        _mainThreadActions.Enqueue(() => HandleDeathLinkReceived(cause, source));
                     }
                     catch (Exception ex)
                     {
@@ -4195,8 +4116,7 @@ namespace Peak.AP
 
                     if (loginResult.SlotData.ContainsKey("breath_link"))
                     {
-                        var value = loginResult.SlotData["breath_link"];
-                        _breathLinkEnabled = Convert.ToInt32(value) != 0;
+                        _breathLinkEnabled = ReadBoolOption(loginResult, "breath_link", _breathLinkEnabled);
 
                         if (_breathLinkEnabled)
                         {
@@ -4206,9 +4126,7 @@ namespace Peak.AP
 
                     if (loginResult.SlotData.ContainsKey("ring_link"))
                     {
-                        var value = loginResult.SlotData["ring_link"];
-                        _ringLinkEnabled  = Convert.ToInt32(value) != 0;
-                        //
+                        _ringLinkEnabled = ReadBoolOption(loginResult, "ring_link", _ringLinkEnabled);
 
                         if (_ringLinkEnabled )
                         {
@@ -4218,38 +4136,20 @@ namespace Peak.AP
 
                     if (loginResult.SlotData.ContainsKey("energy_link"))
                     {
-                        var value = loginResult.SlotData["energy_link"];
-                        energyLinkEnabled = Convert.ToInt32(value) != 0;
-                        //
+                        energyLinkEnabled = ReadBoolOption(loginResult, "energy_link", energyLinkEnabled);
 
                         if (energyLinkEnabled)
                         {
                             tags.Add("EnergyLink");
 
-                            // Get team name
-                            if (loginResult.SlotData.ContainsKey("team"))
-                            {
-                                var teamValue = loginResult.SlotData["team"];
-                                int teamNumber = Convert.ToInt32(teamValue);
-                                _energyLinkTeamName = teamNumber.ToString();
-                                //
-                            }
+                            _energyLinkTeamName = _session.ConnectionInfo.Team.ToString();
                         }
-                    }
-                    if (energyLinkEnabled && loginResult.SlotData.ContainsKey("team"))
-                    {
-                        var teamValue = loginResult.SlotData["team"];
-                        int teamNumber = Convert.ToInt32(teamValue);
-                        _energyLinkTeamName = teamNumber.ToString();
-                        //
                     }
 
 
                     if (loginResult.SlotData.ContainsKey("hard_ring_link"))
                     {
-                        var value = loginResult.SlotData["hard_ring_link"];
-                        _hardRingLinkEnabled = Convert.ToInt32(value) != 0;
-                        //
+                        _hardRingLinkEnabled = ReadBoolOption(loginResult, "hard_ring_link", _hardRingLinkEnabled);
 
                         if (_hardRingLinkEnabled)
                         {
@@ -4259,9 +4159,7 @@ namespace Peak.AP
 
                     if (loginResult.SlotData.ContainsKey("trap_link"))
                     {
-                        var value = loginResult.SlotData["trap_link"];
-                        _trapLinkEnabled = Convert.ToInt32(value) != 0;
-                        //
+                        _trapLinkEnabled = ReadBoolOption(loginResult, "trap_link", _trapLinkEnabled);
 
                         if (_trapLinkEnabled)
                         {
@@ -4273,9 +4171,7 @@ namespace Peak.AP
 
                     if (loginResult.SlotData.ContainsKey("death_link"))
                     {
-                        var value = loginResult.SlotData["death_link"];
-                        _deathLinkEnabled = Convert.ToInt32(value) != 0;
-                        //
+                        _deathLinkEnabled = ReadBoolOption(loginResult, "death_link", _deathLinkEnabled);
 
                         if (_deathLinkEnabled)
                         {
@@ -4351,74 +4247,20 @@ namespace Peak.AP
                         _enabledTraps,
                         ApplyItemEffect
                     );
-                    if (loginResult.SlotData.ContainsKey("goal"))
-                    {
-                        var value = loginResult.SlotData["goal"];
-                        _slotGoalType = Convert.ToInt32(value);
-                    }
+                    _slotGoalType = ReadIntOption(loginResult, "goal", _slotGoalType);
 
-                    if (loginResult.SlotData.ContainsKey("ascent_count"))
-                    {
-                        var value = loginResult.SlotData["ascent_count"];
-                        _slotRequiredAscent = Convert.ToInt32(value);
-                    }
+                    _slotRequiredAscent = ReadIntOption(loginResult, "ascent_count", _slotRequiredAscent);
 
-                    if (loginResult.SlotData.ContainsKey("badge_count"))
-                    {
-                        var value = loginResult.SlotData["badge_count"];
-                        _slotRequiredBadges = Convert.ToInt32(value);
+                    _slotRequiredBadges = ReadIntOption(loginResult, "badge_count", _slotRequiredBadges);
 
-                    }
+                    _deathLinkBehavior = ReadIntOption(loginResult, "death_link_behavior", _deathLinkBehavior);
+                    _deathLinkSendBehavior = ReadIntOption(loginResult, "death_link_send_behavior", _deathLinkSendBehavior);
 
-                    if (loginResult.SlotData.ContainsKey("death_link_behavior"))
-                    {
-                        var value = loginResult.SlotData["death_link_behavior"];
-                        _deathLinkBehavior = Convert.ToInt32(value);
+                    progressiveEnabled = ReadBoolOption(loginResult, "progressive_stamina", progressiveEnabled);
 
-                    }
-                    else
-                    {
-                        //_log.LogWarning("[PeakPelago] death_link_behavior not found in slot data");
-                    }
-                    if (loginResult.SlotData.ContainsKey("death_link_send_behavior"))
-                    {
-                        var value = loginResult.SlotData["death_link_send_behavior"];
-                        _deathLinkSendBehavior = Convert.ToInt32(value);
-
-                    }
-                    else
-                    {
-                        //_log.LogWarning("[PeakPelago] death_link_send_behavior not found in slot data");
-                    }
-
-                    if (loginResult.SlotData.ContainsKey("progressive_stamina"))
-                    {
-                        var value = loginResult.SlotData["progressive_stamina"];
-                        progressiveEnabled = Convert.ToInt32(value) != 0;
-                    }
-                    else
-                    {
-                        //_log.LogWarning("[PeakPelago] progressive_stamina not found in slot data");
-                    }
-
-                    if (loginResult.SlotData.ContainsKey("additional_stamina_bars"))
-                    {
-                        var value = loginResult.SlotData["additional_stamina_bars"];
-                        additionalEnabled = Convert.ToInt32(value) != 0;
-                    }
-                    else
-                    {
-                        //_log.LogWarning("[PeakPelago] additional_stamina_bars not found in slot data");
-                    }
-                    if (loginResult.SlotData.ContainsKey("item_sanity"))
-                    {
-                        var value = loginResult.SlotData["item_sanity"];
-                        _itemSanityEnabled = Convert.ToInt32(value) != 0;
-                    }
-                    if (loginResult.SlotData.ContainsKey("loot_sanity"))
-                    {
-                        _lootSanityMode = Convert.ToInt32(loginResult.SlotData["loot_sanity"]);
-                    }
+                    additionalEnabled = ReadBoolOption(loginResult, "additional_stamina_bars", additionalEnabled);
+                    _itemSanityEnabled = ReadBoolOption(loginResult, "item_sanity", _itemSanityEnabled);
+                    _lootSanityMode = ReadIntOption(loginResult, "loot_sanity", _lootSanityMode);
                     if (loginResult.SlotData.ContainsKey("loot_biome_assignments"))
                     {
                         try
@@ -4442,10 +4284,7 @@ namespace Peak.AP
                             _log.LogWarning($"[PeakPelago] Failed to parse loot_biome_assignments: {ex.Message}");
                         }
                     }
-                    if (loginResult.SlotData.ContainsKey("logical_scout_statue"))
-                    {
-                        _logicalScoutStatue = Convert.ToInt32(loginResult.SlotData["logical_scout_statue"]) != 0;
-                    }
+                    _logicalScoutStatue = ReadBoolOption(loginResult, "logical_scout_statue", _logicalScoutStatue);
 
                     LoadOfflineChecks();
                     if (_stateData.OfflineChecks.Count > 0)
@@ -4604,47 +4443,7 @@ namespace Peak.AP
         {
             try
             {
-                if (_session == null) return;
-                
-                // Count how many Progressive Ascent items we've actually received
-                int progressiveAscentCount = _session.Items.AllItemsReceived.Count(item =>
-                {
-                    string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                    return itemName != null && itemName.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase);
-                });
-                
-                
-                
-                // Clear the unlocked ascents set to rebuild it
-                _stateData.UnlockedAscents.Clear();
-                
-                // Unlock ascents based on the actual count
-                for (int i = 1; i <= progressiveAscentCount && i <= 7; i++)
-                {
-                    _stateData.UnlockedAscents.Add(i);
-                    
-                    // Use reflection to access the Ascents class and unlock the ascent
-                    var ascentsType = Type.GetType("Ascents");
-                    if (ascentsType == null)
-                    {
-                        ascentsType = typeof(Character).Assembly.GetType("Ascents");
-                    }
-                    
-                    if (ascentsType != null)
-                    {
-                        var unlockMethod = ascentsType.GetMethod("UnlockAscent", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                        if (unlockMethod != null)
-                        {
-                            unlockMethod.Invoke(null, new object[] { i });
-                            
-                        }
-                    }
-                }
-                
-                if (_stateData.UnlockedAscents.Count > 0)
-                {
-                    
-                }
+                RebuildAscentUnlocks();
             }
             catch (Exception ex)
             {
@@ -4652,11 +4451,15 @@ namespace Peak.AP
             }
         }
         
+        private static Dictionary<string, string> _slotKeyToTrapNameMapping;
+
         private string MapSlotKeyToTrapName(string slotKey)
         {
-            var mapping = new Dictionary<string, string>
+            if (_slotKeyToTrapNameMapping == null)
             {
-                { "instant_death_trap", "Instant Death Trap" },
+                _slotKeyToTrapNameMapping = new Dictionary<string, string>
+                {
+                    { "instant_death_trap", "Instant Death Trap" },
                 { "items_to_bombs", "Items to Bombs" },
                 { "pokemon_trivia_trap", "Pokemon Trivia Trap" },
                 { "blackout_trap", "Blackout Trap" },
@@ -4690,10 +4493,11 @@ namespace Peak.AP
                 { "pixel_trap", "Pixel Trap" },
                 { "eruption_trap", "Eruption Trap" },
                 { "beetle_horde_trap", "Beetle Horde Trap" },
-                { "custom_trivia_trap", "Custom Trivia Trap" },
-            };
-            
-            return mapping.TryGetValue(slotKey, out string trapName) ? trapName : null;
+                    { "custom_trivia_trap", "Custom Trivia Trap" },
+                };
+            }
+
+            return _slotKeyToTrapNameMapping.TryGetValue(slotKey, out string trapName) ? trapName : null;
         }
 
         public void TryCloseSession()
@@ -4745,28 +4549,38 @@ namespace Peak.AP
             string unlockName = _session.Items.GetItemName(hintMsg.Item.ItemId, receivingGame);
             if (string.IsNullOrEmpty(unlockName)) return;
 
-            bool changed = false;
-            if (hintMsg.IsFound)
-            {
-                changed = _activeHints.Remove(unlockName);
-            }
-            else
+            bool isFound = hintMsg.IsFound;
+            string display = null;
+            if (!isFound)
             {
                 string findingPlayerName = _session.Players.GetPlayerName(hintMsg.Sender.Slot);
                 string findingGame = _session.Players.GetPlayerInfo(hintMsg.Sender.Slot)?.Game ?? "???";
                 string locName = _session.Locations.GetLocationNameFromId(hintMsg.Item.LocationId, findingGame) ?? $"Location {hintMsg.Item.LocationId}";
-                string display = $"{findingPlayerName}'s {findingGame}: {locName}";
-                if (!_activeHints.TryGetValue(unlockName, out string existing) || existing != display)
+                display = $"{findingPlayerName}'s {findingGame}: {locName}";
+            }
+
+            _mainThreadActions.Enqueue(() =>
+            {
+                bool changed;
+                if (isFound)
+                {
+                    changed = _activeHints.Remove(unlockName);
+                }
+                else if (!_activeHints.TryGetValue(unlockName, out string existing) || existing != display)
                 {
                     _activeHints[unlockName] = display;
                     changed = true;
                 }
-            }
+                else
+                {
+                    changed = false;
+                }
 
-            if (changed)
-            {
-                _mainThreadActions.Enqueue(() => OnHintsChanged?.Invoke());
-            }
+                if (changed)
+                {
+                    OnHintsChanged?.Invoke();
+                }
+            });
         }
 
         private void HandleCollectedItemForHints(ItemSendLogMessage itemMsg)
@@ -4778,20 +4592,23 @@ namespace Peak.AP
             string unlockName = _session.Items.GetItemName(itemMsg.Item.ItemId, receivingGame);
             if (string.IsNullOrEmpty(unlockName)) return;
 
-            if (_activeHints.Remove(unlockName))
+            _mainThreadActions.Enqueue(() =>
             {
-                _mainThreadActions.Enqueue(() => OnHintsChanged?.Invoke());
-            }
+                if (_activeHints.Remove(unlockName))
+                {
+                    OnHintsChanged?.Invoke();
+                }
+            });
         }
 
         public void SeedHintCache()
         {
             if (_session == null) return;
-            _activeHints.Clear();
             int slot = _session.ConnectionInfo.Slot;
             _session.Hints.GetHintsAsync((hints) =>
             {
                 if (hints == null) return;
+                var seeded = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var h in hints)
                 {
                     if (h.ReceivingPlayer != slot || h.Found) continue;
@@ -4801,9 +4618,14 @@ namespace Peak.AP
                     string findingPlayerName = _session.Players.GetPlayerName(h.FindingPlayer);
                     string findingGame = _session.Players.GetPlayerInfo(h.FindingPlayer)?.Game ?? "???";
                     string locName = _session.Locations.GetLocationNameFromId(h.LocationId, findingGame) ?? $"Location {h.LocationId}";
-                    _activeHints[unlockName] = $"{findingPlayerName}'s {findingGame}: {locName}";
+                    seeded[unlockName] = $"{findingPlayerName}'s {findingGame}: {locName}";
                 }
-                _mainThreadActions.Enqueue(() => OnHintsChanged?.Invoke());
+                _mainThreadActions.Enqueue(() =>
+                {
+                    _activeHints.Clear();
+                    foreach (var kvp in seeded) _activeHints[kvp.Key] = kvp.Value;
+                    OnHintsChanged?.Invoke();
+                });
             });
         }
 
@@ -4959,7 +4781,6 @@ namespace Peak.AP
                     if (_intentionalDisconnect)
                     {
                         
-                        _intentionalDisconnect = false;
                         _wasConnected = false;
                     }
                     else

@@ -1,204 +1,37 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using Archipelago.MultiClient.Net;
-using Archipelago.MultiClient.Net.Packets;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
-using Newtonsoft.Json.Linq;
 using static MountainProgressHandler;
 
 namespace Peak.AP
 {
-    public class HardRingLinkService
+    public class HardRingLinkService : RingLinkServiceBase
     {
-        private readonly ManualLogSource _log;
-        private ArchipelagoSession _session;
-        private bool _isEnabled;
-        private int _connectionId;
-        private Harmony _harmony;
-        private ArchipelagoNotificationManager _notifications;
-
         public HardRingLinkService(ManualLogSource log, ArchipelagoNotificationManager notifications)
+            : base(log, notifications)
         {
-            _log = log;
-            _connectionId = UnityEngine.Random.Range(int.MinValue, int.MaxValue);
-            _notifications = notifications;
         }
 
-        /// <summary>
-        /// Initialize the Ring Link service with an Archipelago session
-        /// </summary>
-        public void Initialize(ArchipelagoSession session, bool enabled)
-        {
-            _session = session;
-            _isEnabled = enabled;
+        protected override string Tag => "HardRingLink";
+        protected override string DisplayName => "Hard Ring Link";
+        protected override string HarmonyId => "com.mickemoose.peak.ap.hardringlink";
+        protected override string SendRpcName => "RPC_SendHardRingLink";
 
-            if (_isEnabled)
-            {
-                // Always set up Harmony patches for applying effects (needed for both host and clients)
-                _harmony = new Harmony("com.mickemoose.peak.ap.hardringlink");
-                _harmony.PatchAll(typeof(HardRingLinkPatches));
-                HardRingLinkPatches.SetInstance(this);
-
-                // Only subscribe to packets if we have a session (host only)
-                if (_session != null)
-                {
-                    _session.Socket.PacketReceived += OnPacketReceived;
-                    _log.LogInfo($"[PeakPelago] Hard Ring Link service initialized with session (Connection ID: {_connectionId})");
-                }
-                else
-                {
-                    _log.LogInfo($"[PeakPelago] Hard Ring Link service enabled for client (no session, effects only)");
-                }
-            }
-        }
-
-        /// <summary>
-        /// Enable or disable Ring Link
-        /// </summary>
-        public void SetEnabled(bool enabled)
-        {
-            _isEnabled = enabled;
-            _log.LogInfo($"[PeakPelago] Hard Ring Link {(enabled ? "enabled" : "disabled")}");
-        }
+        protected override void ApplyHarmonyPatches() => _harmony.PatchAll(typeof(HardRingLinkPatches));
+        protected override void SetPatchInstance() => HardRingLinkPatches.SetInstance(this);
+        protected override void ClearPatchInstance() => HardRingLinkPatches.SetInstance(null);
 
         /// <summary>
         /// Send a Ring Link packet when rings change (supports negative amounts)
         /// </summary>
-        public void SendHardRingLink(int amount)
-        {
-            if (!_isEnabled) return;
-
-            // Client mode: forward to host via RPC
-            if (_session == null)
-            {
-                try
-                {
-                    var plugin = PeakArchipelagoPlugin._instance;
-                    if (plugin != null && plugin.PhotonView != null && Photon.Pun.PhotonNetwork.IsConnected)
-                    {
-                        plugin.PhotonView.RPC("RPC_SendHardRingLink", Photon.Pun.RpcTarget.MasterClient, amount);
-                        string ringType = amount > 0 ? "positive" : "negative";
-                        _log.LogInfo($"[PeakPelago] Client forwarded Hard Ring Link to host: {amount} rings ({ringType})");
-                        if (ringType == "positive")
-                            _notifications.ShowRingLinkNotification($"HardRingLink: Sent +{amount} ring(s)");
-                        else
-                            _notifications.ShowRingLinkNotification($"HardRingLink: Sent -{amount} ring(s)");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log.LogError($"[PeakPelago] Failed to forward Hard Ring Link to host: {ex.Message}");
-                }
-                return;
-            }
-
-            try
-            {
-                var ringLinkData = new Dictionary<string, JToken>
-                {
-                    { "time", JToken.FromObject(DateTimeOffset.UtcNow.ToUnixTimeSeconds()) },
-                    { "source", JToken.FromObject(_connectionId) },
-                    { "amount", JToken.FromObject(amount) }
-                };
-
-                var bouncePacket = new BouncePacket
-                {
-                    Tags = new List<string> { "HardRingLink" },
-                    Data = ringLinkData
-                };
-
-                _session.Socket.SendPacket(bouncePacket);
-
-                string ringType = amount > 0 ? "positive" : "negative";
-                _log.LogInfo($"[PeakPelago] Sent Hard Ring Link: {amount} rings ({ringType})");
-                if (ringType == "positive")
-                {
-                    _notifications.ShowRingLinkNotification($"HardRingLink: Sent +{amount} ring(s)");
-                }
-                else
-                {
-                    _notifications.ShowRingLinkNotification($"HardRingLink: Sent -{amount} ring(s)");
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Failed to send Ring Link: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Handle incoming Archipelago packets
-        /// </summary>
-        private void OnPacketReceived(ArchipelagoPacketBase packet)
-        {
-            try
-            {
-                if (packet is BouncePacket bounce)
-                {
-                    if (bounce.Tags != null && bounce.Tags.Contains("HardRingLink") && _isEnabled)
-                    {
-                        HandleHardRingLinkReceived(bounce.Data);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Error handling Ring Link packet: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// Handle incoming Ring Link packets
-        /// </summary>
-        private void HandleHardRingLinkReceived(Dictionary<string, JToken> data)
-        {
-            try
-            {
-                string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-                if (!currentScene.StartsWith("Level_"))
-                {
-                    return;
-                }
-                // Don't process our own Ring Links
-                if (data.ContainsKey("source"))
-                {
-                    int source = data["source"].ToObject<int>();
-                    if (source == _connectionId)
-                    {
-                        _log.LogDebug("[PeakPelago] Ignoring own Hard Ring Link");
-                        return;
-                    }
-                }
-
-                if (data.ContainsKey("amount"))
-                {
-                    int amount = data["amount"].ToObject<int>();
-                    string ringType = amount > 0 ? "positive" : "negative";
-                    _log.LogInfo($"[PeakPelago] Hard Ring Link received: {amount} rings ({ringType})");
-                    if (ringType == "positive")
-                    {
-                        _notifications.ShowRingLinkNotification($"HardRingLink: +{amount} ring(s)!");
-                    }
-                    else
-                    {
-                        _notifications.ShowRingLinkNotification($"HardRingLink: -{amount} ring(s)!");
-                    }
-                    ApplyRingLinkEffect(amount);
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError($"[PeakPelago] Failed to handle Hard Ring Link: {ex.Message}");
-            }
-        }
+        public void SendHardRingLink(int amount) => SendRingLinkInternal(amount);
 
         /// <summary>
         /// Apply Ring Link effect to all characters in the lobby
         /// </summary>
-        private void ApplyRingLinkEffect(int amount)
+        protected override void ApplyRingLinkEffect(int amount)
         {
             try
             {
@@ -212,9 +45,9 @@ namespace Peak.AP
                 float staminaValue = amount / 100f;
 
                 // Apply to all valid characters
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
+                var validCharacters = Character.AllCharacters.Where(c =>
+                    c != null &&
+                    c.gameObject.activeInHierarchy &&
                     !c.data.dead
                 ).ToList();
 
@@ -228,7 +61,7 @@ namespace Peak.AP
                     else if (staminaValue < 0)
                     {
                         float remainingPenalty = Mathf.Abs(staminaValue);
-                        
+
                         // Negative: Deduct from extra stamina first
                         if (character.data.extraStamina > 0)
                         {
@@ -236,17 +69,17 @@ namespace Peak.AP
                             character.data.extraStamina -= deduction;
                             remainingPenalty -= deduction;
                         }
-                        
+
                         // If there's still penalty left, deduct from regular stamina
                         if (remainingPenalty > 0)
                         {
                             character.data.currentStamina = Mathf.Max(0f, character.data.currentStamina - remainingPenalty);
                         }
                     }
-                    
+
                     // Ensure extra stamina stays within bounds
                     character.data.extraStamina = Mathf.Clamp(character.data.extraStamina, 0f, 1f);
-                    
+
                     string action = amount > 0 ? "added" : "deducted";
                     _log.LogInfo($"[PeakPelago] Hard Ring Link {action}: {Mathf.Abs(staminaValue)} stamina (from {amount} rings)");
                 }
@@ -257,27 +90,6 @@ namespace Peak.AP
             {
                 _log.LogError($"[PeakPelago] Failed to apply Hard Ring Link: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Clean up when disconnecting
-        /// </summary>
-        public void Cleanup()
-        {
-            if (_session != null)
-            {
-                _session.Socket.PacketReceived -= OnPacketReceived;
-            }
-            
-            if (_harmony != null)
-            {
-                _harmony.UnpatchSelf();
-            }
-
-            HardRingLinkPatches.SetInstance(null);
-            
-            _session = null;
-            _isEnabled = false;
         }
 
         /// <summary>
@@ -407,7 +219,7 @@ namespace Peak.AP
             public static class ScoutmasterSetTargetPatch
             {
                 private static bool _hasSpawnedThisSession = false;
-                
+
                 static void Postfix(Scoutmaster __instance, Character setCurrentTarget)
                 {
                     try
@@ -430,7 +242,7 @@ namespace Peak.AP
                         }
                     }
                 }
-                
+
                 [HarmonyPatch(typeof(Scoutmaster), "OnDisable")]
                 public static class ScoutmasterOnDisablePatch
                 {
@@ -454,7 +266,7 @@ namespace Peak.AP
                         {
                             string itemName = __instance.item.name ?? "Unknown";
                             string characterName = __instance.item.holderCharacter.characterName ?? "Unknown";
-                            
+
                             _instance._log.LogInfo($"[PeakPelago] Item wrecked from cooking: {itemName} (held by {characterName}), sending -15 rings via Hard Ring Link");
                             _instance.SendHardRingLink(-15);
                         }

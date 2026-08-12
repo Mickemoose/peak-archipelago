@@ -12,7 +12,8 @@ namespace Peak.AP
     {
         private readonly ManualLogSource _log;
         private readonly PeakArchipelagoPlugin _plugin;
-        
+        private readonly List<LineHandler> _lineHandlers;
+
         private string _lastApSessionUuid = "";
         private bool _isSaving = false;
         private float _lastStateSave = 0f;
@@ -40,6 +41,59 @@ namespace Peak.AP
         {
             _log = log;
             _plugin = plugin;
+            _lineHandlers = BuildLineHandlers();
+        }
+
+        private sealed class LineHandler
+        {
+            public readonly Func<StateData, string> Write;
+            public readonly Action<StateData, string> Read;
+
+            public LineHandler(Func<StateData, string> write, Action<StateData, string> read)
+            {
+                Write = write;
+                Read = read;
+            }
+        }
+
+        private List<LineHandler> BuildLineHandlers()
+        {
+            return new List<LineHandler>
+            {
+                new LineHandler(
+                    d => d.LastProcessedItemIndex.ToString(),
+                    (d, line) => { if (int.TryParse(line.Trim(), out int idx)) { d.LastProcessedItemIndex = idx; _log.LogDebug($"[PeakPelago] Loaded item index: {idx}"); } }),
+                new LineHandler(
+                    d => string.Join(",", d.ReportedChecks.Select(x => x.ToString())),
+                    (d, line) => { if (!string.IsNullOrEmpty(line)) ParseLongSet(line, d.ReportedChecks, "reported checks"); }),
+                new LineHandler(
+                    d => d.TotalLuggageOpened.ToString(),
+                    (d, line) => { if (int.TryParse(line.Trim(), out int luggage)) { d.TotalLuggageOpened = luggage; _log.LogDebug($"[PeakPelago] Loaded luggage count: {luggage}"); } }),
+                new LineHandler(
+                    d => string.Join(",", d.UnlockedAscents.Select(x => x.ToString())),
+                    (d, line) => { if (!string.IsNullOrEmpty(line)) ParseIntSet(line, d.UnlockedAscents, "unlocked ascents"); }),
+                new LineHandler(
+                    d => "",
+                    (d, line) => { }),
+                new LineHandler(
+                    d => d.TotalItemsCooked.ToString(),
+                    (d, line) => { if (int.TryParse(line.Trim(), out int cooked)) { d.TotalItemsCooked = cooked; _log.LogDebug($"[PeakPelago] Loaded cooked items: {cooked}"); } }),
+                new LineHandler(
+                    d => d.PitonsPlaced.ToString(),
+                    (d, line) => { if (int.TryParse(line.Trim(), out int pitons)) { d.PitonsPlaced = pitons; _log.LogDebug($"[PeakPelago] Loaded pitons placed: {pitons}"); } }),
+                new LineHandler(
+                    d => d.GlizzysGobbled.ToString(),
+                    (d, line) => { if (int.TryParse(line.Trim(), out int glizzys)) { d.GlizzysGobbled = glizzys; _log.LogDebug($"[PeakPelago] Loaded glizzys gobbled: {glizzys}"); } }),
+                new LineHandler(
+                    d => d.DamageBlockedByMilk.ToString(),
+                    (d, line) => { if (float.TryParse(line.Trim(), out float damageBlocked)) { d.DamageBlockedByMilk = damageBlocked; _log.LogDebug($"[PeakPelago] Loaded damage blocked by milk: {damageBlocked}"); } }),
+                new LineHandler(
+                    d => d.PoisonHealed.ToString(),
+                    (d, line) => { if (float.TryParse(line.Trim(), out float poisonHealed)) { d.PoisonHealed = poisonHealed; _log.LogDebug($"[PeakPelago] Loaded poison healed: {poisonHealed}"); } }),
+                new LineHandler(
+                    d => d.TotalBasketsScored.ToString(),
+                    (d, line) => { if (int.TryParse(line.Trim(), out int baskets)) { d.TotalBasketsScored = baskets; _log.LogDebug($"[PeakPelago] Loaded baskets scored: {baskets}"); } })
+            };
         }
 
         public void SetSessionUuid(string uuid)
@@ -86,74 +140,10 @@ namespace Peak.AP
                 string[] lines = File.ReadAllLines(StateFilePath);
                 _log.LogInfo($"[PeakPelago] Loading state file with {lines.Length} lines");
 
-                // Line 0: Item index
-                if (lines.Length >= 1 && int.TryParse(lines[0].Trim(), out int idx))
+                for (int i = 0; i < _lineHandlers.Count; i++)
                 {
-                    data.LastProcessedItemIndex = idx;
-                    _log.LogDebug($"[PeakPelago] Loaded item index: {idx}");
-                }
-
-                // Line 1: Reported checks
-                if (lines.Length >= 2 && !string.IsNullOrEmpty(lines[1]))
-                {
-                    ParseLongSet(lines[1], data.ReportedChecks, "reported checks");
-                }
-
-                // Line 2: Total luggage
-                if (lines.Length >= 3 && int.TryParse(lines[2].Trim(), out int luggage))
-                {
-                    data.TotalLuggageOpened = luggage;
-                    _log.LogDebug($"[PeakPelago] Loaded luggage count: {luggage}");
-                }
-
-                // Line 3: Unlocked ascents
-                if (lines.Length >= 4 && !string.IsNullOrEmpty(lines[3]))
-                {
-                    ParseIntSet(lines[3], data.UnlockedAscents, "unlocked ascents");
-                }
-
-                // Line 4: (legacy stamina state, no longer used - stamina is recounted from AP)
-
-                // Line 5: Items cooked
-                if (lines.Length >= 6 && int.TryParse(lines[5].Trim(), out int cooked))
-                {
-                    data.TotalItemsCooked = cooked;
-                    _log.LogDebug($"[PeakPelago] Loaded cooked items: {cooked}");
-                }
-
-                // Line 6: Pitons placed
-                if (lines.Length >= 7 && int.TryParse(lines[6].Trim(), out int pitons))
-                {
-                    data.PitonsPlaced = pitons;
-                    _log.LogDebug($"[PeakPelago] Loaded pitons placed: {pitons}");
-                }
-
-                // Line 7: Glizzys gobbled
-                if (lines.Length >= 8 && int.TryParse(lines[7].Trim(), out int glizzys))
-                {
-                    data.GlizzysGobbled = glizzys;
-                    _log.LogDebug($"[PeakPelago] Loaded glizzys gobbled: {glizzys}");
-                }
-
-                // Line 8: Damage blocked by milk
-                if (lines.Length >= 9 && float.TryParse(lines[8].Trim(), out float damageBlocked))
-                {
-                    data.DamageBlockedByMilk = damageBlocked;
-                    _log.LogDebug($"[PeakPelago] Loaded damage blocked by milk: {damageBlocked}");
-                }
-
-                // Line 9: Poison healed
-                if (lines.Length >= 10 && float.TryParse(lines[9].Trim(), out float poisonHealed))
-                {
-                    data.PoisonHealed = poisonHealed;
-                    _log.LogDebug($"[PeakPelago] Loaded poison healed: {poisonHealed}");
-                }
-
-                // Line 10: Baskets scored
-                if (lines.Length >= 11 && int.TryParse(lines[10].Trim(), out int baskets))
-                {
-                    data.TotalBasketsScored = baskets;
-                    _log.LogDebug($"[PeakPelago] Loaded baskets scored: {baskets}");
+                    if (lines.Length > i)
+                        _lineHandlers[i].Read(data, lines[i]);
                 }
 
                 _log.LogInfo($"[PeakPelago] State loaded: {data.ReportedChecks.Count} checks, {data.TotalLuggageOpened} luggage, {data.UnlockedAscents.Count} ascents");
@@ -174,22 +164,12 @@ namespace Peak.AP
             if (_isSaving) return;
             _isSaving = true;
 
-            string[] lines = new string[]
-            {
-                data.LastProcessedItemIndex.ToString(),
-                string.Join(",", data.ReportedChecks.Select(x => x.ToString())),
-                data.TotalLuggageOpened.ToString(),
-                string.Join(",", data.UnlockedAscents.Select(x => x.ToString())),
-                "",
-                data.TotalItemsCooked.ToString(),
-                data.PitonsPlaced.ToString(),
-                data.GlizzysGobbled.ToString(),
-                data.DamageBlockedByMilk.ToString(),
-                data.PoisonHealed.ToString(),
-                data.TotalBasketsScored.ToString()
-            };
+            string[] lines = new string[_lineHandlers.Count];
+            for (int i = 0; i < _lineHandlers.Count; i++)
+                lines[i] = _lineHandlers[i].Write(data);
 
             string path = StateFilePath;
+            float saveTime = UnityEngine.Time.time;
 
             Task.Run(() =>
             {
@@ -202,19 +182,19 @@ namespace Peak.AP
                         File.Delete(path);
 
                     File.Move(tempPath, path);
+
+                    _lastStateSave = saveTime;
+                    StateDirty = false;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Silent fail on background thread
+                    _log.LogError("[PeakPelago] Failed to save state: " + ex.Message);
                 }
                 finally
                 {
                     _isSaving = false;
                 }
             });
-
-            _lastStateSave = UnityEngine.Time.time;
-            StateDirty = false;
         }
 
         public void SaveOfflineChecks(HashSet<long> offlineChecks)
@@ -318,7 +298,7 @@ namespace Peak.AP
 
     public class StateData
     {
-        public int LastProcessedItemIndex { get; set; } = 0;
+        public int LastProcessedItemIndex { get; set; } = -1;
         public HashSet<long> ReportedChecks { get; } = new HashSet<long>();
         public HashSet<long> OfflineChecks { get; } = new HashSet<long>();
         public int TotalLuggageOpened { get; set; } = 0;
@@ -332,7 +312,7 @@ namespace Peak.AP
 
         public void Clear()
         {
-            LastProcessedItemIndex = 0;
+            LastProcessedItemIndex = -1;
             ReportedChecks.Clear();
             OfflineChecks.Clear();
             TotalLuggageOpened = 0;

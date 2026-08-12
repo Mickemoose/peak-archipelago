@@ -10,6 +10,50 @@ from .Locations import LOCATION_TABLE, EXCLUDED_LOCATIONS
 from .Options import PeakOptions, peak_option_groups
 from .Rules import apply_rules, TROPICS_LOCATIONS, MESA_LOCATIONS, ALPINE_LOCATIONS, ROOTS_LOCATIONS, CALDERA_LOCATIONS, KILN_LOCATIONS
 
+TRAP_DEFINITIONS = [
+    ("Instant Death Trap", "instant_death_trap_weight"),
+    ("Items to Bombs", "items_to_bombs_weight"),
+    ("Pokemon Trivia Trap", "pokemon_trivia_trap_weight"),
+    ("Blackout Trap", "blackout_trap_weight"),
+    ("Spawn Bee Swarm", "spawn_bee_swarm_weight"),
+    ("Banana Peel Trap", "banana_peel_trap_weight"),
+    ("Minor Poison Trap", "minor_poison_trap_weight"),
+    ("Poison Trap", "poison_trap_weight"),
+    ("Deadly Poison Trap", "deadly_poison_trap_weight"),
+    ("Tornado Trap", "tornado_trap_weight"),
+    ("Swap Trap", "swap_trap_weight"),
+    ("Nap Time Trap", "nap_time_trap_weight"),
+    ("Hungry Hungry Camper Trap", "hungry_hungry_camper_trap_weight"),
+    ("Balloon Trap", "balloon_trap_weight"),
+    ("Slip Trap", "slip_trap_weight"),
+    ("Freeze Trap", "freeze_trap_weight"),
+    ("Cold Trap", "cold_trap_weight"),
+    ("Hot Trap", "hot_trap_weight"),
+    ("Injury Trap", "injury_trap_weight"),
+    ("Cactus Ball Trap", "cactus_ball_trap_weight"),
+    ("Yeet Trap", "yeet_trap_weight"),
+    ("Tumbleweed Trap", "tumbleweed_trap_weight"),
+    ("Zombie Horde Trap", "zombie_horde_trap_weight"),
+    ("Gust Trap", "gust_trap_weight"),
+    ("Mandrake Trap", "mandrake_trap_weight"),
+    ("Fungal Infection Trap", "fungal_infection_trap_weight"),
+    ("Fear Trap", "fear_trap_weight"),
+    ("Scoutmaster Trap", "scoutmaster_trap_weight"),
+    ("Zoom Trap", "zoom_trap_weight"),
+    ("Screen Flip Trap", "screen_flip_trap_weight"),
+    ("Drop Everything Trap", "drop_everything_trap_weight"),
+    ("Pixel Trap", "pixel_trap_weight"),
+    ("Eruption Trap", "eruption_trap_weight"),
+    ("Beetle Horde Trap", "beetle_horde_trap_weight"),
+    ("Custom Trivia Trap", "custom_trivia_trap_weight"),
+    ("Pokemon Count Trap", "pokemon_count_trap_weight"),
+    ("Inverted Mouse Trap", "inverted_mouse_trap_weight"),
+    ("Stamina Drain Trap", "stamina_drain_trap_weight"),
+    ("Chaos Control Trap", "chaos_control_trap_weight"),
+    ("Emergency Rescue Trap", "emergency_rescue_trap_weight"),
+    ("Explosion Trap", "explosion_trap_weight"),
+]
+
 class PeakWeb(WebWorld):
     theme = "stone"
     option_groups = peak_option_groups
@@ -26,28 +70,6 @@ class PeakWorld(World):
     item_name_groups = item_groups
     item_name_to_id = {name: data.code for name, data in item_table.items()}
     location_name_to_id = LOCATION_TABLE.copy()
-    
-    # Add event locations to the mapping
-    event_locations = [
-        "Ascent 1 Completed",
-        "Ascent 2 Completed",
-        "Ascent 3 Completed",
-        "Ascent 4 Completed",
-        "Ascent 5 Completed",
-        "Ascent 6 Completed",
-        "Ascent 7 Completed",
-        "Mesa Access",
-        "Alpine Access",
-        "Roots Access",
-        "Tropics Access",
-        "Caldera Access",
-        "Kiln Access",
-        "Idol Dunked",
-        "All Badges Collected"
-
-    ]
-    for event_loc in event_locations:
-        location_name_to_id[event_loc] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -116,7 +138,7 @@ class PeakWorld(World):
 
         # Add progressive stamina items if enabled
         if self.options.progressive_stamina.value:
-            max_stamina_upgrades = 4
+            max_stamina_upgrades = 3
             if self.options.additional_stamina_bars.value:
                 max_stamina_upgrades = 7
             
@@ -141,47 +163,8 @@ class PeakWorld(World):
         
         # Build trap_weights list based on individual trap weights
         trap_weights = []
-        trap_weights += (["Instant Death Trap"] * self.options.instant_death_trap_weight.value)
-        trap_weights += (["Items to Bombs"] * self.options.items_to_bombs_weight.value)
-        trap_weights += (["Pokemon Trivia Trap"] * self.options.pokemon_trivia_trap_weight.value)
-        trap_weights += (["Blackout Trap"] * self.options.blackout_trap_weight.value)
-        trap_weights += (["Spawn Bee Swarm"] * self.options.spawn_bee_swarm_weight.value)
-        trap_weights += (["Banana Peel Trap"] * self.options.banana_peel_trap_weight.value)
-        trap_weights += (["Minor Poison Trap"] * self.options.minor_poison_trap_weight.value)
-        trap_weights += (["Poison Trap"] * self.options.poison_trap_weight.value)
-        trap_weights += (["Deadly Poison Trap"] * self.options.deadly_poison_trap_weight.value)
-        trap_weights += (["Tornado Trap"] * self.options.tornado_trap_weight.value)
-        trap_weights += (["Swap Trap"] * self.options.swap_trap_weight.value)
-        trap_weights += (["Nap Time Trap"] * self.options.nap_time_trap_weight.value)
-        trap_weights += (["Hungry Hungry Camper Trap"] * self.options.hungry_hungry_camper_trap_weight.value)
-        trap_weights += (["Balloon Trap"] * self.options.balloon_trap_weight.value)
-        trap_weights += (["Slip Trap"] * self.options.slip_trap_weight.value)
-        trap_weights += (["Freeze Trap"] * self.options.freeze_trap_weight.value)
-        trap_weights += (["Cold Trap"] * self.options.cold_trap_weight.value)
-        trap_weights += (["Hot Trap"] * self.options.hot_trap_weight.value)
-        trap_weights += (["Injury Trap"] * self.options.injury_trap_weight.value)
-        trap_weights += (["Cactus Ball Trap"] * self.options.cactus_ball_trap_weight.value)
-        trap_weights += (["Yeet Trap"] * self.options.yeet_trap_weight.value)
-        trap_weights += (["Tumbleweed Trap"] * self.options.tumbleweed_trap_weight.value)
-        trap_weights += (["Zombie Horde Trap"] * self.options.zombie_horde_trap_weight.value)
-        trap_weights += (["Gust Trap"] * self.options.gust_trap_weight.value)
-        trap_weights += (["Mandrake Trap"] * self.options.mandrake_trap_weight.value)
-        trap_weights += (["Fungal Infection Trap"] * self.options.fungal_infection_trap_weight.value)
-        trap_weights += (["Fear Trap"] * self.options.fear_trap_weight.value)
-        trap_weights += (["Scoutmaster Trap"] * self.options.scoutmaster_trap_weight.value)
-        trap_weights += (["Zoom Trap"] * self.options.zoom_trap_weight.value)
-        trap_weights += (["Screen Flip Trap"] * self.options.screen_flip_trap_weight.value)
-        trap_weights += (["Drop Everything Trap"] * self.options.drop_everything_trap_weight.value)
-        trap_weights += (["Pixel Trap"] * self.options.pixel_trap_weight.value)
-        trap_weights += (["Eruption Trap"] * self.options.eruption_trap_weight.value)
-        trap_weights += (["Beetle Horde Trap"] * self.options.beetle_horde_trap_weight.value)
-        trap_weights += (["Custom Trivia Trap"] * self.options.custom_trivia_trap_weight.value)
-        trap_weights += (["Pokemon Count Trap"] * self.options.pokemon_count_trap_weight.value)
-        trap_weights += (["Inverted Mouse Trap"] * self.options.inverted_mouse_trap_weight.value)
-        trap_weights += (["Stamina Drain Trap"] * self.options.stamina_drain_trap_weight.value)
-        trap_weights += (["Chaos Control Trap"] * self.options.chaos_control_trap_weight.value)
-        trap_weights += (["Emergency Rescue Trap"] * self.options.emergency_rescue_trap_weight.value)
-        trap_weights += (["Explosion Trap"] * self.options.explosion_trap_weight.value)
+        for trap_name, weight_attr in TRAP_DEFINITIONS:
+            trap_weights += [trap_name] * getattr(self.options, weight_attr).value
 
         # Calculate number of trap items based on TrapPercentage
         trap_count = 0 if (len(trap_weights) == 0) else math.ceil(remaining_slots * (self.options.trap_percentage.value / 100.0))
@@ -204,51 +187,20 @@ class PeakWorld(World):
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Total locations: {total_locations}")
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Trap items added: {trap_count}")
         
+        if len(item_pool) > total_locations:
+            raise Exception(
+                f"[PEAK] Item pool ({len(item_pool)}) exceeds fillable locations ({total_locations}) for "
+                f"player {self.multiworld.player_name[self.player]}. Too many locations are excluded "
+                f"(exclude_locations / disable_*_badges / low ascent goal); reduce exclusions or disable item_sanity."
+            )
+
         self.multiworld.itempool.extend(item_pool)
     
     def output_active_traps(self) -> typing.Dict[str, int]:
         trap_data = {}
 
-        trap_data["instant_death_trap"] = self.options.instant_death_trap_weight.value
-        trap_data["items_to_bombs"] = self.options.items_to_bombs_weight.value
-        trap_data["pokemon_trivia_trap"] = self.options.pokemon_trivia_trap_weight.value
-        trap_data["blackout_trap"] = self.options.blackout_trap_weight.value
-        trap_data["spawn_bee_swarm"] = self.options.spawn_bee_swarm_weight.value
-        trap_data["banana_peel_trap"] = self.options.banana_peel_trap_weight.value
-        trap_data["minor_poison_trap"] = self.options.minor_poison_trap_weight.value
-        trap_data["poison_trap"] = self.options.poison_trap_weight.value
-        trap_data["deadly_poison_trap"] = self.options.deadly_poison_trap_weight.value
-        trap_data["tornado_trap"] = self.options.tornado_trap_weight.value
-        trap_data["swap_trap"] = self.options.swap_trap_weight.value
-        trap_data["nap_time_trap"] = self.options.nap_time_trap_weight.value
-        trap_data["hungry_hungry_camper_trap"] = self.options.hungry_hungry_camper_trap_weight.value
-        trap_data["balloon_trap"] = self.options.balloon_trap_weight.value
-        trap_data["slip_trap"] = self.options.slip_trap_weight.value
-        trap_data["freeze_trap"] = self.options.freeze_trap_weight.value
-        trap_data["cold_trap"] = self.options.cold_trap_weight.value
-        trap_data["hot_trap"] = self.options.hot_trap_weight.value
-        trap_data["injury_trap"] = self.options.injury_trap_weight.value
-        trap_data["cactus_ball_trap"] = self.options.cactus_ball_trap_weight.value
-        trap_data["yeet_trap"] = self.options.yeet_trap_weight.value
-        trap_data["tumbleweed_trap"] = self.options.tumbleweed_trap_weight.value
-        trap_data["zombie_horde_trap"] = self.options.zombie_horde_trap_weight.value
-        trap_data["gust_trap"] = self.options.gust_trap_weight.value
-        trap_data["mandrake_trap"] = self.options.mandrake_trap_weight.value
-        trap_data["fungal_infection_trap"] = self.options.fungal_infection_trap_weight.value
-        trap_data["fear_trap"] = self.options.fear_trap_weight.value
-        trap_data["scoutmaster_trap"] = self.options.scoutmaster_trap_weight.value
-        trap_data["zoom_trap"] = self.options.zoom_trap_weight.value
-        trap_data["screen_flip_trap"] = self.options.screen_flip_trap_weight.value
-        trap_data["drop_everything_trap"] = self.options.drop_everything_trap_weight.value
-        trap_data["pixel_trap"] = self.options.pixel_trap_weight.value
-        trap_data["eruption_trap"] = self.options.eruption_trap_weight.value
-        trap_data["beetle_horde_trap"] = self.options.beetle_horde_trap_weight.value
-        trap_data["custom_trivia_trap"] = self.options.custom_trivia_trap_weight.value
-        trap_data["pokemon_count_trap"] = self.options.pokemon_count_trap_weight.value
-        trap_data["inverted_mouse_trap"] = self.options.inverted_mouse_trap_weight.value
-        trap_data["stamina_drain_trap"] = self.options.stamina_drain_trap_weight.value
-        trap_data["chaos_control_trap"] = self.options.chaos_control_trap_weight.value
-        trap_data["emergency_rescue_trap"] = self.options.emergency_rescue_trap_weight.value
+        for trap_name, weight_attr in TRAP_DEFINITIONS:
+            trap_data[weight_attr[:-len("_weight")]] = getattr(self.options, weight_attr).value
 
         return trap_data
 
@@ -286,6 +238,22 @@ class PeakWorld(World):
         
         logging.info(f"[Player {self.multiworld.player_name[player]}] Found {len(shore_accessible_locations)} shore-accessible locations")
         
+        def make_biome_mountain_rule(threshold, loc):
+            def biome_rule(item, loc=loc):
+                if item.player != player:
+                    return True
+                if item.name == "Progressive Mountain":
+                    if "napberry" not in loc.name.lower():
+                        if ("berry" in loc.name.lower() or
+                            "conch" in loc.name.lower() or
+                            "binoculars" in loc.name.lower() or
+                            "guidebook" in loc.name.lower()):
+                            return False
+                    mountains_in_pool = sum(1 for i in self.multiworld.itempool if i.player == player and i.name == "Progressive Mountain")
+                    return mountains_in_pool >= threshold
+                return True
+            return biome_rule
+
         # Set item placement rules
         for location in self.multiworld.get_locations(player):
             if location.progress_type == LocationProgressType.EXCLUDED:
@@ -333,38 +301,10 @@ class PeakWorld(World):
                         location.item_rule = make_rule(required_ascents, 0, 0)
 
             if location.name in TROPICS_LOCATIONS or location.name in ROOTS_LOCATIONS:
-                def biome_rule_1(item):
-                    if item.player != player:
-                        return True
-                    if item.name == "Progressive Mountain":
-                        if "napberry" not in location.name.lower():
-                            if ("berry" in location.name.lower() or 
-                                "conch" in location.name.lower() or 
-                                "binoculars" in location.name.lower() or 
-                                "guidebook" in location.name.lower()):
-                                return False
-                        mountains_in_pool = sum(1 for i in self.multiworld.itempool if i.player == player and i.name == "Progressive Mountain")
-                        return mountains_in_pool >= 2  # Need at least 2 in pool to place 1 here
-                    return True
-                location.item_rule = biome_rule_1
+                location.item_rule = make_biome_mountain_rule(2, location)
 
             elif location.name in ALPINE_LOCATIONS or location.name in MESA_LOCATIONS:
-                def biome_rule_2(item):
-                    if item.player != player:
-                        return True
-
-                    # Can place Progressive Mountain here if at least 2 others exist elsewhere
-                    if item.name == "Progressive Mountain":
-                        if "napberry" not in location.name.lower():
-                            if ("berry" in location.name.lower() or 
-                                "conch" in location.name.lower() or 
-                                "binoculars" in location.name.lower() or 
-                                "guidebook" in location.name.lower()):
-                                return False
-                        mountains_in_pool = sum(1 for i in self.multiworld.itempool if i.player == player and i.name == "Progressive Mountain")
-                        return mountains_in_pool >= 3  # Need at least 3 in pool to place 1 here
-                    return True
-                location.item_rule = biome_rule_2
+                location.item_rule = make_biome_mountain_rule(3, location)
 
             elif location.name in CALDERA_LOCATIONS:
                 def biome_rule_3(item):
@@ -438,20 +378,7 @@ class PeakWorld(World):
         else:
             return  # Unsupported goal type, exit early
 
-        # Ensure item pool matches number of locations
-        final_locations = [loc for loc in self.multiworld.get_locations() 
-                   if loc.player == self.player and loc.address is not None]
-        current_items = [item for item in self.multiworld.itempool if item.player == self.player]
-        missing = len(final_locations) - len(current_items)
-
-        if missing > 0:
-            logging.debug(
-                f"[Player {self.multiworld.player_name[self.player]}] "
-                f"Item pool is short by {missing} items. Adding filler items."
-            )
-            for _ in range(missing):
-                filler_name = self.get_filler_item_name()
-                self.multiworld.itempool.append(self.create_item(filler_name))
+        return
 
     def fill_slot_data(self):
         """Return slot data for this player."""

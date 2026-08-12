@@ -14,6 +14,9 @@ namespace Peak.AP
             RandomPlayer
         }
 
+        private static System.Reflection.MethodInfo cachedGetBodypartRigMethod;
+        private static Type cachedBodypartTypeType;
+
         public static void ApplySlipTrap(ManualLogSource log, TargetMode targetMode = TargetMode.RandomPlayer)
         {
             try
@@ -22,26 +25,13 @@ namespace Peak.AP
 
                 if (targetMode == TargetMode.RandomPlayer)
                 {
-                    if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
-                    {
-                        log.LogWarning("[PeakPelago] Cannot apply slippery trap - no characters found");
-                        return;
-                    }
+                    targetCharacter = TrapHelpers.GetRandomValidCharacter(excludePassedOut: false);
 
-                    var validCharacters = Character.AllCharacters.Where(c => 
-                        c != null && 
-                        c.gameObject.activeInHierarchy && 
-                        !c.data.dead
-                    ).ToList();
-
-                    if (validCharacters.Count == 0)
+                    if (targetCharacter == null)
                     {
                         log.LogWarning("[PeakPelago] Cannot apply slippery trap - no valid characters found");
                         return;
                     }
-
-                    var random = new System.Random();
-                    targetCharacter = validCharacters[random.Next(validCharacters.Count)];
                 }
                 else
                 {
@@ -74,35 +64,45 @@ namespace Peak.AP
 
             try
             {
-                var getBodypartRigMethod = targetCharacter.GetType().GetMethod(
-                    "GetBodypartRig", 
-                    System.Reflection.BindingFlags.Public | 
-                    System.Reflection.BindingFlags.NonPublic | 
-                    System.Reflection.BindingFlags.Instance
-                );
+                if (cachedGetBodypartRigMethod == null)
+                {
+                    cachedGetBodypartRigMethod = targetCharacter.GetType().GetMethod(
+                        "GetBodypartRig",
+                        System.Reflection.BindingFlags.Public |
+                        System.Reflection.BindingFlags.NonPublic |
+                        System.Reflection.BindingFlags.Instance
+                    );
+                }
+
+                var getBodypartRigMethod = cachedGetBodypartRigMethod;
 
                 if (getBodypartRigMethod == null)
                 {
                     log.LogError("[PeakPelago] Could not find GetBodypartRig method");
-                    
+
                     var allMethods = targetCharacter.GetType().GetMethods(
-                        System.Reflection.BindingFlags.Public | 
-                        System.Reflection.BindingFlags.NonPublic | 
+                        System.Reflection.BindingFlags.Public |
+                        System.Reflection.BindingFlags.NonPublic |
                         System.Reflection.BindingFlags.Instance
                     );
                     var bodypartMethods = allMethods.Where(m => m.Name.Contains("Bodypart") || m.Name.Contains("bodypart")).ToList();
                     log.LogInfo($"[PeakPelago] Available methods containing 'Bodypart': {string.Join(", ", bodypartMethods.Select(m => m.Name))}");
-                    
+
                     yield break;
                 }
 
-                var bodypartTypeType = System.AppDomain.CurrentDomain.GetAssemblies()
-                    .SelectMany(a => {
-                        try { return a.GetTypes(); }
-                        catch { return []; }
-                    })
-                    .FirstOrDefault(t => t.Name == "BodypartType");
-                    
+                if (cachedBodypartTypeType == null)
+                {
+                    cachedBodypartTypeType = System.AppDomain.CurrentDomain.GetAssemblies()
+                        .SelectMany(a => {
+                            try { return a.GetTypes(); }
+                            catch { return []; }
+                        })
+                        .FirstOrDefault(t => t.Name == "BodypartType");
+                }
+
+                var bodypartTypeType = cachedBodypartTypeType;
+
                 if (bodypartTypeType == null)
                 {
                     log.LogError("[PeakPelago] Could not find BodypartType enum");
@@ -128,7 +128,7 @@ namespace Peak.AP
                     yield break;
                 }
 
-                targetCharacter.RPCA_Fall(2f);
+                targetCharacter.RPCA_Fall(2f, 0f);
                 
                 Vector3 forwardUpForce = (targetCharacter.data.lookDirection_Flat + Vector3.up) * 200f;
                 footR.AddForce(forwardUpForce, ForceMode.Impulse);

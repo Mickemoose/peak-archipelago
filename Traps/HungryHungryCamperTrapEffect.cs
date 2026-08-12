@@ -22,29 +22,13 @@ namespace Peak.AP
 
                 if (targetMode == TargetMode.RandomPlayer)
                 {
-                    // Use the static AllCharacters list for random selection
-                    if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
+                    targetCharacter = TrapHelpers.GetRandomValidCharacter(excludePassedOut: false);
+
+                    if (targetCharacter == null)
                     {
                         log.LogWarning("[PeakPelago] Cannot apply hunger trap - no characters found");
                         return;
                     }
-
-                    // Filter to only active, alive characters
-                    var validCharacters = Character.AllCharacters.Where(c => 
-                        c != null && 
-                        c.gameObject.activeInHierarchy && 
-                        !c.data.dead
-                    ).ToList();
-
-                    if (validCharacters.Count == 0)
-                    {
-                        log.LogWarning("[PeakPelago] Cannot apply nap trap - no valid characters found");
-                        return;
-                    }
-
-                    // Pick a random character
-                    var random = new System.Random();
-                    targetCharacter = validCharacters[random.Next(validCharacters.Count)];
                 }
                 else
                 {

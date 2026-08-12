@@ -107,7 +107,7 @@ namespace Peak.AP
 
             if (PhotonNetwork.LocalPlayer == null) return;
 
-            int maxUpgrades = _additionalBarsEnabled ? 7 : 4;
+            int maxUpgrades = _additionalBarsEnabled ? 7 : 3;
             
             // Use local state instead of reading from Photon
             if (_localStaminaUpgrades >= maxUpgrades)
@@ -237,7 +237,9 @@ namespace Peak.AP
                 string itemName = session.Items.GetItemName(item.ItemId, item.ItemGame);
                 return itemName?.Equals("Progressive Stamina Bar", StringComparison.OrdinalIgnoreCase) ?? false;
             });
-            
+
+            staminaItems = Mathf.Min(staminaItems, _additionalBarsEnabled ? 7 : 3);
+
             float correctStamina = 0.25f + (staminaItems * 0.25f);
             
             _localBaseMaxStamina = correctStamina;
@@ -396,6 +398,9 @@ namespace Peak.AP
     public static class CharacterHandlePassedOutPatch
     {
         private static ProgressiveStaminaManager _staminaManager;
+        private static readonly FieldInfo _unPassOutCalledField = AccessTools.Field(typeof(Character), "UnPassOutCalled");
+        private static readonly FieldInfo _passOutFailsafeTickField = AccessTools.Field(typeof(Character), "passOutFailsafeTick");
+        private static readonly MethodInfo _zombieFailsafeMethod = AccessTools.Method(typeof(Character), "ZombieFailsafe");
 
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
@@ -411,10 +416,24 @@ namespace Peak.AP
 
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
-                bool shouldBePassedOut = statusSum >= baseMaxStamina;
 
-                if (!shouldBePassedOut)
-                    return true;
+                if (statusSum < baseMaxStamina && Time.time - __instance.data.lastPassedOut > 3f)
+                {
+                    bool unPassOutCalled = _unPassOutCalledField != null && (bool)_unPassOutCalledField.GetValue(__instance);
+                    if (!unPassOutCalled)
+                    {
+                        __instance.photonView.RPC("RPCA_UnPassOut", RpcTarget.All);
+                        _passOutFailsafeTickField?.SetValue(__instance, 0f);
+                    }
+                    else if (_passOutFailsafeTickField != null)
+                    {
+                        float tick = (float)_passOutFailsafeTickField.GetValue(__instance) + Time.deltaTime;
+                        _passOutFailsafeTickField.SetValue(__instance, tick);
+                        if (tick > 3f) _unPassOutCalledField?.SetValue(__instance, false);
+                    }
+                }
+
+                _zombieFailsafeMethod?.Invoke(__instance, null);
 
                 if (__instance.data.deathTimer > 1f)
                 {
@@ -470,9 +489,9 @@ namespace Peak.AP
 
                 bool shouldPassOut = statusSum >= baseMaxStamina;
 
-                if (__instance.data.isSkeleton)
+                if (shouldPassOut)
                 {
-                    if (shouldPassOut)
+                    if (__instance.data.isSkeleton)
                     {
                         if (!__instance.TryCheckpoint())
                         {
@@ -480,24 +499,18 @@ namespace Peak.AP
                                 __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
                         }
                     }
+                    else
+                    {
+                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
+                        if (__instance.data.passOutValue > 0.999f)
+                        {
+                            __instance.photonView.RPC("RPCA_PassOut", RpcTarget.All);
+                        }
+                    }
                 }
                 else
                 {
-                    if (shouldPassOut)
-                    {
-                        if (!__instance.data.fullyPassedOut)
-                        {
-                            __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
-                            if (__instance.data.passOutValue > 0.999f)
-                            {
-                                __instance.photonView.RPC("RPCA_PassOut", RpcTarget.All);
-                            }
-                        }
-                    }
-                    else if (!__instance.data.fullyPassedOut)
-                    {
-                        __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 0f, Time.deltaTime / 5f);
-                    }
+                    __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 0f, Time.deltaTime / 5f);
                 }
 
                 return false;
@@ -510,23 +523,17 @@ namespace Peak.AP
         }
     }
 
-    [HarmonyPatch(typeof(CharacterAfflictions), "AddStatus")]
-    public static class CharacterAfflictionsAddStatusPatch
+    [HarmonyPatch(typeof(CharacterAfflictions), "GetStatusCap")]
+    public static class CharacterAfflictionsGetStatusCapPatch
     {
         private static ProgressiveStaminaManager _staminaManager;
-        private static FieldInfo _statusArrayField;
 
         public static void SetStaminaManager(ProgressiveStaminaManager manager)
         {
             _staminaManager = manager;
         }
 
-        static void Prefix(CharacterAfflictions __instance, CharacterAfflictions.STATUSTYPE statusType, out float __state)
-        {
-            __state = __instance.GetCurrentStatus(statusType);
-        }
-
-        static void Postfix(CharacterAfflictions __instance, CharacterAfflictions.STATUSTYPE statusType, float amount, float __state)
+        static void Postfix(CharacterAfflictions __instance, ref float __result)
         {
             try
             {
@@ -536,54 +543,14 @@ namespace Peak.AP
                 float baseMax = _staminaManager.GetBaseMaxStamina(__instance.character);
                 if (baseMax <= 1.0f) return;
 
-                // Vanilla blocks all status additions (except Curse) when invincible.
-                // Without this check, we'd misinterpret the blocked add as vanilla clamping
-                // and force-set the value anyway.
-                if (__instance.character.data.isInvincible && statusType != CharacterAfflictions.STATUSTYPE.Curse)
-                    return;
-
-                float afterAdd = __instance.GetCurrentStatus(statusType);
-                float desired = __state + amount;
-
-                // If the game didn't clamp, nothing to fix
-                if (afterAdd >= desired) return;
-
-                // Find the internal float array on first use
-                if (_statusArrayField == null)
+                if (__result < baseMax)
                 {
-                    foreach (var field in typeof(CharacterAfflictions).GetFields(
-                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
-                    {
-                        if (field.FieldType == typeof(float[]))
-                        {
-                            float[] arr = (float[])field.GetValue(__instance);
-                            if (arr != null && arr.Length > (int)statusType)
-                            {
-                                _statusArrayField = field;
-                                break;
-                            }
-                        }
-                    }
+                    __result = baseMax;
                 }
-
-                if (_statusArrayField == null) return;
-
-                float[] statuses = (float[])_statusArrayField.GetValue(__instance);
-                int index = (int)statusType;
-                if (index < 0 || index >= statuses.Length) return;
-
-                // Calculate how much room this status type has
-                float otherSum = 0f;
-                for (int i = 0; i < statuses.Length; i++)
-                {
-                    if (i != index) otherSum += statuses[i];
-                }
-                float maxForThis = Mathf.Max(baseMax - otherSum, 0f);
-                statuses[index] = Mathf.Clamp(desired, 0f, maxForThis);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[PeakPelago] AddStatus uncap patch error: {ex.Message}");
+                Debug.LogError($"[PeakPelago] GetStatusCap patch error: {ex.Message}");
             }
         }
     }

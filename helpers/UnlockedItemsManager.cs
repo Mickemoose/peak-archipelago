@@ -326,7 +326,8 @@ namespace Peak.AP
 
                 if (!OriginalLootWeights.HasCaptured)
                 {
-                    _log?.LogWarning("[PeakPelago] RefreshLootTables: Original weights not captured yet");
+                    _log?.LogWarning("[PeakPelago] RefreshLootTables: Original weights not captured yet - deferring");
+                    _needsRefresh = true;
                     return;
                 }
 
@@ -339,8 +340,9 @@ namespace Peak.AP
 
                 foreach (var pool in LootData.AllSpawnWeightData.Keys.ToList())
                 {
-                    // Skip RespawnCoffin - handled separately by LogicalScoutStatue
-                    if (pool == SpawnPool.RespawnCoffin) continue;
+                    // RespawnCoffin is owned by RefreshScoutStatuePool when LogicalScoutStatue is on, and left
+                    // vanilla when ItemSanity is off. Otherwise fall through so ItemSanity still gates it.
+                    if (pool == SpawnPool.RespawnCoffin && (_logicalScoutStatue || !_itemSanityEnabled)) continue;
 
                     bool isLootSanityPool = lootSanityPools.Contains(pool);
 
@@ -371,61 +373,91 @@ namespace Peak.AP
                         }
                     }
 
-                    // LootSanity: add trackable items to pools based on biome assignments
-                    if (!isLootSanityPool) continue;
-
                     foreach (ushort itemId in trackableItems)
                     {
                         if (MultiplayerOnlyItemIds.Contains(itemId)) continue; // Already handled
 
                         bool allowed = !_itemSanityEnabled || unlockedItems.Contains(itemId);
 
-                        // Determine if this item belongs in this pool based on biome assignments
-                        bool belongsInPool = false;
-                        if (_lootBiomeAssignments.Count > 0)
+                        if (isLootSanityPool)
                         {
-                            // Find the acquire location for this item ID and check its assigned biome
-                            var acquireMap = GetAcquireToApNameMap();
-                            foreach (var kvp in acquireMap)
+                            // LootSanity: (re)distribute trackable items into this pool based on biome assignments
+                            bool belongsInPool = false;
+                            if (_lootBiomeAssignments.Count > 0)
                             {
-                                if (ItemIdMappings.NameToId.TryGetValue(kvp.Value, out ushort mappedId) && mappedId == itemId)
+                                // Find the acquire location for this item ID and check its assigned biome
+                                var acquireMap = GetAcquireToApNameMap();
+                                foreach (var kvp in acquireMap)
                                 {
-                                    if (_lootBiomeAssignments.TryGetValue(kvp.Key, out int biomeLevel))
+                                    if (ItemIdMappings.NameToId.TryGetValue(kvp.Value, out ushort mappedId) && mappedId == itemId)
                                     {
-                                        var allowedPools = GetPoolsForBiomeLevel(biomeLevel);
-                                        belongsInPool = allowedPools.Contains(pool);
+                                        if (_lootBiomeAssignments.TryGetValue(kvp.Key, out int biomeLevel))
+                                        {
+                                            var allowedPools = GetPoolsForBiomeLevel(biomeLevel);
+                                            belongsInPool = allowedPools.Contains(pool);
+                                        }
+                                        break;
                                     }
-                                    break;
+                                }
+                            }
+                            else
+                            {
+                                // No assignments from server - fall back to adding to all affected pools
+                                belongsInPool = true;
+                            }
+
+                            if (allowed && belongsInPool)
+                            {
+                                const int equalWeight = 1;
+                                if (!LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
+                                {
+                                    LootData.AllSpawnWeightData[pool].Add(itemId, equalWeight);
+                                    restoredCount++;
+                                }
+                                else if (LootData.AllSpawnWeightData[pool][itemId] != equalWeight)
+                                {
+                                    LootData.AllSpawnWeightData[pool][itemId] = equalWeight;
+                                    restoredCount++;
+                                }
+                            }
+                            else
+                            {
+                                // Item not allowed or doesn't belong in this pool - remove
+                                if (LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
+                                {
+                                    LootData.AllSpawnWeightData[pool].Remove(itemId);
+                                    removedCount++;
                                 }
                             }
                         }
                         else
                         {
-                            // No assignments from server - fall back to adding to all affected pools
-                            belongsInPool = true;
-                        }
+                            // Normal pool: ItemSanity gates the item's ORIGINAL spawns, independent of LootSanity.
+                            int originalWeight = OriginalLootWeights.GetOriginalWeight(pool, itemId);
+                            if (originalWeight <= 0) continue; // item does not originally spawn in this pool
 
-                        if (allowed && belongsInPool)
-                        {
-                            const int equalWeight = 1;
-                            if (!LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
+                            if (allowed)
                             {
-                                LootData.AllSpawnWeightData[pool].Add(itemId, equalWeight);
-                                restoredCount++;
+                                // Unlocked (or ItemSanity off) - ensure it spawns at its original weight
+                                if (!LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
+                                {
+                                    LootData.AllSpawnWeightData[pool].Add(itemId, originalWeight);
+                                    restoredCount++;
+                                }
+                                else if (LootData.AllSpawnWeightData[pool][itemId] != originalWeight)
+                                {
+                                    LootData.AllSpawnWeightData[pool][itemId] = originalWeight;
+                                    restoredCount++;
+                                }
                             }
-                            else if (LootData.AllSpawnWeightData[pool][itemId] != equalWeight)
+                            else
                             {
-                                LootData.AllSpawnWeightData[pool][itemId] = equalWeight;
-                                restoredCount++;
-                            }
-                        }
-                        else
-                        {
-                            // Item not allowed or doesn't belong in this pool - remove
-                            if (LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
-                            {
-                                LootData.AllSpawnWeightData[pool].Remove(itemId);
-                                removedCount++;
+                                // Locked - remove it from its normal spawn pool
+                                if (LootData.AllSpawnWeightData[pool].ContainsKey(itemId))
+                                {
+                                    LootData.AllSpawnWeightData[pool].Remove(itemId);
+                                    removedCount++;
+                                }
                             }
                         }
                     }

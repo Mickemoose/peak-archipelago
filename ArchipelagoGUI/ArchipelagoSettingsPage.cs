@@ -413,6 +413,7 @@ namespace Peak.AP
             if (plugin.Status == "Connected")
             {
                 plugin._intentionalDisconnect = true;
+                plugin.CancelReconnect();
                 plugin.Session?.Socket?.Disconnect();
                 plugin._status = "Disconnected";
             }

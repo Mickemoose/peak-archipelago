@@ -90,80 +90,15 @@ namespace Peak.AP
                 yield break;
             }
 
-            float originalActiveSeconds = (float)activeSecondsField.GetValue(screenEffect);
             activeSecondsField.SetValue(screenEffect, duration);
             log.LogInfo($"[PeakPelago] Applied blind screen effect for {duration} seconds");
-            object mapHandler = GetMapHandler();
-            float originalFogDensity = 0f;
-            bool fogModified = false;
-
-            if (mapHandler != null)
-            {
-                try
-                {
-                    var fogDensityField = mapHandler.GetType().GetField("fogDensity");
-                    if (fogDensityField != null)
-                    {
-                        originalFogDensity = (float)fogDensityField.GetValue(mapHandler);
-                        fogDensityField.SetValue(mapHandler, Mathf.Min(originalFogDensity * 3f, 0.1f));
-                        fogModified = true;
-                        log.LogInfo($"[PeakPelago] Increased fog density from {originalFogDensity} to {Mathf.Min(originalFogDensity * 3f, 0.1f)}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    log.LogWarning($"[PeakPelago] Could not modify fog: {ex.Message}");
-                }
-            }
 
             yield return new WaitForSeconds(duration);
 
             log.LogInfo("[PeakPelago] Blind screen effect expired");
-            if (fogModified && mapHandler != null)
-            {
-                try
-                {
-                    var fogDensityField = mapHandler.GetType().GetField("fogDensity");
-                    if (fogDensityField != null)
-                    {
-                        fogDensityField.SetValue(mapHandler, originalFogDensity);
-                        log.LogInfo($"[PeakPelago] Restored fog density to {originalFogDensity}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    log.LogWarning($"[PeakPelago] Could not restore fog: {ex.Message}");
-                }
-            }
 
             PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
             log.LogInfo("[PeakPelago] Fear trap completed");
-        }
-
-        private static object GetMapHandler()
-        {
-            try
-            {
-                var singletonType = typeof(UnityEngine.Object).Assembly.GetType("Zorro.Core.Singleton`1");
-                if (singletonType != null)
-                {
-                    var mapHandlerType = typeof(UnityEngine.Object).Assembly.GetType("MapHandler");
-                    if (mapHandlerType != null)
-                    {
-                        var genericType = singletonType.MakeGenericType(mapHandlerType);
-                        var instanceProperty = genericType.GetProperty("Instance");
-                        if (instanceProperty != null)
-                        {
-                            return instanceProperty.GetValue(null);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _log?.LogError($"[PeakPelago] Failed to get MapHandler: {ex.Message}");
-            }
-            return null;
         }
     }
 }

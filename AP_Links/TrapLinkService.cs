@@ -15,7 +15,7 @@ namespace Peak.AP
         private bool _isEnabled;
         private string _playerName;
         private LinkedList<string> _trapQueue = new LinkedList<string>();
-        private string _priorityTrap = null;
+        private volatile string _priorityTrap = null;
         private float _lastTrapActivation = 0f;
         private const float TRAP_ACTIVATION_COOLDOWN = 5f;
         private string _activeTrap = null;
@@ -536,7 +536,8 @@ namespace Peak.AP
                     if (peakTrapName != null && _enabledTraps.Contains(peakTrapName))
                     {
                         _priorityTrap = peakTrapName;
-                        _notifications.ShowTrapLinkNotification($"TrapLink: received {externalTrapName} from {source}");
+                        PeakArchipelagoPlugin._instance?.EnqueueMainThread(() =>
+                            _notifications.ShowTrapLinkNotification($"TrapLink: received {externalTrapName} from {source}"));
                         _log.LogInfo($"[PeakPelago] Set priority trap: '{peakTrapName}' (from '{externalTrapName}')");
                     }
                     else if (peakTrapName == null)

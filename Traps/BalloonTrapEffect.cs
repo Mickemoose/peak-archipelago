@@ -13,28 +13,14 @@ namespace Peak.AP
         {
             try
             {
-                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply balloon trap - no characters found");
-                    return;
-                }
-
-                // Filter to only active, alive characters
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead
-                ).ToList();
-
-                if (validCharacters.Count == 0)
+                var targetCharacter = TrapHelpers.GetRandomValidCharacter(excludePassedOut: false);
+                if (targetCharacter == null)
                 {
                     log.LogWarning("[PeakPelago] Cannot apply balloon trap - no valid characters found");
                     return;
                 }
 
-                // Pick a random character
                 var random = new System.Random();
-                var targetCharacter = validCharacters[random.Next(validCharacters.Count)];
 
                 // Get the character's balloon component
                 var balloonComponent = targetCharacter.GetComponent<CharacterBalloons>();

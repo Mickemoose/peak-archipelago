@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Linq;
 using BepInEx.Logging;
 using Photon.Pun;
 using UnityEngine;
@@ -35,12 +34,7 @@ namespace Peak.AP
                     return;
                 }
 
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead &&
-                    !c.data.fullyPassedOut
-                ).ToList();
+                var validCharacters = TrapHelpers.GetValidCharacters();
 
                 if (validCharacters.Count == 0)
                 {

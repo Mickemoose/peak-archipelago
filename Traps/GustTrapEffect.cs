@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Reflection;
 using BepInEx.Logging;
 using Photon.Pun;
 using UnityEngine;
@@ -11,6 +12,11 @@ namespace Peak.AP
         private static readonly float Duration = 10f;
         private static readonly float GustForce = 20f;
         private static readonly float ForceRadius = 2f;
+
+        private static readonly FieldInfo UntilSwitchField = typeof(WindChillZone).GetField("untilSwitch",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo TimeUntilNextWindField = typeof(WindChillZone).GetField("timeUntilNextWind",
+            BindingFlags.Instance | BindingFlags.NonPublic);
 
         public static void ApplyGustTrap(ManualLogSource log)
         {
@@ -139,30 +145,22 @@ namespace Peak.AP
 
         private static float GetUntilSwitch(WindChillZone zone)
         {
-            var field = typeof(WindChillZone).GetField("untilSwitch",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            return (float)field.GetValue(zone);
+            return (float)UntilSwitchField.GetValue(zone);
         }
 
         private static void SetUntilSwitch(WindChillZone zone, float value)
         {
-            var field = typeof(WindChillZone).GetField("untilSwitch",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            field.SetValue(zone, value);
+            UntilSwitchField.SetValue(zone, value);
         }
 
         private static float GetTimeUntilNextWind(WindChillZone zone)
         {
-            var field = typeof(WindChillZone).GetField("timeUntilNextWind",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            return (float)field.GetValue(zone);
+            return (float)TimeUntilNextWindField.GetValue(zone);
         }
 
         private static void SetTimeUntilNextWind(WindChillZone zone, float value)
         {
-            var field = typeof(WindChillZone).GetField("timeUntilNextWind",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            field.SetValue(zone, value);
+            TimeUntilNextWindField.SetValue(zone, value);
         }
 
         private static Vector3 RandomWindDirection()

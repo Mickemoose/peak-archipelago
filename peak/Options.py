@@ -532,6 +532,8 @@ peak_option_groups = [
         InvertedMouseTrapWeight,
         StaminaDrainTrapWeight,
         ChaosControlTrapWeight,
+        EmergencyRescueTrapWeight,
+        ExplosionTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,

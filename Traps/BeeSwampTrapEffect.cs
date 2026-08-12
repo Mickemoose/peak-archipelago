@@ -25,30 +25,13 @@ namespace Peak.AP
 
                 if (targetMode == TargetMode.RandomPlayer)
                 {
-                    // Use the static AllCharacters list for random selection
-                    if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
-                    {
-                        log.LogWarning("[PeakPelago] Cannot spawn bee swarm - no characters found");
-                        return;
-                    }
+                    targetCharacter = TrapHelpers.GetRandomValidCharacter();
 
-                    // Filter to only active, alive characters
-                    var validCharacters = Character.AllCharacters.Where(c =>
-                        c != null &&
-                        c.gameObject.activeInHierarchy &&
-                        !c.data.dead &&
-                        !c.data.fullyPassedOut
-                    ).ToList();
-
-                    if (validCharacters.Count == 0)
+                    if (targetCharacter == null)
                     {
                         log.LogWarning("[PeakPelago] Cannot spawn bee swarm - no valid characters found");
                         return;
                     }
-
-                    // Pick a random character
-                    var random = new System.Random();
-                    targetCharacter = validCharacters[random.Next(validCharacters.Count)];
                 }
                 else
                 {

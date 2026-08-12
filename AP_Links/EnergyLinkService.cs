@@ -25,7 +25,7 @@ namespace Peak.AP
         private IDataStorageHelper _dataStorageHelper;
         private ArchipelagoNotificationManager _notifications;
         private Harmony _harmony;
-        private int _currentEnergy = 0;
+        private long _currentEnergy = 0;
         private int _maxEnergy = 0;
         private string _energyKey;
         private GameObject _tertiaryPromptObject;
@@ -90,9 +90,9 @@ namespace Peak.AP
             try
             {
                 // EnergyLink is just a number, not an object
-                _currentEnergy = newValue.ToObject<int>();
+                _currentEnergy = newValue.ToObject<long>();
                 _log.LogInfo($"[PeakPelago] EnergyLink updated from server: {_currentEnergy}");
-                BroadcastEnergyUpdate();
+                _plugin?.EnqueueMainThread(BroadcastEnergyUpdate);
             }
             catch (Exception ex)
             {
@@ -121,7 +121,7 @@ namespace Peak.AP
             try
             {
                 var energyData = _dataStorageHelper[Scope.Global, _energyKey];
-                _currentEnergy = energyData.To<int>();
+                _currentEnergy = energyData.To<long>();
                 _log.LogDebug($"[PeakPelago] EnergyLink state: {_currentEnergy}");
             }
             catch (Exception ex)
@@ -145,27 +145,7 @@ namespace Peak.AP
                 {
                     _log.LogInfo($"[PeakPelago] CLIENT: Requesting host to contribute {amount} J from {itemName}");
                     _plugin.PhotonView.RPC("RPC_ContributeEnergy", RpcTarget.MasterClient, itemName, amount);
-                    double megajoules = ((double) amount) / 1000000f;
-                    if (megajoules >= 1) {
-                        if (megajoules % 1 == 0) {
-                            _notifications.ShowEnergyLinkNotification(
-                                $"EnergyLink: Contributed {megajoules:F0} MJ from {itemName}"
-                            );
-                        }
-                        else
-                        {
-                            _notifications.ShowEnergyLinkNotification(
-                                $"EnergyLink: Contributed {megajoules:F2} MJ from {itemName}"
-                            );
-                        }
-                    }
-                    else
-                    {
-                        double kilojoules = ((double) amount) / 1000f;
-                        _notifications.ShowEnergyLinkNotification(
-                            $"EnergyLink: Contributed {kilojoules:F0} kJ from {itemName}"
-                        );
-                    }
+                    ShowContributionNotification(itemName, amount);
                 }
                 else
                 {
@@ -178,31 +158,36 @@ namespace Peak.AP
             {
                 _dataStorageHelper[Scope.Global, _energyKey] += amount;
                 _log.LogInfo($"[PeakPelago] HOST: Contributed {amount} J from {itemName} to EnergyLink");
-                double megajoules = ((double) amount) / 1000000f;
-                if (megajoules >= 1) {
-                    if (megajoules % 1 == 0) {
-                        _notifications.ShowEnergyLinkNotification(
-                            $"EnergyLink: Contributed {megajoules:F0} MJ from {itemName}"
-                        );
-                    }
-                    else
-                    {
-                        _notifications.ShowEnergyLinkNotification(
-                            $"EnergyLink: Contributed {megajoules:F2} MJ from {itemName}"
-                        );
-                    }
-                }
-                else
-                {
-                    double kilojoules = ((double) amount) / 1000f;
-                    _notifications.ShowEnergyLinkNotification(
-                        $"EnergyLink: Contributed {kilojoules:F0} kJ from {itemName}"
-                    );
-                }
+                ShowContributionNotification(itemName, amount);
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Failed to contribute energy: {ex.Message}");
+            }
+        }
+
+        private void ShowContributionNotification(string itemName, int amount)
+        {
+            double megajoules = ((double) amount) / 1000000f;
+            if (megajoules >= 1) {
+                if (megajoules % 1 == 0) {
+                    _notifications.ShowEnergyLinkNotification(
+                        $"EnergyLink: Contributed {megajoules:F0} MJ from {itemName}"
+                    );
+                }
+                else
+                {
+                    _notifications.ShowEnergyLinkNotification(
+                        $"EnergyLink: Contributed {megajoules:F2} MJ from {itemName}"
+                    );
+                }
+            }
+            else
+            {
+                double kilojoules = ((double) amount) / 1000f;
+                _notifications.ShowEnergyLinkNotification(
+                    $"EnergyLink: Contributed {kilojoules:F0} kJ from {itemName}"
+                );
             }
         }
 
@@ -215,7 +200,7 @@ namespace Peak.AP
         }
 
 
-        public void UpdateEnergyCache(int current, int max)
+        public void UpdateEnergyCache(long current, int max)
         {
             _currentEnergy = current;
             _log.LogInfo($"[PeakPelago] Updated energy cache: {_currentEnergy}");
@@ -517,7 +502,7 @@ namespace Peak.AP
                 return false;
             }
         }
-        public int GetCurrentEnergy()
+        public long GetCurrentEnergy()
         {
             return _currentEnergy;
         }

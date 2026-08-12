@@ -286,7 +286,7 @@ namespace Peak.AP
         private EnergyLinkService _energyLinkService;
         private BoxCollider _collider;
         private Animator _animator;
-        private int _cachedEnergy = 0;
+        private long _cachedEnergy = 0;
         private string _selectedBundleName;
         private Action _selectedBundleAction;
         private const int BUNDLE_COST = 400000000; // 400 MJ

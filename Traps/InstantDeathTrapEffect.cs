@@ -12,33 +12,11 @@ namespace Peak.AP
         {
             try
             {
-                // Get all valid characters
-                if (Character.AllCharacters == null || Character.AllCharacters.Count == 0)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply instant death trap - no characters found");
-                    return;
-                }
-
-                // Filter to only active, alive characters
-                var validCharacters = Character.AllCharacters.Where(c => 
-                    c != null && 
-                    c.gameObject.activeInHierarchy && 
-                    !c.data.dead &&
-                    !c.data.fullyPassedOut
-                ).ToList();
-
-                if (validCharacters.Count == 0)
-                {
-                    log.LogWarning("[PeakPelago] Cannot apply instant death trap - no valid characters found");
-                    return;
-                }
-
-                var random = new System.Random();
-                var targetCharacter = validCharacters[random.Next(validCharacters.Count)];
+                var targetCharacter = TrapHelpers.GetRandomValidCharacter();
 
                 if (targetCharacter == null)
                 {
-                    log.LogWarning("[PeakPelago] Cannot apply instant death trap - target character not found");
+                    log.LogWarning("[PeakPelago] Cannot apply instant death trap - no valid characters found");
                     return;
                 }
 
