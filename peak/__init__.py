@@ -3,7 +3,7 @@ import math
 from collections import Counter
 import typing
 
-from BaseClasses import ItemClassification, CollectionState, LocationProgressType
+from BaseClasses import ItemClassification, CollectionState, LocationProgressType, Tutorial
 from worlds.AutoWorld import World, WebWorld
 from .Items import PeakItem, item_table, progression_table, useful_table, filler_table, trap_table, unlock_table, lookup_id_to_name, item_groups
 from .Locations import LOCATION_TABLE, EXCLUDED_LOCATIONS
@@ -58,6 +58,17 @@ class PeakWeb(WebWorld):
     theme = "stone"
     option_groups = peak_option_groups
 
+    setup_en = Tutorial(
+        "Multiworld Setup Guide",
+        "A guide to setting up the Archipelago randomizer for PEAK.",
+        "English",
+        "setup_en.md",
+        "setup/en",
+        ["Mickemoose"]
+    )
+
+    tutorials = [setup_en]
+
 class PeakWorld(World):
     """
     PEAK is a multiplayer climbing game where you and your friends must reach the summit of a procedurally generated mountain.
@@ -70,6 +81,8 @@ class PeakWorld(World):
     item_name_groups = item_groups
     item_name_to_id = {name: data.code for name, data in item_table.items()}
     location_name_to_id = LOCATION_TABLE.copy()
+
+    web = PeakWeb()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
