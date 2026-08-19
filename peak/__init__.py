@@ -37,6 +37,7 @@ TRAP_DEFINITIONS = [
     ("Gust Trap", "gust_trap_weight"),
     ("Mandrake Trap", "mandrake_trap_weight"),
     ("Fungal Infection Trap", "fungal_infection_trap_weight"),
+    ("Trun To Stone Trap", "turn_to_stone_trap_weight"),
     ("Fear Trap", "fear_trap_weight"),
     ("Scoutmaster Trap", "scoutmaster_trap_weight"),
     ("Zoom Trap", "zoom_trap_weight"),
@@ -135,10 +136,10 @@ class PeakWorld(World):
             for _ in range(required_ascent):
                 item_pool.append(self.create_item("Progressive Ascent"))
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {required_ascent} Progressive Ascent items (Reach Peak goal)")
-        else:  # Other goals - add all 7 Progressive Ascent items
-            for _ in range(7):
+        else:  # Other goals - add all 8 Progressive Ascent items
+            for _ in range(8):
                 item_pool.append(self.create_item("Progressive Ascent"))
-            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 7 Progressive Ascent items (non-Reach Peak goal)")
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 8 Progressive Ascent items (non-Reach Peak goal)")
 
         for _ in range(4):
             item_pool.append(self.create_item("Progressive Mountain"))
@@ -166,7 +167,14 @@ class PeakWorld(World):
                 item_pool.append(self.create_item(item_name))
         # Add unlock items only when ItemSanity is enabled
         if self.options.item_sanity.value:
+            scout_amulet_unlocks = {
+                "Scout's Tenacity Unlock", "Scout's Generosity Unlock",
+                "Scout's Ambition Unlock", "Scout's Initiative Unlock",
+                "Scout's Honor Unlock",
+            }
             for unlock_name in unlock_table.keys():
+                if unlock_name in scout_amulet_unlocks and not self.options.scout_amulet_sanity.value:
+                    continue
                 item_pool.append(self.create_item(unlock_name))
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {len(unlock_table)} unlock items (ItemSanity enabled)")
         else:
@@ -224,7 +232,7 @@ class PeakWorld(World):
 
         player = self.player
         # Count total Progressive items we're placing
-        prog_ascent_count = 7 if self.options.goal.value != 0 and self.options.goal.value != 3 else self.options.ascent_count.value
+        prog_ascent_count = 8 if self.options.goal.value != 0 and self.options.goal.value != 3 else self.options.ascent_count.value
         prog_stamina_count = 0
         if self.options.progressive_stamina.value:
             prog_stamina_count = 7 if self.options.additional_stamina_bars.value else 4
@@ -367,7 +375,7 @@ class PeakWorld(World):
 
         # Set completion condition based on goal type
         if goal == 0:  # Reach Peak
-            if 1 <= ascent_num <= 7:
+            if 1 <= ascent_num <= 8:
                 self.multiworld.completion_condition[self.player] = (
                     lambda state, n=ascent_num: state.has(f"Ascent {n} Completed", self.player)
                 )
@@ -384,14 +392,38 @@ class PeakWorld(World):
                 lambda state: state.has("Idol Dunked", self.player)
             )
         elif goal == 3:  # Peak and Badges
-            if 1 <= ascent_num <= 7:
+            if 1 <= ascent_num <= 8:
                 self.multiworld.completion_condition[self.player] = (
                     lambda state, n=ascent_num: state.has(f"Ascent {n} Completed", self.player) and state.has("All Badges Collected", self.player)
                 )
+        elif goal == 4:  # Free The Soul
+            self.multiworld.completion_condition[self.player] = (
+                lambda state: state.has("Soul Freed", self.player)
+            )
         else:
             return  # Unsupported goal type, exit early
 
         return
+
+    def get_sphere_index(self) -> typing.Dict[typing.Tuple[int, str], int]:
+        """Map (player, location name) to the logical sphere it is reachable in.
+
+        Cached on the multiworld so a multi-slot PEAK generation only pays for it once.
+        Unreachable locations are absent from the map.
+        """
+        cached = getattr(self.multiworld, "_peak_sphere_index", None)
+        if cached is not None:
+            return cached
+
+        cached = {}
+        for depth, sphere in enumerate(self.multiworld.get_spheres()):
+            if not sphere:
+                break
+            for location in sphere:
+                cached[(location.player, location.name)] = depth
+
+        setattr(self.multiworld, "_peak_sphere_index", cached)
+        return cached
 
     def fill_slot_data(self):
         """Return slot data for this player."""
@@ -406,16 +438,31 @@ class PeakWorld(World):
         requested_badge_count = self.options.badge_count.value
         actual_badge_count = min(requested_badge_count, max_badges_available)
 
-        mountain_hints = []
-        for location in self.multiworld.get_locations():
-            if location.item and location.item.name == "Progressive Mountain" and location.item.player == self.player:
-                mountain_hints.append({
-                    "location": location.name,
-                    "player": self.multiworld.get_player_name(location.player),
-                    "game": self.multiworld.game[location.player],
-                    "location_id": location.address,
-                    "player_slot": location.player
-                })
+        sphere_index = self.get_sphere_index()
+        unreachable_sphere = len(sphere_index) + 1
+
+        mountain_locations = [
+            location for location in self.multiworld.get_locations()
+            if location.item
+            and location.item.name == "Progressive Mountain"
+            and location.item.player == self.player
+        ]
+        mountain_locations.sort(key=lambda loc: (
+            sphere_index.get((loc.player, loc.name), unreachable_sphere),
+            loc.player,
+            loc.name,
+        ))
+
+        mountain_hints = [
+            {
+                "location": location.name,
+                "player": self.multiworld.get_player_name(location.player),
+                "game": self.multiworld.game[location.player],
+                "location_id": location.address,
+                "player_slot": location.player
+            }
+            for location in mountain_locations
+        ]
         
         slot_data = {
             "goal": self.options.goal.value,
@@ -436,6 +483,7 @@ class PeakWorld(World):
             "item_sanity": self.options.item_sanity.value,
             "loot_sanity": self.options.loot_sanity.value,
             "logical_scout_statue": self.options.logical_scout_statue.value,
+            "scout_amulet_sanity": self.options.scout_amulet_sanity.value,
             "session_id": session_id,
             "mountain_hints": mountain_hints,
             "loot_biome_assignments": getattr(self, "loot_biome_assignments", {})

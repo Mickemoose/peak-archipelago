@@ -14,6 +14,7 @@ namespace Peak.AP
         private static bool _itemSanityEnabled = false;
         private static int _lootSanityMode = 0; // 0=None, 1=Luggage, 2=Trees/Bushes, 3=All
         private static bool _logicalScoutStatue = false;
+        private static bool _scoutAmuletSanity = false;
         private static int _progressiveMountainCount = 0;
         private static StateData _stateData;
         private static Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
@@ -28,6 +29,26 @@ namespace Peak.AP
             25,  // Cursed Skull
             67,  // Scout Effigy
             16,  // Bugle of Friendship (Bugle_Magic)
+            173, // Ritual Dagger
+        };
+
+        private const ushort SCOUTS_TENACITY_ITEM_ID = 182;
+        private const ushort SCOUTS_GENEROSITY_ITEM_ID = 180;
+        private const ushort SCOUTS_AMBITION_ITEM_ID = 179;
+        private const ushort SCOUTS_INITIATIVE_ITEM_ID = 170;
+        private const ushort SCOUTS_HONOR_ITEM_ID = 183;
+
+        /// <summary>
+        /// The four Scout amulets and Scout's Honor. Excluded from the randomized loot pools
+        /// unless Scout Amulet Sanity is enabled.
+        /// </summary>
+        private static readonly HashSet<ushort> ScoutAmuletItemIds = new HashSet<ushort>
+        {
+            SCOUTS_TENACITY_ITEM_ID,
+            SCOUTS_GENEROSITY_ITEM_ID,
+            SCOUTS_AMBITION_ITEM_ID,
+            SCOUTS_INITIATIVE_ITEM_ID,
+            SCOUTS_HONOR_ITEM_ID,
         };
 
         private static readonly HashSet<SpawnPool> LuggagePools = new HashSet<SpawnPool>
@@ -41,6 +62,9 @@ namespace Peak.AP
             SpawnPool.LuggageClimber,
             SpawnPool.LuggageAncient,
             SpawnPool.LuggageCursed,
+            SpawnPool.LuggageGloom,
+            SpawnPool.LuggageCitadel,
+            SpawnPool.LuggageClown,
         };
 
         private static readonly HashSet<SpawnPool> NaturalPools = new HashSet<SpawnPool>
@@ -182,17 +206,19 @@ namespace Peak.AP
         public static void Initialize(ManualLogSource log, ArchipelagoSession session,
             bool itemSanityEnabled = false, int lootSanityMode = 0,
             bool logicalScoutStatue = false, int progressiveMountainCount = 0,
-            StateData stateData = null, Dictionary<string, int> lootBiomeAssignments = null)
+            StateData stateData = null, Dictionary<string, int> lootBiomeAssignments = null,
+            bool scoutAmuletSanity = false)
         {
             _log = log;
             _session = session;
             _itemSanityEnabled = itemSanityEnabled;
             _lootSanityMode = lootSanityMode;
             _logicalScoutStatue = logicalScoutStatue;
+            _scoutAmuletSanity = scoutAmuletSanity;
             _progressiveMountainCount = progressiveMountainCount;
             _stateData = stateData;
             _lootBiomeAssignments = lootBiomeAssignments ?? new Dictionary<string, int>();
-            _log?.LogInfo($"[PeakPelago] UnlockedItemsManager initialized (ItemSanity: {(_itemSanityEnabled ? "ON" : "OFF")}, LootSanity: {_lootSanityMode}, LogicalScoutStatue: {(_logicalScoutStatue ? "ON" : "OFF")})");
+            _log?.LogInfo($"[PeakPelago] UnlockedItemsManager initialized (ItemSanity: {(_itemSanityEnabled ? "ON" : "OFF")}, LootSanity: {_lootSanityMode}, LogicalScoutStatue: {(_logicalScoutStatue ? "ON" : "OFF")}, ScoutAmuletSanity: {(_scoutAmuletSanity ? "ON" : "OFF")})");
 
             if (LootData.AllSpawnWeightData != null && OriginalLootWeights.HasCaptured)
             {
@@ -376,6 +402,7 @@ namespace Peak.AP
                     foreach (ushort itemId in trackableItems)
                     {
                         if (MultiplayerOnlyItemIds.Contains(itemId)) continue; // Already handled
+                        if (!_scoutAmuletSanity && ScoutAmuletItemIds.Contains(itemId)) continue;
 
                         bool allowed = !_itemSanityEnabled || unlockedItems.Contains(itemId);
 

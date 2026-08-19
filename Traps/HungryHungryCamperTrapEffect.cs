@@ -47,8 +47,25 @@ namespace Peak.AP
                 string characterName = targetCharacter == Character.localCharacter ? "local player" : targetCharacter.characterName;
                 log.LogInfo($"[PeakPelago] Applying Hunger Trap to {characterName}");
 
-                // Apply it during the next fixed update to ensure proper timing
-                targetCharacter.StartCoroutine(ApplyStatusNextFrame(targetCharacter, CharacterAfflictions.STATUSTYPE.Hunger, hungerAmount));
+                // AddStatus only works on the owning client, so route remote targets through their own client
+                if (targetCharacter == Character.localCharacter)
+                {
+                    targetCharacter.StartCoroutine(ApplyStatusNextFrame(targetCharacter, CharacterAfflictions.STATUSTYPE.Hunger, hungerAmount, log));
+                }
+                else if (PeakArchipelagoPlugin._instance?.PhotonView != null && targetCharacter.photonView?.Owner != null)
+                {
+                    PeakArchipelagoPlugin._instance.PhotonView.RPC(
+                        "ApplyHungerTrapRPC",
+                        Photon.Pun.RpcTarget.All,
+                        targetCharacter.photonView.Owner.ActorNumber,
+                        hungerAmount
+                    );
+                }
+                else
+                {
+                    log.LogWarning($"[PeakPelago] Cannot route hunger trap to {characterName} - no PhotonView available");
+                    return;
+                }
 
                 log.LogInfo($"[PeakPelago] Hunger Trap scheduled for {characterName}!");
             }
@@ -58,10 +75,25 @@ namespace Peak.AP
             }
         }
 
-        private static IEnumerator ApplyStatusNextFrame(Character targetCharacter, CharacterAfflictions.STATUSTYPE type, float amount)
+        public static IEnumerator ApplyStatusNextFrame(Character targetCharacter, CharacterAfflictions.STATUSTYPE type, float amount, ManualLogSource log)
         {
             yield return new WaitForFixedUpdate();
-            targetCharacter.refs.afflictions.AddStatus(type, amount);
+
+            if (targetCharacter == null || targetCharacter.refs.afflictions == null)
+            {
+                yield break;
+            }
+
+            if (type == CharacterAfflictions.STATUSTYPE.Hunger && !targetCharacter.refs.afflictions.canGetHungry)
+            {
+                log.LogWarning("[PeakPelago] Hunger trap had no effect - target is protected by a campfire buff");
+                yield break;
+            }
+
+            if (!targetCharacter.refs.afflictions.AddStatus(type, amount))
+            {
+                log.LogWarning($"[PeakPelago] Hunger trap was rejected for status {type}");
+            }
         }
     }
 }

@@ -24,7 +24,23 @@ namespace Peak.AP
                 
                 log.LogInfo($"[PeakPelago] Applying Instant Death Trap to: {characterName}");
 
-                targetCharacter.StartCoroutine(KillCharacterNextFrame(targetCharacter, characterName, log));
+                // DieInstantly resolves checkpoints against localCharacter, so it has to run on the victim's client
+                if (targetCharacter == Character.localCharacter)
+                {
+                    targetCharacter.StartCoroutine(KillCharacterNextFrame(targetCharacter, characterName, log));
+                }
+                else if (PeakArchipelagoPlugin._instance?.PhotonView != null && targetCharacter.photonView?.Owner != null)
+                {
+                    PeakArchipelagoPlugin._instance.PhotonView.RPC(
+                        "InstantDeathTrapRPC",
+                        Photon.Pun.RpcTarget.All,
+                        targetCharacter.photonView.Owner.ActorNumber
+                    );
+                }
+                else
+                {
+                    log.LogWarning($"[PeakPelago] Cannot route instant death trap to {characterName} - no PhotonView available");
+                }
             }
             catch (Exception ex)
             {
@@ -33,26 +49,16 @@ namespace Peak.AP
             }
         }
 
-        private static IEnumerator KillCharacterNextFrame(Character targetCharacter, string characterName, ManualLogSource log)
+        public static IEnumerator KillCharacterNextFrame(Character targetCharacter, string characterName, ManualLogSource log)
         {
             yield return null;
 
             try
             {
                 log.LogInfo($"[PeakPelago] Executing instant death for {characterName}");
-                
-                var dieInstantlyMethod = targetCharacter.GetType().GetMethod("DieInstantly", 
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-                if (dieInstantlyMethod != null)
-                {
-                    dieInstantlyMethod.Invoke(targetCharacter, null);
-                    log.LogInfo($"[PeakPelago] Instant Death Trap killed {characterName}!");
-                }
-                else
-                {
-                    log.LogError("[PeakPelago] Could not find DieInstantly method");
-                }
+                targetCharacter.DieInstantly();
+                log.LogInfo($"[PeakPelago] Instant Death Trap killed {characterName}!");
             }
             catch (Exception ex)
             {

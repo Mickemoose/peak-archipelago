@@ -36,16 +36,16 @@ namespace Peak.AP
                 // Get the base max stamina from our manager
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina();
                 float statusSum = Character.observedCharacter.refs.afflictions.statusSum;
-                
+
                 // The outline extends to the BASE max (where afflictions end)
                 __instance.staminaBarOutline.sizeDelta = new Vector2(
-                    14f + baseMaxStamina * __instance.fullBar.sizeDelta.x, 
+                    14f + baseMaxStamina * __instance.fullBar.sizeDelta.x,
                     __instance.staminaBarOutline.sizeDelta.y
                 );
 
                 // The green bar shows effective stamina (base minus afflictions)
                 float effectiveMax = Mathf.Max(baseMaxStamina - statusSum, 0f);
-                
+
                 float targetMaxWidth = Mathf.Max(0f, effectiveMax * __instance.fullBar.sizeDelta.x + __instance.staminaBarOffset);
                 float lerpedMaxWidth = Mathf.Lerp(
                     __instance.maxStaminaBar.sizeDelta.x,
@@ -58,16 +58,51 @@ namespace Peak.AP
                     __instance.maxStaminaBar.sizeDelta.y
                 );
 
-                // Disable the LayoutGroup so we can position afflictions manually
                 if (__instance.afflictions.Length > 0)
                 {
-                    Transform layoutGroupTransform = __instance.afflictions[0].rtf.parent;
-                    if (layoutGroupTransform != null)
+                    Transform mainParent = null;
+                    Transform petrifyParent = null;
+
+                    for (int i = 0; i < __instance.afflictions.Length; i++)
                     {
-                        var hlg = layoutGroupTransform.GetComponent<HorizontalLayoutGroup>();
+                        var aff = __instance.afflictions[i];
+                        if (aff == null || aff.rtf == null)
+                            continue;
+
+                        if (aff.isPetrify)
+                        {
+                            if (petrifyParent == null) petrifyParent = aff.rtf.parent;
+                        }
+                        else if (mainParent == null)
+                        {
+                            mainParent = aff.rtf.parent;
+                        }
+                    }
+
+                    if (petrifyParent == null && __instance.petrifyAffliction != null && __instance.petrifyAffliction.rtf != null)
+                    {
+                        petrifyParent = __instance.petrifyAffliction.rtf.parent;
+                    }
+
+                    // The petrify bar lives in the extra stamina bar, which vanilla lays out on its own
+                    bool petrifyIsSeparate = petrifyParent != null && petrifyParent != mainParent;
+
+                    // Disable the LayoutGroup so we can position afflictions manually
+                    if (mainParent != null)
+                    {
+                        var hlg = mainParent.GetComponent<HorizontalLayoutGroup>();
                         if (hlg != null && hlg.enabled)
                         {
                             hlg.enabled = false;
+                        }
+                    }
+
+                    if (petrifyIsSeparate)
+                    {
+                        var extraHlg = petrifyParent.GetComponent<HorizontalLayoutGroup>();
+                        if (extraHlg != null && !extraHlg.enabled)
+                        {
+                            extraHlg.enabled = true;
                         }
                     }
 
@@ -76,6 +111,10 @@ namespace Peak.AP
                     for (int i = 0; i < __instance.afflictions.Length; i++)
                     {
                         var aff = __instance.afflictions[i];
+                        if (aff == null || aff.rtf == null)
+                            continue;
+                        if (petrifyIsSeparate && aff.isPetrify)
+                            continue;
                         if (!aff.gameObject.activeSelf || aff.width <= 0.01f)
                             continue;
 

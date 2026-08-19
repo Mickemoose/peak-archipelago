@@ -27,7 +27,7 @@ using UnityEngine.UI;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.6.0")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.6.1")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -107,6 +107,7 @@ namespace Peak.AP
         private int _lootSanityMode = 0; // 0=None, 1=Luggage, 2=Trees/Bushes, 3=All
         public Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
         private bool _logicalScoutStatue = false;
+        private bool _scoutAmuletSanity = false;
         public int _progressiveMountainCount = 0;
 
         // ===== AP Link Management =====
@@ -179,7 +180,6 @@ namespace Peak.AP
                 StaminaBarUpdatePatch.SetStaminaManager(_staminaManager);
                 CharacterHandlePassedOutPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
-                BarAfflictionChangeAfflictionPatch.SetStaminaManager(_staminaManager);
                 CharacterAfflictionsGetStatusCapPatch.SetStaminaManager(_staminaManager);
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _hardRingLinkService = new HardRingLinkService(_log, _notifications);
@@ -210,6 +210,7 @@ namespace Peak.AP
                 InitializeItemEffectHandlers();
                 GlobalEvents.OnAchievementThrown += OnAchievementThrown;
                 GlobalEvents.OnItemRequested += OnItemRequested;
+                GlobalEvents.OnSoulFreed += OnSoulFreed;
                 _harmony = new Harmony("com.mickemoose.peak.ap");
                 _harmony.PatchAll();
                 _log.LogInfo("[PeakPelago] Harmony patches applied successfully");
@@ -263,6 +264,7 @@ namespace Peak.AP
         {
             GlobalEvents.OnAchievementThrown -= OnAchievementThrown;
             GlobalEvents.OnItemRequested -= OnItemRequested;
+            GlobalEvents.OnSoulFreed -= OnSoulFreed;
             _ringLinkService?.Cleanup();
             _hardRingLinkService?.Cleanup();
             _breathLinkService?.Cleanup();
@@ -294,11 +296,40 @@ namespace Peak.AP
             }
         }
 
+        private void PublishSessionSeedToRoom()
+        {
+            try
+            {
+                string seed = CampfireModelSpawner.SessionSeed;
+                if (string.IsNullOrEmpty(seed)) return;
+                if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient) return;
+
+                var room = PhotonNetwork.CurrentRoom;
+                if (room.CustomProperties != null
+                    && room.CustomProperties.TryGetValue(CampfireModelSpawner.SeedRoomProperty, out object existing)
+                    && existing is string existingSeed && existingSeed == seed)
+                {
+                    return;
+                }
+
+                Hashtable props = new Hashtable();
+                props[CampfireModelSpawner.SeedRoomProperty] = seed;
+                room.SetCustomProperties(props);
+                _log.LogInfo("[PeakPelago] Published session seed to room properties");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error publishing session seed: {ex.Message}");
+            }
+        }
+
         public void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
         {
             try
             {
                 _log.LogInfo($"[PeakPelago] Player {newPlayer.NickName} joined the room");
+
+                PublishSessionSeedToRoom();
 
                 // Only the host syncs to new players
                 if (PhotonNetwork.IsMasterClient && _photonView != null)
@@ -641,6 +672,12 @@ namespace Peak.AP
         private void ShowDeathLinkRPC(string cause, string source)
         {
             _notifications?.ReceiveDeathLinkRPC(cause, source);
+        }
+
+        [PunRPC]
+        private void RPC_SpawnAntiSphere(float x, float y, float z, float lifetime)
+        {
+            AntiSphereEffect.SpawnAntiSphereAt(_log, new Vector3(x, y, z), lifetime);
         }
 
         [PunRPC]
@@ -1145,6 +1182,7 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.AppliedEsotericaBadge, "Applied Esoterica Badge" },
                 { ACHIEVEMENTTYPE.MycoacrobaticsBadge, "Mycoacrobatics Badge" },
                 { ACHIEVEMENTTYPE.CryptogastronomyBadge, "Cryptogastronomy Badge" },
+                { ACHIEVEMENTTYPE.WandererBadge, "Wanderer Badge" },
             };
 
             return _badgeToLocationMapping;
@@ -1495,15 +1533,15 @@ namespace Peak.AP
         private float _lastAcquiredItemTime = 0f;
 
         // Mapping from in-game item names to Archipelago location names
-        private Dictionary<ushort, string> _itemIdToLocationMapping = new Dictionary<ushort, string>();
+        private Dictionary<ushort, string> _itemIdToLocationMapping = [];
 
         // Track which ascent badges have been awarded to avoid duplicates
-        private HashSet<string> _awardedAscentBadges = new HashSet<string>();
+        private HashSet<string> _awardedAscentBadges = [];
         // Track which badges have been collected to avoid duplicates
-        private HashSet<ACHIEVEMENTTYPE> _collectedBadges = new HashSet<ACHIEVEMENTTYPE>();
+        private HashSet<ACHIEVEMENTTYPE> _collectedBadges = [];
 
         // Item effect handlers for Archipelago items
-        private Dictionary<string, System.Action> _itemEffectHandlers = new Dictionary<string, System.Action>();
+        private Dictionary<string, Action> _itemEffectHandlers = [];
 
         private void InitializeItemMapping()
         {
@@ -1511,12 +1549,12 @@ namespace Peak.AP
             //
             //for (ushort itemID = 0; itemID < 300; itemID++)
             //{
-            //    if (ItemDatabase.TryGetItem(itemID, out Item item))
+             //   if (ItemDatabase.TryGetItem(itemID, out Item item))
             //    {
-            //        
-            //    }
+             //       _log.LogInfo($"[PeakPelago] Item ID {itemID}: {item.name}");
+             //   }
             //}
-            //
+            
             _itemIdToLocationMapping = new Dictionary<ushort, string>
             {
                 // Rope items
@@ -1642,7 +1680,30 @@ namespace Peak.AP
                 { 21, "Acquire Yellow Clusterberry" },
 
                 { 77, "Acquire Scoutmaster's Bugle"},
-                { 60, "Acquire Scorchberry"}
+                { 60, "Acquire Scorchberry"},
+
+
+                //GLOOM & CITADEL UPDATE
+                { 192, "Acquire Anti-Zooka"},
+                { 184, "Acquire The Early Worm"},
+                { 181, "Acquire Warp Fungus"},
+                { 174, "Acquire Glider"},
+                { 173, "Acquire Ritual Dagger"},
+                { 171, "Acquire Candlestick"},
+                { 172, "Acquire Frog"},
+                { 169, "Acquire Rocketpack"},
+                { 168, "Acquire Jetpack"},
+                { 166, "Acquire Fanny Pack"},
+                { 185, "Acquire Frog Legs"},
+
+                { 182, "Acquire Scout's Tenacity"},
+                { 180, "Acquire Scout's Generosity"},
+                { 179, "Acquire Scout's Ambition"},
+                { 170, "Acquire Scout's Initiative"},
+
+                { 183, "Acquire Scout's Honor"},
+                
+
 
             };
         }
@@ -1782,6 +1843,7 @@ namespace Peak.AP
                 { "Morale Boost", () => MoraleBoost.SpawnMoraleBoost(
                     Character.localCharacter != null ? Character.localCharacter.Center : Vector3.zero,
                     -1f, 0.50f, 0f, sendToAll: true) },
+                { "Anti-Sphere", () => AntiSphereEffect.SpawnAntiSphereOnPlayer(_log, _photonView) },
 
                 // Trap Items
                 { "Spawn Bee Swarm", () => BeeSwarmTrapEffect.ApplyBeeSwarmTrap(_log) },
@@ -1828,6 +1890,12 @@ namespace Peak.AP
                 amountPerTick: 0.1f,
                 tickInterval: 1.0f,
                 duration: 5.0f
+                ) },
+                { "Turn To Stone Trap", () => StatusOverTimeTrapEffect.ApplyStatusOverTime(_log, StatusOverTimeTrapEffect.TargetMode.RandomPlayer,
+                STATUSTYPE.Petrify,
+                amountPerTick: 0.1f,
+                tickInterval: 1.0f,
+                duration: 10.0f
                 ) },
                 { "Fear Trap", () => FearTrapEffect.ApplyFearTrap(_log) },
                 { "Scoutmaster Trap", () => ScoutmasterTrapEffect.TriggerScoutmasterTrap(_log)},
@@ -2051,6 +2119,59 @@ namespace Peak.AP
         }
 
         [PunRPC]
+        private void ApplyHungerTrapRPC(int targetActorNumber, float amount)
+        {
+            try
+            {
+                if (Character.localCharacter == null)
+                {
+                    _log.LogWarning("[PeakPelago] Local character is null!");
+                    return;
+                }
+
+                if (Character.localCharacter.photonView.Owner.ActorNumber != targetActorNumber)
+                {
+                    return;
+                }
+
+                StartCoroutine(HungryHungryCamperTrapEffect.ApplyStatusNextFrame(
+                    Character.localCharacter,
+                    CharacterAfflictions.STATUSTYPE.Hunger,
+                    amount,
+                    _log
+                ));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in ApplyHungerTrapRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void InstantDeathTrapRPC(int targetActorNumber)
+        {
+            try
+            {
+                if (Character.localCharacter == null)
+                {
+                    _log.LogWarning("[PeakPelago] Local character is null!");
+                    return;
+                }
+
+                if (Character.localCharacter.photonView.Owner.ActorNumber != targetActorNumber)
+                {
+                    return;
+                }
+
+                StartCoroutine(InstantDeathTrapEffect.KillCharacterNextFrame(Character.localCharacter, "local player", _log));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in InstantDeathTrapRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
         private void SwapTrapWarpRPC(int targetActorNumber, float posX, float posY, float posZ)
         {
             try
@@ -2177,29 +2298,6 @@ namespace Peak.AP
                 _progressiveMountainCount = mountainCount;
                 
                 
-                
-                // Report the access checks as we unlock them
-                if (mountainCount >= 1)
-                {
-                    ReportCheckByName("Tropics Access");
-                    ReportCheckByName("Roots Access");
-                }
-                
-                if (mountainCount >= 2)
-                {
-                    ReportCheckByName("Alpine Access");
-                    ReportCheckByName("Mesa Access");
-                }
-                
-                if (mountainCount >= 3)
-                {
-                    ReportCheckByName("Caldera Access");
-                }
-                
-                if (mountainCount >= 4)
-                {
-                    ReportCheckByName("Kiln Access");
-                }
                 
                 _notifications.ShowSimpleMessage($"Mountain Progress {mountainCount}/4!");
                 UnlockedItemsManager.UpdateMountainCount(_progressiveMountainCount);
@@ -2389,6 +2487,70 @@ namespace Peak.AP
             }
         }
 
+        public const float TRACKER_SPAWN_COOLDOWN = 5f;
+        private float _lastTrackerSpawnTime = -999f;
+
+        public float GetTrackerSpawnCooldownRemaining()
+        {
+            float remaining = TRACKER_SPAWN_COOLDOWN - (Time.time - _lastTrackerSpawnTime);
+            return remaining > 0f ? remaining : 0f;
+        }
+
+        public bool TrySpawnTrackerItem(string internalName, out string message)
+        {
+            message = null;
+            try
+            {
+                float remaining = GetTrackerSpawnCooldownRemaining();
+                if (remaining > 0f)
+                {
+                    message = $"Cooldown {remaining:0.0}s";
+                    return false;
+                }
+
+                if (Character.localCharacter == null || Character.localCharacter.data.dead)
+                {
+                    message = "Not in a run";
+                    return false;
+                }
+
+                if (!PhotonNetwork.InRoom)
+                {
+                    message = "Not connected";
+                    return false;
+                }
+
+                if (string.IsNullOrEmpty(internalName) || !ItemIdMappings.NameToId.TryGetValue(internalName, out ushort itemId))
+                {
+                    message = "No item mapping";
+                    return false;
+                }
+
+                if (!ItemDatabase.TryGetItem(itemId, out Item itemToSpawn))
+                {
+                    message = "Item not in database";
+                    return false;
+                }
+
+                var local = Character.localCharacter;
+                Vector3 forward = MainCamera.instance != null
+                    ? MainCamera.instance.transform.forward
+                    : local.transform.forward;
+
+                Vector3 spawnPosition = local.Center + forward * 2f + Vector3.up * 0.5f;
+                PhotonNetwork.Instantiate("0_Items/" + itemToSpawn.name, spawnPosition, Quaternion.identity, 0);
+
+                _lastTrackerSpawnTime = Time.time;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error spawning tracker item: " + ex.Message);
+                message = "Spawn failed";
+                return false;
+            }
+        }
+
         private void SpawnPhysicalItem(string itemName)
         {
             try
@@ -2452,7 +2614,7 @@ namespace Peak.AP
                 return itemName?.Equals("Progressive Ascent", StringComparison.OrdinalIgnoreCase) ?? false;
             });
 
-            progressiveAscentCount = Mathf.Min(progressiveAscentCount, 7);
+            progressiveAscentCount = Mathf.Min(progressiveAscentCount, 8);
 
             _stateData.UnlockedAscents.Clear();
             for (int i = 1; i <= progressiveAscentCount; i++)
@@ -2779,25 +2941,52 @@ namespace Peak.AP
             }
         }
 
+        private static string GetPeakNameForBiome(Biome.BiomeType biome)
+        {
+            switch (biome)
+            {
+                case Biome.BiomeType.Shore:
+                    return "SHORE";
+                case Biome.BiomeType.Tropics:
+                    return "TROPICS";
+                case Biome.BiomeType.Mesa:
+                    return "MESA";
+                case Biome.BiomeType.Alpine:
+                    return "ALPINE";
+                case Biome.BiomeType.Volcano:
+                    return "CALDERA";
+                case Biome.BiomeType.Swamp:
+                    return "GLOOM";
+                case Biome.BiomeType.Roots:
+                    return "ROOTS";
+                default:
+                    return null;
+            }
+        }
+
         private string GetAscentBadgeLocation(string peakName, int ascentLevel)
         {
             // Map peak names to their ascent badge locations
             switch (peakName.ToUpper())
             {
                 case "SHORE":
-                    return "Beachcomber " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Beachcomber " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
                 case "TROPICS":
-                    return "Trailblazer " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Trailblazer " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
                 case "MESA":
-                    return "Nomad " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Nomad " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
                 case "ALPINE":
-                    return "Alpinist " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Alpinist " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
                 case "CALDERA":
-                    return "Volcanology " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Volcanology " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
                 case "THE KILN":
-                    return "Volcanology " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Volcanology " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
                 case "ROOTS":
-                    return "Forestry " + GetRomanNumeral(ascentLevel + 1) + " Badge (Ascent " + ascentLevel + ")";
+                    return "Forestry " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
+                case "GLOOM":
+                    return "Wanderer " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
+                case "CITADEL":
+                    return "Wanderer " + GetRomanNumeral(ascentLevel) + " Badge (Ascent " + ascentLevel + ")";
                 default:
                     _log.LogWarning("[PeakPelago] Unknown peak name for ascent badge: " + peakName);
                     return null;
@@ -2834,6 +3023,7 @@ namespace Peak.AP
                 case 6: return "VI";
                 case 7: return "VII";
                 case 8: return "VIII";
+                case 9: return "IX";
                 default: return number.ToString();
             }
         }
@@ -2872,26 +3062,78 @@ namespace Peak.AP
                 _log.LogWarning("[PeakPelago] CLIENT: Character or stamina manager is null, couldn't update");
             }
         }
+        private MountainHint _cachedNextMountainHint;
+        private int _cachedHintMountainCount = -1;
+        private int _cachedHintCheckedCount = -1;
+
+        private MountainHint GetNextMountainHint()
+        {
+            if (_mountainHints == null || _mountainHints.Count == 0) return null;
+
+            int checkedCount = _session != null ? _session.Locations.AllLocationsChecked.Count : -1;
+            if (_cachedHintMountainCount == _progressiveMountainCount && _cachedHintCheckedCount == checkedCount)
+            {
+                return _cachedNextMountainHint;
+            }
+
+            MountainHint resolved = null;
+            int start = Mathf.Clamp(_progressiveMountainCount, 0, _mountainHints.Count - 1);
+
+            for (int offset = 0; offset < _mountainHints.Count; offset++)
+            {
+                int i = (start + offset) % _mountainHints.Count;
+                if (!IsMountainHintCollected(_mountainHints[i]))
+                {
+                    resolved = _mountainHints[i];
+                    break;
+                }
+            }
+
+            _cachedNextMountainHint = resolved;
+            _cachedHintMountainCount = _progressiveMountainCount;
+            _cachedHintCheckedCount = checkedCount;
+            return resolved;
+        }
+
+        private bool IsMountainHintCollected(MountainHint hint)
+        {
+            if (hint == null || hint.LocationId <= 0) return true;
+            if (_session == null) return false;
+            if (hint.PlayerSlot != _session.ConnectionInfo.Slot) return false;
+
+            return _session.Locations.AllLocationsChecked.Contains(hint.LocationId);
+        }
+
         private static class CampfireHelper
         {
-            public static int GetRequiredProgressiveMountain(string biomeName)
+            public static int GetRequiredProgressiveMountain(Biome.BiomeType biome, int segmentIndex)
             {
-                switch (biomeName)
+                switch (biome)
                 {
-                    case "SHORE":
-                    case "BEACH":
+                    case Biome.BiomeType.Shore:
                         return 1;
-                    case "TROPICS":
-                    case "ROOTS":
+                    case Biome.BiomeType.Tropics:
+                    case Biome.BiomeType.Roots:
                         return 2;
-                    case "ALPINE":
-                    case "MESA":
+                    case Biome.BiomeType.Alpine:
+                    case Biome.BiomeType.Mesa:
                         return 3;
-                    case "VOLCANO":
+                    case Biome.BiomeType.Volcano:
+                    case Biome.BiomeType.Swamp:
                         return 4;
                     default:
-                        return 0;
+                        return Mathf.Clamp(segmentIndex + 1, 1, 4);
                 }
+            }
+
+            public static int GetCurrentSegmentIndex(MapHandler mapHandler)
+            {
+                if (mapHandler == null || mapHandler.segments == null) return -1;
+                if (VoidBiome.VoidBiomeActive) return -1;
+
+                int index = (int)mapHandler.GetCurrentSegment();
+                if (index < 0 || index >= mapHandler.segments.Length) return -1;
+                return index;
             }
         }
 
@@ -2927,12 +3169,15 @@ namespace Peak.AP
         [HarmonyPatch(typeof(Character), "UseStamina")]
         public static class CharacterUseStaminaBreathLinkPatch
         {
-            static void Postfix(Character __instance, bool __result)
+            static void Postfix(Character __instance, float usage, bool __result)
             {
                 try
                 {
+                    // UseStamina returns false immediately when usage is zero
+                    if (usage <= 0f) return;
                     // UseStamina returns false when stamina is fully depleted
                     if (__result) return;
+                    if (__instance.data.currentStamina > 0f || __instance.data.extraStamina > 0f) return;
                     if (!__instance.view.IsMine) return;
                     if (_instance == null) return;
                     if (_instance._breathLinkService == null || !_instance._breathLinkService.IsEnabled()) return;
@@ -2950,7 +3195,12 @@ namespace Peak.AP
         [HarmonyPatch(typeof(CharacterAfflictions), "SubtractStatus")]
         public static class CharacterAfflictionsSubtractStatusPatch
         {
-            static void Postfix(CharacterAfflictions __instance, STATUSTYPE statusType, float amount, bool fromRPC, bool decreasedNaturally)
+            static void Prefix(CharacterAfflictions __instance, out float __state)
+            {
+                __state = __instance.GetCurrentStatus(STATUSTYPE.Poison);
+            }
+
+            static void Postfix(CharacterAfflictions __instance, STATUSTYPE statusType, float amount, bool fromRPC, bool decreasedNaturally, float __state)
             {
                 try
                 {
@@ -2958,9 +3208,12 @@ namespace Peak.AP
                     if (!__instance.character.IsLocal) return;
                     if (statusType != STATUSTYPE.Poison) return;
                     if (decreasedNaturally) return; // Only count intentional healing
-                    
-                    _instance._stateData.PoisonHealed += amount;
-                    
+
+                    float healed = __state - __instance.GetCurrentStatus(STATUSTYPE.Poison);
+                    if (healed <= 0f) return;
+
+                    _instance._stateData.PoisonHealed += healed;
+
                     if (_instance._stateData.PoisonHealed >= 2.0f && !_instance._collectedBadges.Contains(ACHIEVEMENTTYPE.ToxicologyBadge))
                     {
                         _instance.ReportCheckByName("Toxicology Badge");
@@ -3006,20 +3259,17 @@ namespace Peak.AP
                     
                     if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
                     {
-                        if (Singleton<MapHandler>.Instance == null) return;
-                        
-                        int currentSegmentIndex = (int)Singleton<MapHandler>.Instance.GetCurrentSegment();
-                        
+                        int currentSegmentIndex = CampfireHelper.GetCurrentSegmentIndex(Singleton<MapHandler>.Instance);
+                        if (currentSegmentIndex < 0) return;
+
                         if (currentSegmentIndex < (int)__instance.advanceToSegment)
                         {
                             var currentSegment = Singleton<MapHandler>.Instance.segments[currentSegmentIndex];
-                            string biomeName = currentSegment.biome.ToString().ToUpper();
-                            int required = CampfireHelper.GetRequiredProgressiveMountain(biomeName);
-                            int hintIndex = required - 1;
+                            int required = CampfireHelper.GetRequiredProgressiveMountain(currentSegment.biome, currentSegmentIndex);
                             string hintText = "";
-                            if (hintIndex >= 0 && hintIndex < _instance._mountainHints.Count)
+                            var hint = _instance.GetNextMountainHint();
+                            if (hint != null)
                             {
-                                var hint = _instance._mountainHints[hintIndex];
                                 hintText = $"{hint.Location} ({hint.Player}'s {hint.Game})";
                             }
                             
@@ -3029,7 +3279,7 @@ namespace Peak.AP
                             }
                             else
                             {
-                                __result = "RELIGHT";
+                                __result = LocalizedText.GetText("LIGHT");
                             }
                         }
                     }
@@ -3051,10 +3301,9 @@ namespace Peak.AP
                     
                     if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
                     {
-                        if (Singleton<MapHandler>.Instance == null) return;
-                        
-                        int currentSegmentIndex = (int)Singleton<MapHandler>.Instance.GetCurrentSegment();
-                        
+                        int currentSegmentIndex = CampfireHelper.GetCurrentSegmentIndex(Singleton<MapHandler>.Instance);
+                        if (currentSegmentIndex < 0) return;
+
                         if (currentSegmentIndex < (int)__instance.advanceToSegment)
                         {
                             __result = true;
@@ -3082,10 +3331,9 @@ namespace Peak.AP
                     
                     if (__instance.state == Campfire.FireState.Spent && __instance.advanceToSegment != 0)
                     {
-                        if (Singleton<MapHandler>.Instance == null) return;
-                        
-                        int currentSegmentIndex = (int)Singleton<MapHandler>.Instance.GetCurrentSegment();
-                        
+                        int currentSegmentIndex = CampfireHelper.GetCurrentSegmentIndex(Singleton<MapHandler>.Instance);
+                        if (currentSegmentIndex < 0) return;
+
                         if (currentSegmentIndex < (int)__instance.advanceToSegment)
                         {
                             __result = true;
@@ -3119,32 +3367,31 @@ namespace Peak.AP
                         var mapHandler = Singleton<MapHandler>.Instance;
                         if (mapHandler == null) return true;
                         
-                        Segment currentSegment = mapHandler.GetCurrentSegment();
-                        
+                        int currentSegmentIndex = CampfireHelper.GetCurrentSegmentIndex(mapHandler);
+                        if (currentSegmentIndex < 0) return true;
+
                         // Check if we haven't advanced yet
-                        if ((int)currentSegment < (int)__instance.advanceToSegment)
+                        if (currentSegmentIndex < (int)__instance.advanceToSegment)
                         {
-                            var currentSegmentData = mapHandler.segments[(int)currentSegment];
-                            string currentBiomeName = currentSegmentData.biome.ToString().ToUpper();
-                            
-                            int requiredMountain = CampfireHelper.GetRequiredProgressiveMountain(currentBiomeName);
-                            
+                            var currentSegmentData = mapHandler.segments[currentSegmentIndex];
+
+                            int requiredMountain = CampfireHelper.GetRequiredProgressiveMountain(currentSegmentData.biome, currentSegmentIndex);
+
                             // If we now have enough, trigger the advancement
                             if (requiredMountain > 0 && _instance._progressiveMountainCount >= requiredMountain)
                             {
-                                
-                                // Advance segment on all clients using RPC
-                                if (_instance._photonView != null && PhotonNetwork.IsConnected)
+
+                                // Light on all clients, which advances the segment and writes the quicksave
+                                if (__instance.view != null && PhotonNetwork.IsConnected)
                                 {
-                                    int targetSegmentInt = (int)__instance.advanceToSegment;
-                                    _instance._photonView.RPC("SyncSegmentAdvancement", RpcTarget.All, targetSegmentInt);
+                                    __instance.view.RPC("Light_Rpc", RpcTarget.All, true, 0f);
                                 }
                                 else
                                 {
                                     // Fallback for single player
                                     mapHandler.GoToSegment(__instance.advanceToSegment);
                                 }
-                                
+
                                 return false; // Skip original method
                             }
                         }
@@ -3166,29 +3413,30 @@ namespace Peak.AP
         [HarmonyPatch(typeof(Campfire), "Light_Rpc")]
         public static class CampfireLightRpcPatch
         {
-            static bool Prefix(Campfire __instance)
+            static bool Prefix(Campfire __instance, bool updateSegment, float burningFor)
             {
                 try
                 {
                     if (_instance == null) return true;
-                    
+                    if (!updateSegment) return true;
+
                     var advanceToSegment = __instance.advanceToSegment;
                     if (advanceToSegment == 0) return true;
-                    
+
                     var mapHandler = FindFirstObjectByType<MapHandler>();
                     if (mapHandler == null) return true;
-                    
-                    int currentSegmentIndex = (int)mapHandler.GetCurrentSegment();
-                    if (currentSegmentIndex < 0 || currentSegmentIndex >= mapHandler.segments.Length)
+
+                    int currentSegmentIndex = CampfireHelper.GetCurrentSegmentIndex(mapHandler);
+                    if (currentSegmentIndex < 0)
                     {
                         return true;
                     }
-                    
+
                     var currentSegment = mapHandler.segments[currentSegmentIndex];
                     string currentBiomeName = currentSegment.biome.ToString().ToUpper();
-                    
-                    int requiredMountain = GetRequiredProgressiveMountain(currentBiomeName);
-                    
+
+                    int requiredMountain = CampfireHelper.GetRequiredProgressiveMountain(currentSegment.biome, currentSegmentIndex);
+
                     if (requiredMountain > 0)
                     {
                         if (_instance._progressiveMountainCount < requiredMountain)
@@ -3197,10 +3445,9 @@ namespace Peak.AP
                             
                             // Show warning notification
                             _instance._notifications?.ShowWarningMessage($"Need {requiredMountain} Mountain Progress to advance! (Have {_instance._progressiveMountainCount})");
-                            int hintIndex = requiredMountain - 1;
-                            if (hintIndex >= 0 && hintIndex < _instance._mountainHints.Count)
+                            var hint = _instance.GetNextMountainHint();
+                            if (hint != null)
                             {
-                                var hint = _instance._mountainHints[hintIndex];
                                 _instance._notifications?.ShowSimpleMessage($"Mountain #{requiredMountain}: {hint.Location} ({hint.Player}'s {hint.Game})");
                                 if (_instance._session != null && hint.LocationId > 0)
                                 {
@@ -3217,8 +3464,10 @@ namespace Peak.AP
                             
                             // Light the campfire but don't advance
                             __instance.state = Campfire.FireState.Lit;
-                            
-                            var updateLitMethod = typeof(Campfire).GetMethod("UpdateLit", 
+                            __instance.beenBurningFor = burningFor;
+                            Shader.SetGlobalFloat("FakeMountainEnabled", (!__instance.disableFogFakeMountain) ? 1 : 0);
+
+                            var updateLitMethod = typeof(Campfire).GetMethod("UpdateLit",
                                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                             updateLitMethod?.Invoke(__instance, null);
                             
@@ -3243,27 +3492,8 @@ namespace Peak.AP
                 }
             }
             
-            private static int GetRequiredProgressiveMountain(string biomeName)
-            {
-                switch (biomeName)
-                {
-                    case "SHORE":
-                    case "BEACH":
-                        return 1;
-                    case "TROPICS":
-                    case "ROOTS":
-                        return 2;
-                    case "ALPINE":
-                    case "MESA":
-                        return 3;
-                    case "VOLCANO":
-                        return 4;
-                    default:
-                        return 0;
-                }
-            }
         }
-        [HarmonyPatch(typeof(PauseMenuMainPage), "OnQuitClicked")]
+        [HarmonyPatch(typeof(PauseMenuMainPage), "Quit")]
         public static class PauseMenuQuitPatch
         {
             static void Prefix()
@@ -3418,43 +3648,36 @@ namespace Peak.AP
                 {
                     if (_instance == null) return;
                     
-                    int currentSegment = (int)__instance.GetCurrentSegment();
-                    
-                    // Update spawn points for DeathLink
-                    if (currentSegment >= 0 && currentSegment < __instance.segments.Length)
-                    {
-                        var segment = __instance.segments[currentSegment];
-                        if (segment.reconnectSpawnPos != null)
-                        {
-                            foreach (var character in Character.AllCharacters)
-                            {
-                                if (character != null)
-                                {
-                                    character.data.spawnPoint = segment.reconnectSpawnPos;
-                                }
-                            }
+                    int currentSegment = CampfireHelper.GetCurrentSegmentIndex(__instance);
+                    if (currentSegment < 0) return;
 
+                    // Update spawn points for DeathLink
+                    var segment = __instance.segments[currentSegment];
+                    if (segment.reconnectSpawnPos != null)
+                    {
+                        foreach (var character in Character.AllCharacters)
+                        {
+                            if (character != null)
+                            {
+                                character.data.spawnPoint = segment.reconnectSpawnPos;
+                            }
                         }
                     }
-                    
+
+
                     // Award badge for the segment we just COMPLETED (previous segment)
                     if (currentSegment > 0)
                     {
                         var previousSegment = __instance.segments[currentSegment - 1];
-                        var progressHandler = MountainProgressHandler.Instance;
-                        
-                        if (progressHandler != null && progressHandler.progressPoints != null)
+                        string peakName = GetPeakNameForBiome(previousSegment.biome);
+
+                        if (peakName != null)
                         {
-                            // Find the progress point that matches the biome we just completed
-                            foreach (var point in progressHandler.progressPoints)
-                            {
-                                if (point.biome == previousSegment.biome)
-                                {
-                                    string peakName = point.title;
-                                    _instance.HandleAscentPeakReached(peakName);
-                                    break;
-                                }
-                            }
+                            _instance.HandleAscentPeakReached(peakName);
+                        }
+                        else
+                        {
+                            _instance._log.LogWarning($"[PeakPelago] No ascent badge mapping for completed biome {previousSegment.biome}");
                         }
                     }
                 }
@@ -3471,7 +3694,12 @@ namespace Peak.AP
         [HarmonyPatch(typeof(Luggage), "OpenLuggageRPC")]
         public static class LuggageOpenRPCPatch
         {
-            static void Postfix(Luggage __instance)
+            static void Prefix(Luggage __instance, out bool __state)
+            {
+                __state = __instance.state == Luggage.LuggageState.Open;
+            }
+
+            static void Postfix(Luggage __instance, bool spawnItems, bool __state)
             {
                 try
                 {
@@ -3479,6 +3707,9 @@ namespace Peak.AP
                     {
                         return;
                     }
+
+                    // Only count a real player open that actually transitioned the luggage
+                    if (!spawnItems || __state) return;
 
                     // Host observes ALL luggage opens via the RPC
 
@@ -3762,7 +3993,7 @@ namespace Peak.AP
                         int maxConsecutiveAscent = 0;
 
                         // Check for consecutive ascents starting from 1
-                        for (int i = 1; i <= 7; i++) // Ascents go from 1 to 7
+                        for (int i = 1; i <= 8; i++) // Ascents go from 1 to 8
                         {
                             if (sortedAscents.Contains(i))
                             {
@@ -4285,6 +4516,7 @@ namespace Peak.AP
                         }
                     }
                     _logicalScoutStatue = ReadBoolOption(loginResult, "logical_scout_statue", _logicalScoutStatue);
+                    _scoutAmuletSanity = ReadBoolOption(loginResult, "scout_amulet_sanity", _scoutAmuletSanity);
 
                     LoadOfflineChecks();
                     if (_stateData.OfflineChecks.Count > 0)
@@ -4315,7 +4547,7 @@ namespace Peak.AP
                 SaveState();
                 _status = "Connected";
                 _wantReconnect = false;
-                UnlockedItemsManager.Initialize(_log, _session, _itemSanityEnabled, _lootSanityMode, _logicalScoutStatue, _progressiveMountainCount, _stateData, _lootBiomeAssignments);
+                UnlockedItemsManager.Initialize(_log, _session, _itemSanityEnabled, _lootSanityMode, _logicalScoutStatue, _progressiveMountainCount, _stateData, _lootBiomeAssignments, _scoutAmuletSanity);
                 _notifications.ShowConnected();
                 if (LootData.AllSpawnWeightData != null)
                 {
@@ -4395,7 +4627,19 @@ namespace Peak.AP
                             _collectedBadges.Add(badgeType);
                             
                             // Set the badge in the character's badge status array
-                            int badgeIndex = (int)badgeType;
+                            int badgeIndex = -1;
+                            var badgeData = GUIManager.instance?.mainBadgeManager?.badgeData;
+                            if (badgeData != null)
+                            {
+                                for (int i = 0; i < badgeData.Length; i++)
+                                {
+                                    if (badgeData[i] != null && badgeData[i].linkedAchievement == badgeType)
+                                    {
+                                        badgeIndex = i;
+                                        break;
+                                    }
+                                }
+                            }
                             if (badgeIndex >= 0 && badgeIndex < Character.localCharacter.data.badgeStatus.Length)
                             {
                                 Character.localCharacter.data.badgeStatus[badgeIndex] = true;
@@ -5056,6 +5300,9 @@ namespace Peak.AP
                     currentSessionId = loginResult.SlotData["session_id"].ToString();
                 }
 
+                CampfireModelSpawner.SetSessionSeed(currentSessionId);
+                PublishSessionSeedToRoom();
+
                 _stateManager.CheckAndHandleSessionChange(currentSessionId, ClearCacheForSessionChange);
             }
             catch (Exception ex)
@@ -5196,6 +5443,22 @@ namespace Peak.AP
         // ===== Item Acquisition Event Handling =====
 
         /// <summary>Handle item request events to track item acquisitions</summary>
+        private void OnSoulFreed(int phase)
+        {
+            try
+            {
+                // Phase 0 is the pre-stinger beat; phase 1 is the state change the game itself gates on
+                if (phase != 1) return;
+
+                _log.LogInfo("[PeakPelago] Scoutmaster's soul freed in the Nadir");
+                ReportCheckByName("Soul Freed");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("[PeakPelago] Error handling soul freed: " + ex.Message);
+            }
+        }
+
         private void OnItemRequested(Item item, Character character)
         {
             try

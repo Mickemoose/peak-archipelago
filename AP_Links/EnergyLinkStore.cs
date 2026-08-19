@@ -46,7 +46,7 @@ namespace Peak.AP
             
             foreach (var kvp in spawnedModels)
             {
-                if (kvp.Key != null && kvp.Key.GetInstanceID() == campfireInstanceId)
+                if (kvp.Key != null && GetStableCampfireId(kvp.Key) == campfireInstanceId)
                 {
                     var store = kvp.Value?.GetComponent<EnergyLinkStoreInteractable>();
                     if (store != null)
@@ -63,6 +63,47 @@ namespace Peak.AP
         {
             _energyLinkService = service;
             _log?.LogInfo("[CampfireSpawner] EnergyLinkService reference set");
+        }
+
+        public const string SeedRoomProperty = "AP_SessionSeed";
+        public static string SessionSeed = "";
+
+        public static void SetSessionSeed(string seed)
+        {
+            SessionSeed = seed ?? "";
+            _log?.LogInfo("[CampfireSpawner] Session seed set");
+        }
+
+        public static string GetKnownSessionSeed()
+        {
+            if (!string.IsNullOrEmpty(SessionSeed)) return SessionSeed;
+
+            var room = PhotonNetwork.CurrentRoom;
+            if (room?.CustomProperties != null
+                && room.CustomProperties.TryGetValue(SeedRoomProperty, out object value)
+                && value is string seed)
+            {
+                return seed;
+            }
+            return "";
+        }
+
+        public static uint Fnv1a(string text)
+        {
+            uint hash = 2166136261;
+            foreach (char c in text)
+            {
+                hash ^= c;
+                hash *= 16777619;
+            }
+            return hash;
+        }
+
+        public static int GetStableCampfireId(Campfire campfire)
+        {
+            if (campfire == null) return 0;
+            Vector3 p = campfire.transform.position;
+            return unchecked((int)Fnv1a($"{Mathf.RoundToInt(p.x)}|{Mathf.RoundToInt(p.y)}|{Mathf.RoundToInt(p.z)}"));
         }
 
         private static void LoadModelPrefab()
@@ -426,15 +467,20 @@ namespace Peak.AP
                 _log?.LogInfo($"[EnergyLinkStore] Initial energy: {_cachedEnergy}"); // REMOVED max energy
             }
             UpdateCachedEnergy();
-            SelectRandomBundle();
+            SelectBundle();
             SetEmissiveTexture(CampfireModelSpawner.redEmissiveTexture);
         }
 
-        private void SelectRandomBundle()
+        private static readonly List<KeyValuePair<string, BundleDefinition>> OrderedBundles =
+            BundleDefinitions.OrderBy(kvp => kvp.Key, StringComparer.Ordinal).ToList();
+        private string _selectionSeed;
+
+        private void SelectBundle()
         {
-            var bundleList = BundleDefinitions.ToList();
-            var randomIndex = UnityEngine.Random.Range(0, bundleList.Count);
-            var selectedBundle = bundleList[randomIndex];
+            _selectionSeed = CampfireModelSpawner.GetKnownSessionSeed();
+            int campfireId = CampfireModelSpawner.GetStableCampfireId(_parentCampfire);
+            uint hash = CampfireModelSpawner.Fnv1a($"{_selectionSeed}|{campfireId}");
+            var selectedBundle = OrderedBundles[(int)(hash % (uint)OrderedBundles.Count)];
 
             var bundleDef = selectedBundle.Value;
             _selectedBundleAction = () => DispenseBundle(bundleDef);
@@ -493,6 +539,11 @@ namespace Peak.AP
             {
                 UpdateCachedEnergy();
                 _lastEnergyUpdateTime = Time.time;
+
+                if (_isAvailable && _selectionSeed != CampfireModelSpawner.GetKnownSessionSeed())
+                {
+                    SelectBundle();
+                }
             }
         }
 
@@ -693,7 +744,7 @@ namespace Peak.AP
                 // Client sends RPC to host
                 if (_parentCampfire != null)
                 {
-                    int campfireId = _parentCampfire.GetInstanceID();
+                    int campfireId = CampfireModelSpawner.GetStableCampfireId(_parentCampfire);
                     _log?.LogInfo($"[EnergyLinkStore] CLIENT: Sending purchase request to host for campfire {campfireId}");
                     
                     // Send to host to process
@@ -717,7 +768,7 @@ namespace Peak.AP
                 _log?.LogInfo($"[EnergyLinkStore] Purchase successful!");
                 
                 // Broadcast to all clients that this store was purchased
-                int campfireId = _parentCampfire.GetInstanceID();
+                int campfireId = CampfireModelSpawner.GetStableCampfireId(_parentCampfire);
                 object[] data = [campfireId];
                 
                 RaiseEventOptions raiseEventOptions = new RaiseEventOptions { Receivers = ReceiverGroup.All };
@@ -735,16 +786,22 @@ namespace Peak.AP
         {
             _isAvailable = false;
             SetEmissiveTexture(CampfireModelSpawner.greenEmissiveTexture);
-            _selectedBundleAction?.Invoke();
+            if (PhotonNetwork.IsMasterClient)
+            {
+                _selectedBundleAction?.Invoke();
+            }
         }
-        
+
         [PunRPC]
         private void RPC_PurchaseStore()
         {
             _log?.LogInfo("[EnergyLinkStore] RPC received - executing purchase");
             _isAvailable = false;
             SetEmissiveTexture(CampfireModelSpawner.greenEmissiveTexture);
-            _selectedBundleAction?.Invoke();
+            if (PhotonNetwork.IsMasterClient)
+            {
+                _selectedBundleAction?.Invoke();
+            }
         }
         public void CancelCast(Character interactor)
         {

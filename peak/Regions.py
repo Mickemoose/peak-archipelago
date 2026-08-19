@@ -64,10 +64,11 @@ def create_peak_regions(world: "PeakWorld"):
     # If goal is "Reach Peak" (0), exclude ascent badges above the required level
     excluded_ascent_levels = set()
     if goal_type == 0 or goal_type == 3:  # Reach Peak goal or Peak and Badges goal
-        for ascent_level in range(required_ascent + 1, 8):  # Ascents above required level
+        for ascent_level in range(required_ascent + 1, 9):  # Ascents above required level
             excluded_ascent_levels.add(ascent_level)
     
     logging.info(f"[Player {world.multiworld.player_name[world.player]}] Excluded ascent levels: {excluded_ascent_levels}")
+
     
     excluded_location_count = 0
     created_location_count = 0
@@ -127,6 +128,8 @@ def create_peak_regions(world: "PeakWorld"):
         ("Ascent 5 Completed", "Ascent 5 Completed"),
         ("Ascent 6 Completed", "Ascent 6 Completed"),
         ("Ascent 7 Completed", "Ascent 7 Completed"),
+        ("Ascent 8 Completed", "Ascent 8 Completed"),
+        ("Soul Freed", "Soul Freed"),
         ("Idol Dunked", "Idol Dunked"),
         ("All Badges Collected", "All Badges Collected"),
         ("Mesa Access", "Mesa Access"),

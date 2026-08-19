@@ -147,7 +147,22 @@ namespace Peak.AP
                 // Apply the status tick locally
                 if (character.refs.afflictions != null)
                 {
-                    character.refs.afflictions.AddStatus(statusType, amountPerTick);
+                    // AddStatus scales these statuses by the run's difficulty modifier, so undo it
+                    float tickAmount = amountPerTick;
+                    if (character.refs.afflictions.StatusAffectedByDifficultyMod(statusType))
+                    {
+                        float difficultyMultiplier = Ascents.etcDamageMultiplier;
+                        if (difficultyMultiplier <= 0f)
+                        {
+                            log.LogWarning($"[PeakPelago] {statusType} DOT is disabled by this run's damage settings - stopping trap");
+                            PeakArchipelagoPlugin._instance?._trapLinkService?.NotifyTrapComplete();
+                            yield break;
+                        }
+
+                        tickAmount /= difficultyMultiplier;
+                    }
+
+                    character.refs.afflictions.AddStatus(statusType, tickAmount);
                     tickCount++;
 
                     log.LogDebug($"[PeakPelago] {statusType} DOT tick {tickCount}/{totalTicks} on {characterName}");

@@ -165,7 +165,7 @@ namespace Peak.AP
             { "C_Rook_m Variant", 150 },
             { "C_Rook_m", 151 },
             { "FortifiedMilk", 152 },
-            { "FortifiedMilk_TEMP", 153 },
+            { "Glizzy_CattailVariant", 153 },
             { "Glizzy", 154 },
             { "Mandrake", 155 },
             { "Mandrake_Hidden", 156 },
@@ -177,6 +177,35 @@ namespace Peak.AP
             { "Shroomberry_Yellow", 162 },
             { "Skull", 163 },
             { "Parasol_Roots Variant", 164 },
+            { "Snowball", 165 },
+            { "Fannypack", 166 },
+            { "RescueHook_Infinite", 167 },
+            { "Jetpack", 168 },
+            { "Rocketpack", 169 },
+            { "Amulet_SuperJump", 170 }, //Scout's Initiative
+            { "Candle", 171 },
+            { "Frog", 172 },
+            { "RitualDagger", 173 },
+            { "Glider", 174 },
+            { "Warpsketball", 175 }, //unused warp basketball maybe we add it?
+            { "Parachute", 176 }, //unused parachute
+            { "EggRaven", 177 },
+            { "NestEgg_Raven", 178 },
+            { "Amulet_InfiniteStamina", 179 }, //Scout's Ambition
+            { "Amulet_Clone", 180 }, //Scout's Generosity
+            { "WarpFungus", 181 },
+            { "Amulet_Healing", 182 }, //Scout's Tenacity
+            { "ScoutsHonor", 183 },
+            { "EarlyWorm", 184 },
+            { "FrogLegs", 185 },
+            { "GuidebookPage_4_Poison", 186 },
+            { "GuidebookPage_5_Zombies", 187 },
+            { "GuidebookPage_7_BurningSun", 188 },
+            { "GuidebookPage_8_Magma", 189 },
+            { "GuidebookPage_9_Gloom", 190 },
+            { "ScoutmasterSoul", 191 },
+            { "AntiZooka", 192 },
+            { "Cheat Compass 1", 193 },
         };
 
         /// <summary>
@@ -284,6 +313,27 @@ namespace Peak.AP
             { "Red Clusterberry Unlock", "Clusterberry Red" },
             { "Yellow Clusterberry Unlock", "Clusterberry Yellow" },
             { "Scoutmaster's Bugle Unlock", "Bugle_Scoutmaster Variant" },
+            { "Scorchberry Unlock", "Pepper Berry" },
+            { "Scout's Honor Unlock", "ScoutsHonor" },
+            { "Scout's Initiative Unlock", "Amulet_SuperJump" },
+            { "Scout's Ambition Unlock", "Amulet_InfiniteStamina" },
+            { "Scout's Generosity Unlock", "Amulet_Clone" },
+            { "Scout's Tenacity Unlock", "Amulet_Healing" },
+            { "Anti-Zooka Unlock", "AntiZooka" },
+            { "The Early Worm Unlock", "EarlyWorm" },
+            { "Frog Unlock", "Frog" },
+            { "Fanny Pack Unlock", "Fannypack" },
+            { "Frog Legs Unlock", "FrogLegs" },
+            { "Jetpack Unlock", "Jetpack" },
+            { "Rocketpack Unlock", "Rocketpack" },
+            { "Glider Unlock", "Glider" },
+            { "Warp Fungus Unlock", "WarpFungus" },
+            { "Ritual Dagger Unlock", "RitualDagger" },
+            { "Candlestick Unlock", "Candle" },
+            //{ "Parachute Unlock", "Parachute" },
+            //{ "Warpsketball Unlock", "Warpsketball" },
+
+            
         };
 
         /// <summary>

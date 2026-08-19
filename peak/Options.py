@@ -13,24 +13,27 @@ class Goal(Choice):
     24 Karat Badge: Toss the Ancient Idol into The Kiln's lava.
 
     Peak and Badges: Reach the peak on the specified ascent level and collect the specified number of badges
+
+    Free The Soul: Free the Scoutmaster's soul in [REDACTED] in Ascent 8.
     """
     display_name = "Goal"
     option_reach_peak = 0
     option_complete_all_badges = 1
     option_24_karat_badge = 2
     option_peak_and_badges = 3
+    option_free_the_soul = 4
     default = 0
 
 
 class AscentCount(Range):
     """
-    The ascent level required to complete the Reach Peak goal (0-7)
+    The ascent level required to complete the Reach Peak goal (0-8)
     
     Higher ascents add more difficulty modifiers and challenges
     """
     display_name = "Required Ascent Count"
     range_start = 0
-    range_end = 7
+    range_end = 8
     default = 4
 
 
@@ -86,6 +89,19 @@ class LootSanity(Choice):
     option_trees_and_bushes = 2
     option_all = 3
     default = 0
+
+class ScoutAmuletSanity(Toggle):
+    """
+    When enabled, the four Scout amulets (Tenacity, Generosity, Ambition, Initiative) and
+    Scout's Honor take part in Item Sanity and Loot Sanity like any other item: their Unlock
+    items join the pool and Loot Sanity may redistribute them.
+
+    When disabled they spawn exactly as they do in vanilla, and their Acquire checks only
+    require reaching the biome they are normally found in.
+
+    Their Acquire checks exist either way.
+    """
+    display_name = "Scout Amulet Sanity"
 
 class LogicalScoutStatue(Toggle):
     """
@@ -330,6 +346,11 @@ class FungalInfectionTrapWeight(BaseTrapWeight):
     Likelihood of receiving a trap which applies a Spores Affliction over time to a player
     """
     display_name = "Fungal Infection Trap Weight"
+class TurnToStoneTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which slowly turns a player to stone
+    """
+    display_name = "Turn To Stone Trap Weight"
 class FearTrapWeight(BaseTrapWeight):
     """
     Likelihood of receiving a spooky trap
@@ -476,6 +497,7 @@ peak_option_groups = [
         ItemSanity,
         LootSanity,
         LogicalScoutStatue,
+        ScoutAmuletSanity,
     ]),
     OptionGroup("Stamina", [
         ProgressiveStamina,
@@ -519,6 +541,7 @@ peak_option_groups = [
         GustTrapWeight,
         MandrakeTrapWeight,
         FungalInfectionTrapWeight,
+        TurnToStoneTrapWeight,
         FearTrapWeight,
         ScoutmasterTrapWeight,
         ZoomTrapWeight,
@@ -554,6 +577,7 @@ class PeakOptions(PerGameCommonOptions):
     item_sanity: ItemSanity
     loot_sanity: LootSanity
     logical_scout_statue: LogicalScoutStatue
+    scout_amulet_sanity: ScoutAmuletSanity
 
     disable_multiplayer_badges: DisableMultiplayerBadges
     disable_hard_badges: DisableHardBadges
@@ -595,6 +619,7 @@ class PeakOptions(PerGameCommonOptions):
     gust_trap_weight: GustTrapWeight
     mandrake_trap_weight: MandrakeTrapWeight
     fungal_infection_trap_weight: FungalInfectionTrapWeight
+    turn_to_stone_trap_weight: TurnToStoneTrapWeight
     fear_trap_weight: FearTrapWeight
     scoutmaster_trap_weight: ScoutmasterTrapWeight
     zoom_trap_weight: ZoomTrapWeight

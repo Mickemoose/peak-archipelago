@@ -27,8 +27,15 @@ namespace Peak.AP
 
                 if (Scoutmaster.GetPrimaryScoutmaster(out Scoutmaster scoutmaster))
                 {
+                    // SetCurrentTarget silently drops the RPC while the Scoutmaster is prevented from spawning
+                    if (scoutmaster.preventSpawning)
+                    {
+                        log.LogWarning("[PeakPelago] Scoutmaster cannot spawn in this run - trap had no effect");
+                        return;
+                    }
+
                     scoutmaster.SetCurrentTarget(targetCharacter, forceForTime: 45f);
-                    
+
                     log.LogInfo($"[PeakPelago] Scoutmaster now hunting {characterName}!");
                 }
                 else

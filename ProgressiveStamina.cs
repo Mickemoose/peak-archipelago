@@ -256,39 +256,6 @@ namespace Peak.AP
 
     }
 
-    // Keep all your existing Harmony patches - they stay the same
-    [HarmonyPatch(typeof(BarAffliction), "ChangeAffliction")]
-    public static class BarAfflictionChangeAfflictionPatch
-    {
-        private static ProgressiveStaminaManager _staminaManager;
-
-        public static void SetStaminaManager(ProgressiveStaminaManager manager)
-        {
-            _staminaManager = manager;
-        }
-
-        static void Postfix(BarAffliction __instance, StaminaBar bar)
-        {
-            try
-            {
-                if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
-                {
-                    return;
-                }
-                if (Character.observedCharacter == null)
-                {
-                    return;
-                }
-                float currentStatus = Character.observedCharacter.refs.afflictions.GetCurrentStatus(__instance.afflictionType);
-                __instance.size = bar.fullBar.sizeDelta.x * currentStatus;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[PeakPelago] BarAffliction ChangeAffliction patch error: {ex.Message}");
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(BarAffliction), "UpdateAffliction")]
     public static class BarAfflictionUpdateAfflictionPatch
     {
@@ -308,6 +275,10 @@ namespace Peak.AP
                     return true;
                 }
                 if (Character.observedCharacter == null)
+                {
+                    return true;
+                }
+                if (__instance.isPetrify)
                 {
                     return true;
                 }
@@ -414,6 +385,12 @@ namespace Peak.AP
                 if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
                     return true;
 
+                if (__instance.data.shouldPetrify)
+                {
+                    __instance.DieInstantly();
+                    return false;
+                }
+
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
 
@@ -444,13 +421,11 @@ namespace Peak.AP
                         {
                             if (!PhotonNetwork.IsMasterClient)
                                 __instance.data.zombified = true;
-                            __instance.photonView.RPC("RPCA_Zombify", RpcTarget.MasterClient,
-                                __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
+                            __instance.photonView.RPC("RPCA_Zombify", RpcTarget.MasterClient);
                         }
                         else
                         {
-                            __instance.photonView.RPC("RPCA_Die", RpcTarget.All,
-                                __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
+                            __instance.photonView.RPC("RPCA_Die", RpcTarget.All);
                         }
                     }
                 }
@@ -487,7 +462,7 @@ namespace Peak.AP
                 float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
                 float statusSum = __instance.refs.afflictions.statusSum;
 
-                bool shouldPassOut = statusSum >= baseMaxStamina;
+                bool shouldPassOut = statusSum >= baseMaxStamina || __instance.data.shouldPetrify;
 
                 if (shouldPassOut)
                 {
@@ -495,8 +470,7 @@ namespace Peak.AP
                     {
                         if (!__instance.TryCheckpoint())
                         {
-                            __instance.photonView.RPC("RPCA_Die", RpcTarget.All,
-                                __instance.Center + Vector3.up * 0.2f + Vector3.forward * 0.1f);
+                            __instance.photonView.RPC("RPCA_Die", RpcTarget.All);
                         }
                     }
                     else
@@ -504,7 +478,14 @@ namespace Peak.AP
                         __instance.data.passOutValue = Mathf.MoveTowards(__instance.data.passOutValue, 1f, Time.deltaTime / 5f);
                         if (__instance.data.passOutValue > 0.999f)
                         {
-                            __instance.photonView.RPC("RPCA_PassOut", RpcTarget.All);
+                            if (__instance.data.shouldPetrify)
+                            {
+                                __instance.DieInstantly();
+                            }
+                            else
+                            {
+                                __instance.photonView.RPC("RPCA_PassOut", RpcTarget.All);
+                            }
                         }
                     }
                 }

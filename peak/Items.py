@@ -158,6 +158,7 @@ filler_table = {
     "Bing Bong":                    ItemData(77053, ItemClassification.filler),
     "Strange Gem":                  ItemData(77066, ItemClassification.filler),
     "Morale Boost":                 ItemData(77124, ItemClassification.filler),
+    "Anti-Sphere":                  ItemData(77131, ItemClassification.filler),
 }
 
 trap_table = {
@@ -206,6 +207,7 @@ trap_table = {
     "Chaos Control Trap":         ItemData(77127, ItemClassification.trap),
     "Emergency Rescue Trap":      ItemData(77128, ItemClassification.trap),
     "Explosion Trap":             ItemData(77129, ItemClassification.trap),
+    "Turn To Stone Trap":         ItemData(77130, ItemClassification.trap),
 }
 
 # All items that have "Acquire X" locations need unlock versions for logic
@@ -236,6 +238,23 @@ _unlock_items = [
     "Purple Kingberry", "Yellow Kingberry", "Green Kingberry",
     "Black Clusterberry", "Red Clusterberry", "Yellow Clusterberry",
     "Scorchberry",
+    # Gloom & Citadel update
+    "Anti-Zooka",
+    "The Early Worm",
+    "Warp Fungus",
+    "Glider",
+    "Ritual Dagger",
+    "Candlestick",
+    "Frog",
+    "Rocketpack",
+    "Jetpack",
+    "Fanny Pack",
+    "Frog Legs",
+    "Scout's Tenacity",
+    "Scout's Generosity",
+    "Scout's Ambition",
+    "Scout's Initiative",
+    "Scout's Honor",
 ]
 
 _UNLOCK_ID_START = 78100

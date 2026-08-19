@@ -58,7 +58,11 @@ namespace Peak.AP
             var seq = handler.peakSequence.GetComponent<PeakSequence>();
             if (seq != null)
                 seq.totalWinningSeconds = seq.totalSeconds;
-            Character.forceWin = true;
+            // Ascent 8+ requires a Nadir win, so don't hand out a plain forced win there
+            if (!Ascents.shouldRequireNadir)
+            {
+                Character.forceWin = true;
+            }
             handler.SummonHelicopter();
         }
     }

@@ -75,6 +75,7 @@ namespace Peak.AP
             public const string Confusion = "Confusion Trap";
             public const string ControlBall = "Control Ball Trap";
             public const string ControllerDrift = "Controller Drift Trap";
+            public const string Crystal = "Crystal Trap";
             public const string CursedBall = "Cursed Ball Trap";
             public const string Cutscene = "Cutscene Trap";
             public const string Damage = "Damage Trap";
@@ -340,6 +341,9 @@ namespace Peak.AP
 
             Register("Fungal Infection Trap", StandardTraps.Posession,
                 StandardTraps.Posession);
+
+            Register("Turn To Stone Trap", StandardTraps.Crystal,
+                StandardTraps.Crystal);
 
             Register("Items to Bombs", StandardTraps.ItemsToBombs,
                 StandardTraps.ItemsToBombs);
@@ -651,6 +655,7 @@ namespace Peak.AP
             "Fear Trap",
             "Stamina Drain Trap",
             "Fungal Infection Trap",
+            "Turn To Stone Trap"
         };
 
         private void ActivateTrap(string trapName, bool fromTrapLink)

@@ -6,13 +6,19 @@ if TYPE_CHECKING:
     from . import PeakWorld
 
 CALDERA_LOCATIONS = [
-    "Acquire Big Egg", "Acquire Egg", "Acquire Cooked Bird", "Nomad Badge", "Alpinist Badge", "Cool Cucumber Badge", "Bundled Up Badge"
+    "Acquire Big Egg", "Acquire Egg", "Acquire Cooked Bird", "Nomad Badge", "Alpinist Badge", "Cool Cucumber Badge", "Bundled Up Badge",
+    "Acquire Candlestick", "Acquire Anti-Zooka", "Acquire The Early Worm", "Acquire Warp Fungus",
+    "Acquire Frog", "Acquire Ritual Dagger", "Acquire Frog Legs", "Acquire Rocketpack",
+    "Acquire Jetpack", "Acquire Fanny Pack",
+    "Acquire Scout's Tenacity", "Acquire Scout's Generosity", "Acquire Scout's Ambition",
+    "Acquire Scout's Initiative",
 ]
 
 KILN_LOCATIONS = [
     "Acquire Strange Gem", "Peak Badge", "Speed Climber Badge", "Lone Wolf Badge", "Participation Badge",
     "Survivalist Badge", "Naturalist Badge", "Leave No Trace Badge", "Balloon Badge", "Bing Bong Badge",
     "Gourmand Badge", "High Altitude Badge", "Knot Tying Badge", "24 Karat Badge", "Volcanology Badge",
+    "Wanderer Badge", "Acquire Scout's Honor"
 ]
 
 ROOTS_LOCATIONS = [
@@ -250,6 +256,31 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Pink Berrynana Peel": "Pink Berrynana Unlock",
         "Acquire Blue Berrynana Peel": "Blue Berrynana Unlock",
         "Acquire Brown Berrynana Peel": "Brown Berrynana Unlock",
+
+        # Gloom & Citadel update
+        "Acquire Anti-Zooka": "Anti-Zooka Unlock",
+        "Acquire The Early Worm": "The Early Worm Unlock",
+        "Acquire Warp Fungus": "Warp Fungus Unlock",
+        "Acquire Glider": "Glider Unlock",
+        "Acquire Ritual Dagger": "Ritual Dagger Unlock",
+        "Acquire Candlestick": "Candlestick Unlock",
+        "Acquire Frog": "Frog Unlock",
+        "Acquire Rocketpack": "Rocketpack Unlock",
+        "Acquire Jetpack": "Jetpack Unlock",
+        "Acquire Fanny Pack": "Fanny Pack Unlock",
+        "Acquire Frog Legs": "Frog Legs Unlock",
+        "Acquire Scout's Tenacity": "Scout's Tenacity Unlock",
+        "Acquire Scout's Generosity": "Scout's Generosity Unlock",
+        "Acquire Scout's Ambition": "Scout's Ambition Unlock",
+        "Acquire Scout's Initiative": "Scout's Initiative Unlock",
+        "Acquire Scout's Honor": "Scout's Honor Unlock",
+    }
+
+    scout_amulet_sanity = world.options.scout_amulet_sanity.value
+    scout_amulet_locations = {
+        "Acquire Scout's Tenacity", "Acquire Scout's Generosity",
+        "Acquire Scout's Ambition", "Acquire Scout's Initiative",
+        "Acquire Scout's Honor",
     }
 
     # Generate loot biome assignments (shuffled when loot sanity is on)
@@ -257,13 +288,20 @@ def apply_rules(world: "PeakWorld"):
     loot_biome = generate_loot_biome_assignments(
         acquire_item_rules.keys(), world.random, loot_sanity_mode
     )
+    # The five Scout amulet items keep their vanilla biomes when they are not part of loot sanity
+    if not scout_amulet_sanity:
+        for _name in scout_amulet_locations:
+            if _name in loot_biome:
+                loot_biome[_name] = _get_vanilla_biome_level(_name)
+
     world.loot_biome_assignments = loot_biome
 
     # Apply acquire item rules using the (possibly shuffled) biome assignments
     for location_name, required_item in acquire_item_rules.items():
         try:
             biome_level = loot_biome.get(location_name, 0)
-            if item_sanity:
+            needs_unlock = item_sanity and (scout_amulet_sanity or location_name not in scout_amulet_locations)
+            if needs_unlock:
                 if biome_level == 0:
                     set_rule(world.get_location(location_name),
                              lambda state, item=required_item:
@@ -297,6 +335,22 @@ def apply_rules(world: "PeakWorld"):
         try:
             set_rule(world.get_location("Acquire Pirate's Compass"),
                      lambda state: state.has("Progressive Mountain", player, 4))
+        except KeyError:
+            pass
+
+    # Scout's Honor also requires the other four Scout's items, on top of its biome level
+    if item_sanity and scout_amulet_sanity:
+        _scout_unlocks = [
+            "Scout's Tenacity Unlock", "Scout's Generosity Unlock",
+            "Scout's Ambition Unlock", "Scout's Initiative Unlock",
+        ]
+        try:
+            _honor_level = loot_biome.get("Acquire Scout's Honor", 0)
+            set_rule(world.get_location("Acquire Scout's Honor"),
+                     lambda state, lvl=_honor_level: (
+                         state.has("Scout's Honor Unlock", player) and
+                         state.has_all(_scout_unlocks, player) and
+                         (lvl == 0 or state.has("Progressive Mountain", player, lvl))))
         except KeyError:
             pass
 
@@ -698,9 +752,9 @@ def apply_rules(world: "PeakWorld"):
                 pass
 
     # Ascent locations require their corresponding Ascent Completed events
-    roman_numerals = ["II", "III", "IV", "V", "VI", "VII", "VIII"]
+    roman_numerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
 
-    max_relevant_ascent = 7
+    max_relevant_ascent = 8
     if goal_type == 0 or goal_type == 3:  # Peak Goal or Peak and Badges Goal
         max_relevant_ascent = required_ascent
 
@@ -712,7 +766,7 @@ def apply_rules(world: "PeakWorld"):
                                              state.has("Progressive Stamina Bar", player, 3))
             return lambda state, a=asc: (state.has("Kiln Access", player) and
                                          state.has("Progressive Ascent", player, a))
-        if asc in [6, 7]:
+        if asc in [6, 7, 8]:
             if with_stamina:
                 return lambda state, a=asc: (state.has("Kiln Access", player) and
                                              state.has("Progressive Ascent", player, a) and
@@ -741,7 +795,8 @@ def apply_rules(world: "PeakWorld"):
             f"Alpinist {roman_num} Badge (Ascent {ascent_num})",
             f"Volcanology {roman_num} Badge (Ascent {ascent_num})",
             f"Nomad {roman_num} Badge (Ascent {ascent_num})",
-            f"Forestry {roman_num} Badge (Ascent {ascent_num})"
+            f"Forestry {roman_num} Badge (Ascent {ascent_num})",
+            f"Wanderer {roman_num} Badge (Ascent {ascent_num})",
         ]
 
         for ascent_name in ascent_locations:
@@ -750,6 +805,13 @@ def apply_rules(world: "PeakWorld"):
                          _ascent_rule(ascent_num, progressive_stamina_enabled))
             except KeyError:
                 pass
+
+    # Freeing the Scoutmaster's soul happens in the Nadir, which only Ascent 8 routes through
+    try:
+        set_rule(world.get_location("Soul Freed"),
+                 _ascent_rule(8, progressive_stamina_enabled))
+    except KeyError:
+        pass
 
     # Scout sashes require completion of ALL previous ascents
     scout_sashe_requirements = {

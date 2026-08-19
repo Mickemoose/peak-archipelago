@@ -707,7 +707,7 @@ namespace Peak.AP
         private RectTransform _trackerScrollContent;
         private TextMeshProUGUI _trackerTooltip;
 
-        private static readonly string[] BiomeNames = { "Shore", "Tropics / Roots", "Mesa / Alpine", "Caldera", "Kiln" };
+        private static readonly string[] BiomeNames = { "Shore", "Tropics / Roots", "Mesa / Alpine", "Caldera / Gloom", "Kiln / Citadel" };
 
         private void EnsureTrackerScroll()
         {
@@ -920,6 +920,7 @@ namespace Peak.AP
                 bool isLocked = !isAcquired && itemSanity && !isUnlocked;
                 string capturedUnlockName = unlockName;
                 string capturedItemName = itemName;
+                string capturedInternalName = internalName;
 
                 var trigger = cell.gameObject.AddComponent<EventTrigger>();
                 var enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
@@ -931,7 +932,7 @@ namespace Peak.AP
                     else if (isLocked)
                         ShowTrackerTooltip(GetHintCostText());
                     else
-                        ShowTrackerTooltip(capturedItemName);
+                        ShowTrackerTooltip(GetSpawnTooltip(capturedItemName, capturedInternalName));
                 });
                 trigger.triggers.Add(enterEntry);
                 var exitEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
@@ -942,6 +943,12 @@ namespace Peak.AP
                 {
                     var clickEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
                     clickEntry.callback.AddListener((_) => OnLockedItemClicked(capturedUnlockName));
+                    trigger.triggers.Add(clickEntry);
+                }
+                else if (capturedInternalName != null)
+                {
+                    var clickEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
+                    clickEntry.callback.AddListener((_) => OnUnlockedItemClicked(capturedInternalName, capturedItemName));
                     trigger.triggers.Add(clickEntry);
                 }
 
@@ -979,6 +986,29 @@ namespace Peak.AP
             {
                 return "Click to hint";
             }
+        }
+
+        private string GetSpawnTooltip(string itemName, string internalName)
+        {
+            if (internalName == null) return itemName;
+
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin == null) return itemName;
+
+            float remaining = plugin.GetTrackerSpawnCooldownRemaining();
+            if (remaining > 0f) return $"{itemName} - Cooldown {remaining:0.0}s";
+            return $"{itemName} - Click to spawn";
+        }
+
+        private void OnUnlockedItemClicked(string internalName, string itemName)
+        {
+            var plugin = PeakArchipelagoPlugin._instance;
+            if (plugin == null) return;
+
+            if (plugin.TrySpawnTrackerItem(internalName, out string message))
+                ShowTrackerTooltip($"Spawned {itemName}");
+            else
+                ShowTrackerTooltip(message ?? "Cannot spawn");
         }
 
         private void OnLockedItemClicked(string unlockName)

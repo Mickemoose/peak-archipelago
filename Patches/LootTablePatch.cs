@@ -42,7 +42,8 @@ namespace PeakArchipelago
                 {
                     SpawnPool.LuggageBeach, SpawnPool.LuggageJungle, SpawnPool.LuggageTundra,
                     SpawnPool.LuggageMesa, SpawnPool.LuggageCaldera, SpawnPool.LuggageRoots,
-                    SpawnPool.LuggageClimber
+                    SpawnPool.LuggageClimber, SpawnPool.LuggageAncient, SpawnPool.LuggageGloom,
+                    SpawnPool.LuggageCitadel, SpawnPool.LuggageClown
                 };
 
                 foreach (var item in multiplayerSpecialItems)
@@ -121,15 +122,31 @@ namespace PeakArchipelago
     [HarmonyPatch(typeof(Item), "IsValidToSpawn")]
     public static class ItemIsValidToSpawnPatch
     {
-        static bool Prefix(ref bool __result)
+        static bool Prefix(Item __instance, ref bool __result)
         {
             // AP manages the loot tables directly - skip the banInSolo check
-            if (PeakArchipelagoPlugin._instance?.Session != null)
+            if (PeakArchipelagoPlugin._instance?.Session == null) return true;
+
+            var lootData = __instance.GetComponent<LootData>();
+            string validityName = (lootData != null && lootData.useOtherItemForSpawningValidity != null)
+                ? lootData.useOtherItemForSpawningValidity.gameObject.name
+                : __instance.gameObject.name;
+
+            if (!RunSettings.IsItemEnabled(validityName))
             {
-                __result = true;
+                __result = false;
                 return false;
             }
-            return true;
+
+            if (lootData != null && lootData.excludeBasedOnCustomRunSetting && RunSettings.IsCustomRun &&
+                RunSettings.GetValue(lootData.excludeIfSettingDisabled) == 0)
+            {
+                __result = false;
+                return false;
+            }
+
+            __result = true;
+            return false;
         }
     }
 

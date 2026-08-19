@@ -54,9 +54,9 @@ namespace Peak.AP
         private static IEnumerator GustCoroutine(ManualLogSource log)
         {
             var zone = WindChillZone.instance;
-            if (zone == null)
+            if (zone == null || !zone.isActiveAndEnabled)
             {
-                log.LogWarning("[PeakPelago] WindChillZone.instance is null, applying force-only gust");
+                log.LogWarning("[PeakPelago] WindChillZone is unavailable or disabled by run settings, applying force-only gust");
                 yield return PeakArchipelagoPlugin._instance.StartCoroutine(ForceOnlyCoroutine(log));
                 yield break;
             }
