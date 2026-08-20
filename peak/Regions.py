@@ -22,7 +22,8 @@ def create_peak_regions(world: "PeakWorld"):
 
     # Determine which ascent levels should be excluded based on goal settings
     required_ascent = world.options.ascent_count.value
-    goal_type = world.options.goal.value
+    goals = world.options.goals.value
+    wants_peak = "Reach Peak" in goals
 
     multiplayer_badges = {
         "Ultimate Badge",
@@ -59,11 +60,11 @@ def create_peak_regions(world: "PeakWorld"):
         "Competitive Eating Badge"
     }
     
-    logging.info(f"[Player {world.multiworld.player_name[world.player]}] Goal Type: {goal_type}, Required Ascent: {required_ascent}")
+    logging.info(f"[Player {world.multiworld.player_name[world.player]}] Goals: {sorted(goals)}, Required Ascent: {required_ascent}")
     
     # If goal is "Reach Peak" (0), exclude ascent badges above the required level
     excluded_ascent_levels = set()
-    if goal_type == 0 or goal_type == 3:  # Reach Peak goal or Peak and Badges goal
+    if wants_peak:  # Ascent locations above the required level are unreachable
         for ascent_level in range(required_ascent + 1, 9):  # Ascents above required level
             excluded_ascent_levels.add(ascent_level)
     
@@ -99,7 +100,7 @@ def create_peak_regions(world: "PeakWorld"):
             excluded_location_count += 1
             logging.info(f"[Player {world.multiworld.player_name[world.player]}] SKIPPING HARD BADGE: {name}")
         
-        if goal_type == 0 or goal_type == 3:  # Only skip if goal is Reach Peak or Peak and Badges
+        if wants_peak:  # Only skip if Reach Peak limits the relevant ascents
             for level in excluded_ascent_levels:
                 if f"(Ascent {level})" in name:
                     should_skip = True
@@ -143,7 +144,7 @@ def create_peak_regions(world: "PeakWorld"):
     for loc_name, item_name in event_locations:
         # Skip creating event locations for excluded ascents
         should_skip_event = False
-        if goal_type == 0 or goal_type == 3:
+        if wants_peak:
             for level in excluded_ascent_levels:
                 if f"Ascent {level} Completed" == loc_name:
                     should_skip_event = True

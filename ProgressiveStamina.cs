@@ -160,6 +160,14 @@ namespace Peak.AP
             return GetPlayerStamina(character.photonView.Owner);
         }
 
+        public bool ShouldPassOutExtended(Character character)
+        {
+            if (character == null || character.refs?.afflictions == null) return false;
+            var afflictions = character.refs.afflictions;
+            if (afflictions.m_inAirport) return false;
+            return afflictions.statusSum >= GetBaseMaxStamina(character);
+        }
+
         public float GetBaseMaxStamina(int actorNumber)
         {
             if (!_progressiveStaminaEnabled) return 1.0f;
@@ -391,10 +399,7 @@ namespace Peak.AP
                     return false;
                 }
 
-                float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
-                float statusSum = __instance.refs.afflictions.statusSum;
-
-                if (statusSum < baseMaxStamina && Time.time - __instance.data.lastPassedOut > 3f)
+                if (!_staminaManager.ShouldPassOutExtended(__instance) && Time.time - __instance.data.lastPassedOut > 3f)
                 {
                     bool unPassOutCalled = _unPassOutCalledField != null && (bool)_unPassOutCalledField.GetValue(__instance);
                     if (!unPassOutCalled)
@@ -459,10 +464,7 @@ namespace Peak.AP
                     return true;
                 }
 
-                float baseMaxStamina = _staminaManager.GetBaseMaxStamina(__instance);
-                float statusSum = __instance.refs.afflictions.statusSum;
-
-                bool shouldPassOut = statusSum >= baseMaxStamina || __instance.data.shouldPetrify;
+                bool shouldPassOut = _staminaManager.ShouldPassOutExtended(__instance) || __instance.data.shouldPetrify;
 
                 if (shouldPassOut)
                 {
@@ -500,6 +502,66 @@ namespace Peak.AP
             {
                 Debug.LogError($"[PeakPelago] HandleLife patch error: {ex.Message}");
                 return true;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(CharacterAfflictions), nameof(CharacterAfflictions.shouldPassOut), MethodType.Getter)]
+    public static class CharacterAfflictionsShouldPassOutPatch
+    {
+        private static ProgressiveStaminaManager _staminaManager;
+
+        public static void SetStaminaManager(ProgressiveStaminaManager manager)
+        {
+            _staminaManager = manager;
+        }
+
+        static void Postfix(CharacterAfflictions __instance, ref bool __result)
+        {
+            try
+            {
+                if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
+                    return;
+
+                __result = _staminaManager.ShouldPassOutExtended(__instance.character);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PeakPelago] shouldPassOut patch error: {ex.Message}");
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(CharacterAfflictions), nameof(CharacterAfflictions.AddStatus))]
+    public static class CharacterAfflictionsOverflowCapPatch
+    {
+        private static ProgressiveStaminaManager _staminaManager;
+
+        public static void SetStaminaManager(ProgressiveStaminaManager manager)
+        {
+            _staminaManager = manager;
+        }
+
+        static void Postfix(CharacterAfflictions __instance, CharacterAfflictions.STATUSTYPE statusType, bool __result)
+        {
+            try
+            {
+                if (!__result) return;
+                if (_staminaManager == null || !_staminaManager.IsProgressiveStaminaEnabled())
+                    return;
+
+                float cap = _staminaManager.GetBaseMaxStamina(__instance.character) + 1f;
+                float excess = __instance.statusSum - cap;
+                if (excess > 0f)
+                {
+                    int index = (int)statusType;
+                    __instance.currentStatuses[index] = Mathf.Max(0f, __instance.currentStatuses[index] - excess);
+                    __instance.character.ClampStamina();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PeakPelago] AddStatus overflow cap patch error: {ex.Message}");
             }
         }
     }

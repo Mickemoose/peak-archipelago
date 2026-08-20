@@ -109,9 +109,19 @@ namespace Peak.AP
             }
         }
 
+        private int _lastTrackerVersion;
+        private float _lastTrackerRefreshTime;
+
         private void Update()
         {
             if (_built) UpdateStatus();
+
+            if (_built && _trackerContent != null && _trackerContent.gameObject.activeInHierarchy
+                && PeakArchipelagoPlugin.TrackerVersion != _lastTrackerVersion
+                && Time.unscaledTime - _lastTrackerRefreshTime >= 0.5f)
+            {
+                RefreshTrackerContent();
+            }
         }
 
         private void UpdateStatus()
@@ -799,19 +809,9 @@ namespace Peak.AP
             return acquired;
         }
 
-        private HashSet<string> GetUnlockedItemNames()
+        private HashSet<ushort> GetUnlockedTrackerItemIds()
         {
-            var unlocked = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
-            var plugin = PeakArchipelagoPlugin._instance;
-            if (plugin?._session == null) return unlocked;
-
-            foreach (var item in plugin._session.Items.AllItemsReceived)
-            {
-                string itemName = plugin._session.Items.GetItemName(item.ItemId, item.ItemGame);
-                if (itemName != null)
-                    unlocked.Add(itemName);
-            }
-            return unlocked;
+            return UnlockedItemsManager.GetUnlockedItemIds();
         }
 
         private static readonly int[] BiomeMountainReq = { 0, 1, 2, 3, 4 };
@@ -850,8 +850,73 @@ namespace Peak.AP
             else if (_font != null) tmp.font = _font;
         }
 
+        private static readonly string[] SpawnCategoryOrder = { "Luggage", "Bushes & Trees", "Luggage & Foliage", "Statues", "World" };
+
+        private static bool TryGetItemIdForAcquire(string acquireLoc, out ushort itemId)
+        {
+            itemId = 0;
+            string itemName = acquireLoc.StartsWith("Acquire ") ? acquireLoc.Substring(8) : acquireLoc;
+            string unlockName = itemName + " Unlock";
+            if (ItemIdMappings.ApNameToInternalName.TryGetValue(unlockName, out string internalName))
+            {
+                return ItemIdMappings.NameToId.TryGetValue(internalName, out itemId);
+            }
+            return false;
+        }
+
+        private void CreateCategorizedGrids(RectTransform parent, List<string> acquireLocNames,
+            HashSet<string> acquired, HashSet<ushort> unlocked, bool itemSanity)
+        {
+            var groups = new Dictionary<string, List<string>>();
+            foreach (var loc in acquireLocNames)
+            {
+                string category = "World";
+                if (TryGetItemIdForAcquire(loc, out ushort itemId))
+                {
+                    category = UnlockedItemsManager.GetTrackerSpawnCategory(itemId);
+                }
+                if (!groups.ContainsKey(category))
+                    groups[category] = new List<string>();
+                groups[category].Add(loc);
+            }
+
+            if (groups.Count <= 1)
+            {
+                CreateIconGrid(parent, acquireLocNames, acquired, unlocked, itemSanity);
+                return;
+            }
+
+            foreach (var category in SpawnCategoryOrder)
+            {
+                if (!groups.TryGetValue(category, out var groupLocs)) continue;
+                CreateCategorySubHeader(parent, category);
+                CreateIconGrid(parent, groupLocs, acquired, unlocked, itemSanity);
+            }
+        }
+
+        private void CreateCategorySubHeader(RectTransform parent, string label)
+        {
+            var row = CreateChild(parent, label + "_SubHeader");
+            row.sizeDelta = new Vector2(row.sizeDelta.x, 22f);
+
+            var textChild = CreateChild(row, "Label");
+            textChild.anchorMin = Vector2.zero;
+            textChild.anchorMax = Vector2.one;
+            textChild.offsetMin = new Vector2(14f, 0f);
+            textChild.offsetMax = Vector2.zero;
+            var tmp = textChild.gameObject.AddComponent<TextMeshProUGUI>();
+            tmp.text = label;
+            tmp.fontSize = 15;
+            tmp.fontStyle = FontStyles.Italic;
+            tmp.color = new Color(0.75f, 0.68f, 0.6f, 0.9f);
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
+            tmp.raycastTarget = false;
+            if (_tabFont != null) tmp.font = _tabFont;
+            else if (_font != null) tmp.font = _font;
+        }
+
         private void CreateIconGrid(RectTransform parent, List<string> acquireLocNames,
-            HashSet<string> acquired, HashSet<string> unlocked, bool itemSanity)
+            HashSet<string> acquired, HashSet<ushort> unlocked, bool itemSanity)
         {
             var gridRow = CreateChild(parent, "IconGrid");
 
@@ -860,10 +925,18 @@ namespace Peak.AP
             grid.spacing = new Vector2(4, 4);
             grid.padding = new RectOffset(8, 8, 4, 4);
             grid.childAlignment = TextAnchor.UpperLeft;
-            grid.constraint = GridLayoutGroup.Constraint.Flexible;
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
 
-            var gridFitter = gridRow.gameObject.AddComponent<ContentSizeFitter>();
-            gridFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            float contentWidth = _trackerScrollContent.rect.width;
+            if (contentWidth <= 0f) contentWidth = _trackerContent.rect.width;
+            float availableWidth = contentWidth - 20f - 16f;
+            int columns = availableWidth > 0f
+                ? Mathf.Max(1, Mathf.FloorToInt(availableWidth / (56f + 4f)))
+                : 8;
+            grid.constraintCount = columns;
+
+            int rows = Mathf.Max(1, Mathf.CeilToInt((float)acquireLocNames.Count / columns));
+            gridRow.sizeDelta = new Vector2(gridRow.sizeDelta.x, rows * 56 + (rows - 1) * 4 + 8);
 
             int count = 0;
             foreach (var acquireLoc in acquireLocNames)
@@ -881,7 +954,7 @@ namespace Peak.AP
                 }
 
                 bool isAcquired = acquired.Contains(acquireLoc);
-                bool isUnlocked = !itemSanity || unlocked.Contains(unlockName);
+                bool isUnlocked = !itemSanity || unlocked.Contains(itemId);
 
                 Texture2D icon = null;
                 if (internalName != null && ItemDatabase.TryGetItem(itemId, out Item gameItem))
@@ -1061,6 +1134,12 @@ namespace Peak.AP
         {
             EnsureTrackerScroll();
 
+            _lastTrackerVersion = PeakArchipelagoPlugin.TrackerVersion;
+            _lastTrackerRefreshTime = Time.unscaledTime;
+
+            var scroll = _trackerContent.GetComponent<ScrollRect>();
+            float scrollPos = scroll != null ? scroll.verticalNormalizedPosition : 1f;
+
             for (int i = _trackerScrollContent.childCount - 1; i >= 0; i--)
                 Destroy(_trackerScrollContent.GetChild(i).gameObject);
 
@@ -1074,7 +1153,7 @@ namespace Peak.AP
             bool itemSanity = plugin._itemSanityEnabled;
             int mountains = plugin._progressiveMountainCount;
             var acquired = GetAcquiredLocationNames();
-            var unlocked = GetUnlockedItemNames();
+            var unlocked = GetUnlockedTrackerItemIds();
 
             var biomeGroups = new Dictionary<int, List<string>>();
             foreach (var kvp in plugin._lootBiomeAssignments)
@@ -1096,8 +1175,18 @@ namespace Peak.AP
 
                 CreateBiomeHeader(_trackerScrollContent, BiomeNames[level].ToUpper(), locked, req);
                 if (!locked)
-                    CreateIconGrid(_trackerScrollContent, locs, acquired, unlocked, itemSanity);
+                    CreateCategorizedGrids(_trackerScrollContent, locs, acquired, unlocked, itemSanity);
             }
+
+            if (scroll != null)
+                StartCoroutine(RestoreTrackerScroll(scroll, scrollPos));
+        }
+
+        private System.Collections.IEnumerator RestoreTrackerScroll(ScrollRect scroll, float pos)
+        {
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            scroll.verticalNormalizedPosition = pos;
         }
 
         private Button CreateTabButton(RectTransform parent, string label)

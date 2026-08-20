@@ -269,9 +269,85 @@ namespace Peak.AP
             }
         }
 
+        public static bool CanCreateScoutsHonor()
+        {
+            if (!_itemSanityEnabled || !_scoutAmuletSanity) return true;
+            return IsItemUnlocked(SCOUTS_HONOR_ITEM_ID);
+        }
+
+        private const ushort STRANGE_GEM_ITEM_ID = 112;
+
+        public static bool CanSpawnStrangeGem()
+        {
+            if (!_itemSanityEnabled) return true;
+            return IsItemUnlocked(STRANGE_GEM_ITEM_ID);
+        }
+
+        public static string GetTrackerSpawnCategory(ushort itemId)
+        {
+            if (ScoutAmuletItemIds.Contains(itemId) || itemId == STRANGE_GEM_ITEM_ID) return "Statues";
+
+            switch (_lootSanityMode)
+            {
+                case 1: return "Luggage";
+                case 2: return "Bushes & Trees";
+                case 3: return "Luggage & Foliage";
+            }
+
+            if (OriginalLootWeights.HasCaptured)
+            {
+                bool inLuggage = LuggagePools.Any(p => OriginalLootWeights.GetOriginalWeight(p, itemId) > 0);
+                bool inNatural = NaturalPools.Any(p => OriginalLootWeights.GetOriginalWeight(p, itemId) > 0);
+                if (inLuggage && inNatural) return "Luggage & Foliage";
+                if (inLuggage) return "Luggage";
+                if (inNatural) return "Bushes & Trees";
+                if (OriginalLootWeights.GetOriginalWeight(SpawnPool.RespawnCoffin, itemId) > 0) return "Statues";
+            }
+
+            return "World";
+        }
+
+        public static bool IsAmuletChainItem(ushort itemId)
+        {
+            return ScoutAmuletItemIds.Contains(itemId) || itemId == STRANGE_GEM_ITEM_ID;
+        }
+
+        public static bool CanSpawnScoutAmulet(ushort itemId)
+        {
+            if (itemId == STRANGE_GEM_ITEM_ID) return CanSpawnStrangeGem();
+            if (!ScoutAmuletItemIds.Contains(itemId)) return true;
+            if (!_itemSanityEnabled || !_scoutAmuletSanity) return true;
+            return IsItemUnlocked(itemId);
+        }
+
+        private const string ProgressiveAmuletUnlockName = "Progressive Amulet Unlock";
+
+        private static readonly ushort[] AmuletChainOrder =
+        {
+            STRANGE_GEM_ITEM_ID,
+            SCOUTS_TENACITY_ITEM_ID,
+            SCOUTS_GENEROSITY_ITEM_ID,
+            SCOUTS_AMBITION_ITEM_ID,
+            SCOUTS_INITIATIVE_ITEM_ID,
+            SCOUTS_HONOR_ITEM_ID,
+        };
+
+        private static int GetProgressiveAmuletCount()
+        {
+            if (_session == null) return 0;
+            return _session.Items.AllItemsReceived.Count(item =>
+            {
+                string name = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                return name != null && name.Equals(ProgressiveAmuletUnlockName, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+
         public static bool IsItemUnlocked(ushort itemId)
         {
             if (_session == null) return true;
+
+            int chainIndex = Array.IndexOf(AmuletChainOrder, itemId);
+            if (chainIndex >= 0 && GetProgressiveAmuletCount() > chainIndex) return true;
 
             string apItemName = null;
             foreach (var kvp in ItemIdMappings.ApNameToInternalName)
@@ -297,13 +373,25 @@ namespace Peak.AP
             var unlocked = new HashSet<ushort>();
             if (_session == null) return unlocked;
 
+            int progressiveAmulets = 0;
             foreach (var item in _session.Items.AllItemsReceived)
             {
                 string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
-                if (itemName != null && ItemIdMappings.TryGetIdFromApName(itemName, out ushort gameItemId))
+                if (itemName == null) continue;
+                if (itemName.Equals(ProgressiveAmuletUnlockName, StringComparison.OrdinalIgnoreCase))
+                {
+                    progressiveAmulets++;
+                    continue;
+                }
+                if (ItemIdMappings.TryGetIdFromApName(itemName, out ushort gameItemId))
                 {
                     unlocked.Add(gameItemId);
                 }
+            }
+
+            for (int i = 0; i < progressiveAmulets && i < AmuletChainOrder.Length; i++)
+            {
+                unlocked.Add(AmuletChainOrder[i]);
             }
 
             return unlocked;

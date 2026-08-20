@@ -92,7 +92,20 @@ namespace Peak.AP
                     (d, line) => { if (float.TryParse(line.Trim(), out float poisonHealed)) { d.PoisonHealed = poisonHealed; _log.LogDebug($"[PeakPelago] Loaded poison healed: {poisonHealed}"); } }),
                 new LineHandler(
                     d => d.TotalBasketsScored.ToString(),
-                    (d, line) => { if (int.TryParse(line.Trim(), out int baskets)) { d.TotalBasketsScored = baskets; _log.LogDebug($"[PeakPelago] Loaded baskets scored: {baskets}"); } })
+                    (d, line) => { if (int.TryParse(line.Trim(), out int baskets)) { d.TotalBasketsScored = baskets; _log.LogDebug($"[PeakPelago] Loaded baskets scored: {baskets}"); } }),
+                new LineHandler(
+                    d => $"{(d.GoalSoulFreed ? 1 : 0)},{(d.GoalIdolDunked ? 1 : 0)},{(d.GoalAscentReached ? 1 : 0)}",
+                    (d, line) =>
+                    {
+                        var parts = line.Trim().Split(',');
+                        if (parts.Length >= 3)
+                        {
+                            d.GoalSoulFreed = parts[0] == "1";
+                            d.GoalIdolDunked = parts[1] == "1";
+                            d.GoalAscentReached = parts[2] == "1";
+                            _log.LogDebug($"[PeakPelago] Loaded goal progress: soul={d.GoalSoulFreed}, idol={d.GoalIdolDunked}, ascent={d.GoalAscentReached}");
+                        }
+                    })
             };
         }
 
@@ -309,6 +322,9 @@ namespace Peak.AP
         public float DamageBlockedByMilk { get; set; } = 0f;
         public float PoisonHealed { get; set; } = 0f;
         public int TotalBasketsScored { get; set; } = 0;
+        public bool GoalSoulFreed { get; set; } = false;
+        public bool GoalIdolDunked { get; set; } = false;
+        public bool GoalAscentReached { get; set; } = false;
 
         public void Clear()
         {
@@ -323,6 +339,9 @@ namespace Peak.AP
             DamageBlockedByMilk = 0f;
             PoisonHealed = 0f;
             TotalBasketsScored = 0;
+            GoalSoulFreed = false;
+            GoalIdolDunked = false;
+            GoalAscentReached = false;
         }
     }
 }

@@ -37,7 +37,7 @@ TRAP_DEFINITIONS = [
     ("Gust Trap", "gust_trap_weight"),
     ("Mandrake Trap", "mandrake_trap_weight"),
     ("Fungal Infection Trap", "fungal_infection_trap_weight"),
-    ("Trun To Stone Trap", "turn_to_stone_trap_weight"),
+    ("Turn To Stone Trap", "turn_to_stone_trap_weight"),
     ("Fear Trap", "fear_trap_weight"),
     ("Scoutmaster Trap", "scoutmaster_trap_weight"),
     ("Zoom Trap", "zoom_trap_weight"),
@@ -53,6 +53,7 @@ TRAP_DEFINITIONS = [
     ("Chaos Control Trap", "chaos_control_trap_weight"),
     ("Emergency Rescue Trap", "emergency_rescue_trap_weight"),
     ("Explosion Trap", "explosion_trap_weight"),
+    ("Frog Trap", "frog_trap_weight"),
 ]
 
 class PeakWeb(WebWorld):
@@ -123,7 +124,9 @@ class PeakWorld(World):
     def create_items(self):
         """Create the initial item pool based on the location table."""
         
-        goal_type = self.options.goal.value
+        goals = self.options.goals.value
+        wants_peak = "Reach Peak" in goals
+        wants_soul = "Free The Soul" in goals
         required_ascent = self.options.ascent_count.value
 
         total_locations = sum(1 for loc in self.multiworld.get_locations(self.player) if loc.address is not None)
@@ -132,7 +135,7 @@ class PeakWorld(World):
         item_pool = []
         
         # Add Progressive Ascent items based on goal requirements
-        if goal_type == 0 or goal_type == 3:  # Reach Peak goal - only add enough Progressive Ascent for the required level
+        if wants_peak:  # Reach Peak goal - only add enough Progressive Ascent for the required level
             for _ in range(required_ascent):
                 item_pool.append(self.create_item("Progressive Ascent"))
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {required_ascent} Progressive Ascent items (Reach Peak goal)")
@@ -143,7 +146,8 @@ class PeakWorld(World):
 
         for _ in range(4):
             item_pool.append(self.create_item("Progressive Mountain"))
-        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 4 Progressive Mountain items")
+        self.multiworld.early_items[self.player]["Progressive Mountain"] = 1
+        logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 4 Progressive Mountain items (1 early)")
     
         for _ in range(8):
             item_pool.append(self.create_item("Progressive Endurance"))
@@ -172,10 +176,18 @@ class PeakWorld(World):
                 "Scout's Ambition Unlock", "Scout's Initiative Unlock",
                 "Scout's Honor Unlock",
             }
+            progressive_amulets = wants_soul and self.options.scout_amulet_sanity.value
+            amulet_chain_unlocks = scout_amulet_unlocks | {"Strange Gem Unlock"}
             for unlock_name in unlock_table.keys():
                 if unlock_name in scout_amulet_unlocks and not self.options.scout_amulet_sanity.value:
                     continue
+                if progressive_amulets and unlock_name in amulet_chain_unlocks:
+                    continue
                 item_pool.append(self.create_item(unlock_name))
+            if progressive_amulets:
+                for _ in range(6):
+                    item_pool.append(self.create_item("Progressive Amulet Unlock"))
+                logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Replaced amulet chain unlocks with 6 Progressive Amulet Unlock items (Free The Soul goal)")
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {len(unlock_table)} unlock items (ItemSanity enabled)")
         else:
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Skipping unlock items (ItemSanity disabled)")
@@ -200,6 +212,8 @@ class PeakWorld(World):
         
         # Fill remaining slots with filler items
         filler_items = list(filler_table.keys())
+        if wants_soul:
+            filler_items = [f for f in filler_items if f != "Strange Gem"]
         while len(item_pool) < total_locations:
             filler_name = self.random.choice(filler_items)
             item_pool.append(self.create_item(filler_name))
@@ -232,7 +246,7 @@ class PeakWorld(World):
 
         player = self.player
         # Count total Progressive items we're placing
-        prog_ascent_count = 8 if self.options.goal.value != 0 and self.options.goal.value != 3 else self.options.ascent_count.value
+        prog_ascent_count = self.options.ascent_count.value if "Reach Peak" in self.options.goals.value else 8
         prog_stamina_count = 0
         if self.options.progressive_stamina.value:
             prog_stamina_count = 7 if self.options.additional_stamina_bars.value else 4
@@ -370,39 +384,26 @@ class PeakWorld(World):
                     location.item_rule = shore_mountain_limit
 
         # Access options directly via self.options
-        goal = self.options.goal.value
+        goals = self.options.goals.value
         ascent_num = self.options.ascent_count.value
 
-        # Set completion condition based on goal type
-        if goal == 0:  # Reach Peak
-            if 1 <= ascent_num <= 8:
-                self.multiworld.completion_condition[self.player] = (
-                    lambda state, n=ascent_num: state.has(f"Ascent {n} Completed", self.player)
-                )
-            else:
-                return 
+        # Every selected goal must be completed
+        required_events = []
+        if "Reach Peak" in goals and 1 <= ascent_num <= 8:
+            required_events.append(f"Ascent {ascent_num} Completed")
+        if "Collect Badges" in goals:
+            required_events.append("All Badges Collected")
+        if "24 Karat Badge" in goals:
+            required_events.append("Idol Dunked")
+        if "Free The Soul" in goals:
+            required_events.append("Soul Freed")
 
-        elif goal == 1:  # Complete All Badges
-            self.multiworld.completion_condition[self.player] = (
-                lambda state: state.has("All Badges Collected", self.player)
-            )
+        if not required_events:
+            return
 
-        elif goal == 2:  # 24 Karat Badge
-            self.multiworld.completion_condition[self.player] = (
-                lambda state: state.has("Idol Dunked", self.player)
-            )
-        elif goal == 3:  # Peak and Badges
-            if 1 <= ascent_num <= 8:
-                self.multiworld.completion_condition[self.player] = (
-                    lambda state, n=ascent_num: state.has(f"Ascent {n} Completed", self.player) and state.has("All Badges Collected", self.player)
-                )
-        elif goal == 4:  # Free The Soul
-            self.multiworld.completion_condition[self.player] = (
-                lambda state: state.has("Soul Freed", self.player)
-            )
-        else:
-            return  # Unsupported goal type, exit early
-
+        self.multiworld.completion_condition[self.player] = (
+            lambda state, events=tuple(required_events): state.has_all(events, self.player)
+        )
         return
 
     def get_sphere_index(self) -> typing.Dict[typing.Tuple[int, str], int]:
@@ -465,7 +466,7 @@ class PeakWorld(World):
         ]
         
         slot_data = {
-            "goal": self.options.goal.value,
+            "goals": sorted(self.options.goals.value),
             "ascent_count": self.options.ascent_count.value,
             "badge_count": actual_badge_count,
             "progressive_stamina": self.options.progressive_stamina.value,
@@ -476,7 +477,11 @@ class PeakWorld(World):
             "energy_link": self.options.energy_link.value,
             "trap_link": self.options.trap_link.value,
             "breath_link": self.options.breath_link.value,
+            "damage_link": self.options.damage_link.value,
+            "damage_link_group": self.options.damage_link_group.value,
+            "knockback_link": self.options.knockback_link.value,
             "death_link": self.options.death_link.value,
+            "death_link_group": self.options.death_link_group.value,
             "death_link_behavior": self.options.death_link_behavior.value,
             "death_link_send_behavior": self.options.death_link_send_behavior.value,
             "active_traps": self.output_active_traps(),
@@ -498,6 +503,9 @@ class PeakWorld(World):
 
     def get_filler_item_name(self):
         """Randomly select a filler item from the available candidates."""
-        if not filler_table:
+        candidates = list(filler_table.keys())
+        if "Free The Soul" in self.options.goals.value:
+            candidates = [f for f in candidates if f != "Strange Gem"]
+        if not candidates:
             raise Exception("No filler items available in item_table.")
-        return self.random.choice(list(filler_table.keys()))
+        return self.random.choice(candidates)

@@ -100,7 +100,18 @@ namespace Peak.AP
 
         // ===== Ascent Management =====
         private int _originalMaxAscent = 0;
-        private int _slotGoalType = 0;
+        public static bool RunEnded;
+        private bool _goalNeedsAscent = true;
+        private bool _goalNeedsBadges = false;
+        private bool _goalNeedsIdol = false;
+        private bool _goalNeedsSoul = false;
+        private DamageLinkService _damageLinkService;
+        private bool _damageLinkEnabled = false;
+        private string _damageLinkGroup = "";
+        private KnockbackLinkService _knockbackLinkService;
+        private bool _knockbackLinkEnabled = false;
+        private string _deathLinkGroup = "";
+        private double _lastGroupedDeathLinkSent;
         private int _slotRequiredAscent = 0;
         private int _slotRequiredBadges = 20;
         public bool _itemSanityEnabled = false;
@@ -109,6 +120,12 @@ namespace Peak.AP
         private bool _logicalScoutStatue = false;
         private bool _scoutAmuletSanity = false;
         public int _progressiveMountainCount = 0;
+        public static int TrackerVersion = 0;
+
+        public static void BumpTrackerVersion()
+        {
+            TrackerVersion++;
+        }
 
         // ===== AP Link Management =====
         public RingLinkService _ringLinkService;
@@ -181,10 +198,14 @@ namespace Peak.AP
                 CharacterHandlePassedOutPatch.SetStaminaManager(_staminaManager);
                 BarAfflictionUpdateAfflictionPatch.SetStaminaManager(_staminaManager);
                 CharacterAfflictionsGetStatusCapPatch.SetStaminaManager(_staminaManager);
+                CharacterAfflictionsShouldPassOutPatch.SetStaminaManager(_staminaManager);
+                CharacterAfflictionsOverflowCapPatch.SetStaminaManager(_staminaManager);
                 _ringLinkService = new RingLinkService(_log, _notifications);
                 _hardRingLinkService = new HardRingLinkService(_log, _notifications);
                 _breathLinkService = new BreathLinkService(_log, _notifications);
                 _trapLinkService = new TrapLinkService(_log, _notifications);
+                _damageLinkService = new DamageLinkService(_log, _notifications);
+                _knockbackLinkService = new KnockbackLinkService(_log, _notifications);
                 _energyLinkService = new EnergyLinkService(_log, _notifications);
                 CampfireModelSpawner.SetEnergyLinkService(_energyLinkService);
                 SwapTrapEffect.Initialize(_log, this);
@@ -202,12 +223,16 @@ namespace Peak.AP
                 ChaosControlTrapEffect.Initialize(_log, this);
                 BlackoutTrapEffect.Initialize(_log, this);
                 CampfireModelSpawner.Initialize(_log);
+                ScoutStatueHonorGatePatch.Log = _log;
+                AmuletSpawnerGatePatch.Log = _log;
+                FakeAmuletGatePatch.Log = _log;
                 FearTrapEffect.Initialize(_log, this);
                 EruptionTrapEffect.Initialize(_log);
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
                 _ui.Initialize(this);
                 InitializeItemMapping();
                 InitializeItemEffectHandlers();
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoadedApplyGates;
                 GlobalEvents.OnAchievementThrown += OnAchievementThrown;
                 GlobalEvents.OnItemRequested += OnItemRequested;
                 GlobalEvents.OnSoulFreed += OnSoulFreed;
@@ -330,6 +355,10 @@ namespace Peak.AP
                 _log.LogInfo($"[PeakPelago] Player {newPlayer.NickName} joined the room");
 
                 PublishSessionSeedToRoom();
+                if (PhotonNetwork.IsMasterClient)
+                {
+                    FakeAmuletGatePatch.ApplyGates(null);
+                }
 
                 // Only the host syncs to new players
                 if (PhotonNetwork.IsMasterClient && _photonView != null)
@@ -389,6 +418,7 @@ namespace Peak.AP
             try
             {
                 _progressiveMountainCount = mountainCount;
+                BumpTrackerVersion();
             }
             catch (Exception ex)
             {
@@ -766,15 +796,69 @@ namespace Peak.AP
                     return;
                 }
 
-                var deathLink = new DeathLink(cfgSlot.Value, cause);
-                _deathLinkService.SendDeathLink(deathLink);
+                if (string.IsNullOrEmpty(_deathLinkGroup))
+                {
+                    var deathLink = new DeathLink(cfgSlot.Value, cause);
+                    _deathLinkService.SendDeathLink(deathLink);
+                }
+                else
+                {
+                    if (_session == null) return;
+
+                    _lastGroupedDeathLinkSent = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+                    var data = new Dictionary<string, JToken>
+                    {
+                        { "time", JToken.FromObject(_lastGroupedDeathLinkSent) },
+                        { "source", JToken.FromObject(cfgSlot.Value) },
+                        { "cause", JToken.FromObject(cause) }
+                    };
+                    var bouncePacket = new BouncePacket
+                    {
+                        Tags = new List<string> { "DeathLink" + _deathLinkGroup },
+                        Data = data
+                    };
+                    _session.Socket.SendPacket(bouncePacket);
+                }
                 _lastDeathLinkSent = DateTime.Now;
                 _notifications.ShowDeathLinkSent("DeathLink Sent!");
-                
+
             }
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Failed to send death link: {ex.Message}");
+            }
+        }
+
+        private void OnGroupedDeathLinkPacket(ArchipelagoPacketBase packet)
+        {
+            try
+            {
+                if (!_deathLinkEnabled || string.IsNullOrEmpty(_deathLinkGroup)) return;
+                if (!(packet is BouncePacket bounce)) return;
+                if (bounce.Tags == null || !bounce.Tags.Contains("DeathLink" + _deathLinkGroup)) return;
+
+                var data = bounce.Data;
+                if (data == null) return;
+
+                string source = data.ContainsKey("source") ? data["source"].ToObject<string>() : "Unknown";
+                if (source == cfgSlot.Value)
+                {
+                    _log.LogDebug("[PeakPelago] Ignoring own grouped death link");
+                    return;
+                }
+
+                if (data.ContainsKey("time"))
+                {
+                    double time = data["time"].ToObject<double>();
+                    if (System.Math.Abs(time - _lastGroupedDeathLinkSent) < 0.0001) return;
+                }
+
+                string cause = data.ContainsKey("cause") ? data["cause"].ToObject<string>() : "Death Link";
+                _mainThreadActions.Enqueue(() => HandleDeathLinkReceived(cause, source));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error handling grouped death link: {ex.Message}");
             }
         }
 
@@ -1361,6 +1445,7 @@ namespace Peak.AP
             {
                 // All clients add this to their reported checks to avoid duplicate reports
                 _stateData.ReportedChecks.Add(locationId);
+                BumpTrackerVersion();
                 
                 // Update local state
                 SaveState();
@@ -1378,35 +1463,43 @@ namespace Peak.AP
         {
             if (_session == null) return;
 
-            // Only check if the goal is "Reach Peak"
-            if (_slotGoalType == 0)
+            if (currentAscent >= _slotRequiredAscent)
             {
-                if (currentAscent >= _slotRequiredAscent)
+                if (!_stateData.GoalAscentReached)
                 {
-                    
-                    SendGoalComplete();
-                    string completionLocation = $"Ascent {currentAscent} Completed";
-                    ReportCheckByName(completionLocation);
+                    _stateData.GoalAscentReached = true;
+                    SaveState();
                 }
-                else
-                {
-                    
-                }
-            } else if (_slotGoalType == 3)
-            {
-                // Custom goal type: Reach specified ascent and collect specified badges
-                if (currentAscent >= _slotRequiredAscent && _collectedBadges.Count >= _slotRequiredBadges)
-                {
-                    
-                    SendGoalComplete();
-                    string completionLocation = $"Ascent {currentAscent} with {_collectedBadges.Count} Badges Completed";
-                    ReportCheckByName(completionLocation);
-                }
-                else
-                {
-                    
-                }
+                ReportCheckByName($"Ascent {currentAscent} Completed");
             }
+
+            EvaluateGoalCompletion();
+        }
+
+        private bool GoalNeedsAscent() => _goalNeedsAscent;
+        private bool GoalNeedsBadges() => _goalNeedsBadges;
+
+        private void EvaluateGoalCompletion()
+        {
+            if (_session == null) return;
+
+            bool needIdol = _goalNeedsIdol;
+            bool needSoul = _goalNeedsSoul;
+            bool needAscent = GoalNeedsAscent();
+            bool needBadges = GoalNeedsBadges();
+
+            if (!needIdol && !needSoul && !needAscent && !needBadges) return;
+
+            bool ascentDone = _stateData.GoalAscentReached ||
+                _awardedAscentBadges.Contains($"Ascent {_slotRequiredAscent} Completed_{_slotRequiredAscent}");
+
+            if (needAscent && !ascentDone) return;
+            if (needBadges && _collectedBadges.Count < _slotRequiredBadges) return;
+            if (needIdol && !_stateData.GoalIdolDunked) return;
+            if (needSoul && !_stateData.GoalSoulFreed) return;
+
+            _log.LogInfo("[PeakPelago] All goal requirements met - sending goal completion");
+            SendGoalComplete();
         }
 
         /// <summary>
@@ -1417,56 +1510,13 @@ namespace Peak.AP
         {
             if (_session == null) return;
 
-            switch (_slotGoalType)
+            if (achievementType == ACHIEVEMENTTYPE.TwentyFourKaratBadge && !_stateData.GoalIdolDunked)
             {
-                case 1: // Complete All Badges goal
-                    if (_collectedBadges.Count >= _slotRequiredBadges)
-                    {
-                        
-                        SendGoalComplete();
-                    }
-                    else
-                    {
-                        
-                    }
-                    break;
-
-                case 2: // 24 Karat Badge goal
-                    if (achievementType == ACHIEVEMENTTYPE.TwentyFourKaratBadge)
-                    {
-                        
-                        SendGoalComplete();
-                    }
-                    break;
-                case 3: // Custom Ascent + Badges goal
-                    // Check if we have enough badges AND have already completed the required ascent
-                    if (_collectedBadges.Count >= _slotRequiredBadges)
-                    {
-                        // Check if we've already completed the required ascent
-                        string completionKey = $"Ascent {_slotRequiredAscent} Completed_{_slotRequiredAscent}";
-                        if (_awardedAscentBadges.Contains(completionKey))
-                        {
-                            
-                            SendGoalComplete();
-                        }
-                        else
-                        {
-                            
-                        }
-                    }
-                    else
-                    {
-                        
-                    }
-                    break;
-
-                case 0: // Reach Peak goal
-                    // This is handled in CheckReachPeakGoal method
-                    break;
-                default:
-                    // This is handled in CheckReachPeakGoal method
-                    break;
+                _stateData.GoalIdolDunked = true;
+                SaveState();
             }
+
+            EvaluateGoalCompletion();
         }
         
         /// <summary>
@@ -1878,6 +1928,7 @@ namespace Peak.AP
                 { "Items to Bombs", () => ItemToBombTrapEffect.ApplyItemToBombTrap(_log) },
                 { "Zombie Horde Trap", () => ZombieHordeTrapEffect.ApplyZombieHordeTrap(_log) },
                 { "Beetle Horde Trap", () => BeetleHordeTrapEffect.ApplyBeetleHordeTrap(_log) },
+                { "Frog Trap", () => FrogTrapEffect.ApplyFrogTrap(_log) },
                 { "Zoom Trap", () => ZoomTrapEffect.ApplyZoomTrap(_log) },
                 { "Pixel Trap", () => PixelTrapEffect.ApplyPixelTrap(_log) },
                 { "Screen Flip Trap", () => ScreenFlipTrapEffect.ApplyScreenFlipTrap(_log) },
@@ -2207,6 +2258,266 @@ namespace Peak.AP
         }
 
         [PunRPC]
+        public void NotifyDamageLinkInjury(float amount, string characterName)
+        {
+            try
+            {
+                if (!_damageLinkEnabled) return;
+
+                if (_session != null)
+                {
+                    _damageLinkService?.ReportLocalDamage(amount, characterName);
+                }
+                else if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("RPC_DamageLinkTaken", RpcTarget.MasterClient, amount, characterName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error notifying Damage Link injury: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void RPC_DamageLinkTaken(float amount, string characterName)
+        {
+            _damageLinkService?.ReportLocalDamage(amount, characterName);
+        }
+
+        public void NotifyKnockbackLink(Vector3 force, string characterName)
+        {
+            try
+            {
+                if (!_knockbackLinkEnabled) return;
+
+                if (_session != null)
+                {
+                    _knockbackLinkService?.ReportLocalKnockback(force, characterName);
+                }
+                else if (_photonView != null && PhotonNetwork.IsConnected)
+                {
+                    _photonView.RPC("RPC_KnockbackLinkTaken", RpcTarget.MasterClient, force, characterName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error notifying Knockback Link: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void RPC_KnockbackLinkTaken(Vector3 force, string characterName)
+        {
+            _knockbackLinkService?.ReportLocalKnockback(force, characterName);
+        }
+
+        private static bool _eruptionHarvestAttempted;
+
+        private void OnSceneLoadedApplyGates(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            try
+            {
+                StartCoroutine(ApplyFakeAmuletGatesDelayed());
+
+                if (scene.name == "Title" && !_eruptionHarvestAttempted &&
+                    !EruptionTrapEffect.HasCachedPrefab && !PhotonNetwork.InRoom)
+                {
+                    _eruptionHarvestAttempted = true;
+                    StartCoroutine(HarvestEruptionPrefab());
+                }
+
+                if (scene.name == "WilIsland" && mode == UnityEngine.SceneManagement.LoadSceneMode.Additive)
+                {
+                    foreach (var root in scene.GetRootGameObjects())
+                    {
+                        foreach (var cam in root.GetComponentsInChildren<Camera>(true)) cam.enabled = false;
+                        foreach (var listener in root.GetComponentsInChildren<AudioListener>(true)) listener.enabled = false;
+                        foreach (var audio in root.GetComponentsInChildren<AudioSource>(true)) audio.enabled = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error scheduling scene-load work: {ex.Message}");
+            }
+        }
+
+        private System.Collections.IEnumerator HarvestEruptionPrefab()
+        {
+            _log.LogInfo("[PeakPelago] Harvesting eruption prefab from WilIsland at title screen");
+            var op = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("WilIsland", UnityEngine.SceneManagement.LoadSceneMode.Additive);
+            if (op == null)
+            {
+                _log.LogError("[PeakPelago] Could not begin loading WilIsland for eruption harvest");
+                yield break;
+            }
+            while (!op.isDone) yield return null;
+
+            var scene = UnityEngine.SceneManagement.SceneManager.GetSceneByName("WilIsland");
+            if (!scene.IsValid() || !scene.isLoaded)
+            {
+                _log.LogError("[PeakPelago] WilIsland did not load for eruption harvest");
+                yield break;
+            }
+
+            try
+            {
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    var spawners = root.GetComponentsInChildren<EruptionSpawner>(true);
+                    foreach (var spawner in spawners)
+                    {
+                        if (spawner != null && spawner.eruption != null)
+                        {
+                            EruptionTrapEffect.SetCachedPrefab(spawner.eruption);
+                            break;
+                        }
+                    }
+                    if (EruptionTrapEffect.HasCachedPrefab) break;
+                }
+                _log.LogInfo($"[PeakPelago] Eruption harvest result: {(EruptionTrapEffect.HasCachedPrefab ? "prefab captured" : "no EruptionSpawner found in WilIsland")}");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Eruption harvest error: {ex.Message}");
+            }
+
+            yield return UnityEngine.SceneManagement.SceneManager.UnloadSceneAsync(scene);
+            _log.LogInfo("[PeakPelago] Eruption harvest scene unloaded");
+        }
+
+        private System.Collections.IEnumerator ApplyFakeAmuletGatesDelayed()
+        {
+            yield return new WaitForSeconds(2f);
+            if (PhotonNetwork.IsMasterClient)
+            {
+                FakeAmuletGatePatch.ApplyGates(null);
+            }
+        }
+
+        public void BroadcastFakeAmuletStates(int[] hide, int[] show)
+        {
+            if (_photonView != null && PhotonNetwork.IsConnected)
+            {
+                _photonView.RPC("RPC_ApplyFakeAmuletStates", RpcTarget.All, hide, show);
+            }
+            else
+            {
+                RPC_ApplyFakeAmuletStates(hide, show);
+            }
+        }
+
+        [PunRPC]
+        private void RPC_ApplyFakeAmuletStates(int[] hide, int[] show)
+        {
+            try
+            {
+                FakeAmuletGatePatch.ApplyLocalStates(hide, show);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error applying fake amulet states: {ex.Message}");
+            }
+        }
+
+        public void OnRunEndedInNadir()
+        {
+            try
+            {
+                _log.LogInfo("[PeakPelago] Nadir ending reached - Free The Soul goal step complete");
+                if (!_stateData.GoalSoulFreed)
+                {
+                    _stateData.GoalSoulFreed = true;
+                    SaveState();
+                }
+                EvaluateGoalCompletion();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error handling Nadir ending: {ex.Message}");
+            }
+        }
+
+        public void BroadcastKnockbackLink(Vector3 force, string source)
+        {
+            if (_photonView != null && PhotonNetwork.IsConnected)
+            {
+                _photonView.RPC("RPC_ApplyKnockbackLink", RpcTarget.All, force, source);
+            }
+            else
+            {
+                RPC_ApplyKnockbackLink(force, source);
+            }
+        }
+
+        [PunRPC]
+        private void RPC_ApplyKnockbackLink(Vector3 force, string source)
+        {
+            try
+            {
+                var character = Character.localCharacter;
+                if (character == null || character.refs?.ragdoll == null) return;
+                if (character.data.dead || character.data.fullyPassedOut) return;
+
+                KnockbackLinkPatch.Suppress = true;
+                try
+                {
+                    character.Fall(0.4f);
+                    character.AddForce(force, 0.7f, 1.3f);
+                }
+                finally
+                {
+                    KnockbackLinkPatch.Suppress = false;
+                }
+
+                _log.LogInfo($"[PeakPelago] Applied Knockback Link ({force.magnitude:F1}) from {source}");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error applying Knockback Link: {ex.Message}");
+            }
+        }
+
+        public void BroadcastDamageLinkDamage(float amount, string source)
+        {
+            if (_photonView != null && PhotonNetwork.IsConnected)
+            {
+                _photonView.RPC("RPC_ApplyDamageLinkDamage", RpcTarget.All, amount, source);
+            }
+            else
+            {
+                RPC_ApplyDamageLinkDamage(amount, source);
+            }
+        }
+
+        [PunRPC]
+        private void RPC_ApplyDamageLinkDamage(float amount, string source)
+        {
+            try
+            {
+                var character = Character.localCharacter;
+                if (character == null || character.refs?.afflictions == null) return;
+                if (character.data.dead) return;
+
+                DamageLinkInjuryPatch.Suppress = true;
+                try
+                {
+                    character.refs.afflictions.AddStatus(CharacterAfflictions.STATUSTYPE.Injury, amount);
+                }
+                finally
+                {
+                    DamageLinkInjuryPatch.Suppress = false;
+                }
+
+                _log.LogInfo($"[PeakPelago] Applied Damage Link injury ({amount:F2}) from {source}");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error applying Damage Link damage: {ex.Message}");
+            }
+        }
+
         private void ApplyAfflictionToPlayer(int targetActorNumber, int statusType, float amount)
         {
             try
@@ -2296,6 +2607,7 @@ namespace Peak.AP
                 
                 mountainCount = Mathf.Min(mountainCount, 4); // Cap at 4
                 _progressiveMountainCount = mountainCount;
+                BumpTrackerVersion();
                 
                 
                 
@@ -2327,6 +2639,7 @@ namespace Peak.AP
                 
                 mountainCount = Mathf.Min(mountainCount, 4);
                 _progressiveMountainCount = mountainCount;
+                BumpTrackerVersion();
                 
                 
             }
@@ -2514,6 +2827,12 @@ namespace Peak.AP
                     return false;
                 }
 
+                if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "Airport")
+                {
+                    message = "Can't spawn in the lobby";
+                    return false;
+                }
+
                 if (!PhotonNetwork.InRoom)
                 {
                     message = "Not connected";
@@ -2529,6 +2848,12 @@ namespace Peak.AP
                 if (!ItemDatabase.TryGetItem(itemId, out Item itemToSpawn))
                 {
                     message = "Item not in database";
+                    return false;
+                }
+
+                if (_itemSanityEnabled && !UnlockedItemsManager.IsItemUnlocked(itemId))
+                {
+                    message = "Not unlocked";
                     return false;
                 }
 
@@ -2724,7 +3049,27 @@ namespace Peak.AP
                 // Unlock items just add to the loot pool - no physical spawn needed
                 if (itemName.EndsWith(" Unlock"))
                 {
-                    
+                    if (itemName.Equals("Scout's Honor Unlock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ScoutStatueHonorGatePatch.RetriggerStatues();
+                    }
+                    if (itemName.Equals("Strange Gem Unlock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ScoutStatueGemGatePatch.RetriggerGemSpawns();
+                    }
+                    if (itemName.Equals("Progressive Amulet Unlock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ScoutStatueGemGatePatch.RetriggerGemSpawns();
+                        ScoutStatueHonorGatePatch.RetriggerStatues();
+                    }
+                    if (itemName.StartsWith("Scout's", StringComparison.OrdinalIgnoreCase) ||
+                        itemName.Equals("Progressive Amulet Unlock", StringComparison.OrdinalIgnoreCase) ||
+                        itemName.Equals("Strange Gem Unlock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        AmuletSpawnerGatePatch.RetriggerBlockedSpawners();
+                        FakeAmuletGatePatch.ApplyGates(null);
+                    }
+                    BumpTrackerVersion();
                     return;
                 }
 
@@ -2736,6 +3081,7 @@ namespace Peak.AP
                     {
                         _trapLinkService.SendTrapLink(itemName);
                     }
+                    BumpTrackerVersion();
                 }
                 else
                 {
@@ -2790,6 +3136,7 @@ namespace Peak.AP
             {
 
                 ReportCheckByName(locationName);
+                BumpTrackerVersion();
                 if (_logicalScoutStatue && locationName.StartsWith("Acquire "))
                 {
                     UnlockedItemsManager.RefreshScoutStatuePool();
@@ -2959,6 +3306,31 @@ namespace Peak.AP
                     return "GLOOM";
                 case Biome.BiomeType.Roots:
                     return "ROOTS";
+                default:
+                    return null;
+            }
+        }
+
+        private static string GetBaseBadgeForPeak(string peakName)
+        {
+            switch (peakName.ToUpper())
+            {
+                case "SHORE":
+                    return "Beachcomber Badge";
+                case "TROPICS":
+                    return "Trailblazer Badge";
+                case "MESA":
+                    return "Nomad Badge";
+                case "ALPINE":
+                    return "Alpinist Badge";
+                case "CALDERA":
+                case "THE KILN":
+                    return "Volcanology Badge";
+                case "ROOTS":
+                    return "Forestry Badge";
+                case "GLOOM":
+                case "CITADEL":
+                    return "Wanderer Badge";
                 default:
                     return null;
             }
@@ -3462,6 +3834,20 @@ namespace Peak.AP
                                 }
                             }
                             
+                            if (PhotonNetwork.IsMasterClient)
+                            {
+                                string completedPeakName = GetPeakNameForBiome(currentSegment.biome);
+                                if (completedPeakName != null)
+                                {
+                                    _instance.HandleAscentPeakReached(completedPeakName);
+                                    string baseBadge = GetBaseBadgeForPeak(completedPeakName);
+                                    if (baseBadge != null)
+                                    {
+                                        _instance.ReportCheckByName(baseBadge);
+                                    }
+                                }
+                            }
+
                             // Light the campfire but don't advance
                             __instance.state = Campfire.FireState.Lit;
                             __instance.beenBurningFor = burningFor;
@@ -4164,12 +4550,14 @@ namespace Peak.AP
         {
             if (_session?.Socket == null || !_session.Socket.Connected) return;
             var tags = new List<string>();
-            if (_deathLinkEnabled && cfgDeathLinkEnabled.Value) tags.Add("DeathLink");
+            if (_deathLinkEnabled && cfgDeathLinkEnabled.Value) tags.Add("DeathLink" + _deathLinkGroup);
             if (_ringLinkEnabled) tags.Add("RingLink");
             if (_hardRingLinkEnabled) tags.Add("HardRingLink");
             if (energyLinkEnabled) tags.Add("EnergyLink");
             if (_breathLinkEnabled) tags.Add("BreathLink");
             if (_trapLinkEnabled) tags.Add("TrapLink");
+            if (_damageLinkEnabled) tags.Add("SharedDamage" + _damageLinkGroup);
+            if (_knockbackLinkEnabled) tags.Add("KnockbackLink");
 
             try
             {
@@ -4398,16 +4786,54 @@ namespace Peak.AP
                         }
                     }
 
+                    if (loginResult.SlotData.ContainsKey("damage_link"))
+                    {
+                        _damageLinkEnabled = ReadBoolOption(loginResult, "damage_link", _damageLinkEnabled);
+                        if (loginResult.SlotData.ContainsKey("damage_link_group"))
+                        {
+                            _damageLinkGroup = loginResult.SlotData["damage_link_group"]?.ToString() ?? "";
+                        }
+
+                        if (_damageLinkEnabled)
+                        {
+                            tags.Add("SharedDamage" + _damageLinkGroup);
+                        }
+                    }
+                    _damageLinkService.Initialize(_session, _damageLinkEnabled, _damageLinkGroup, slotName);
+
+                    if (loginResult.SlotData.ContainsKey("knockback_link"))
+                    {
+                        _knockbackLinkEnabled = ReadBoolOption(loginResult, "knockback_link", _knockbackLinkEnabled);
+
+                        if (_knockbackLinkEnabled)
+                        {
+                            tags.Add("KnockbackLink");
+                        }
+                    }
+                    _knockbackLinkService.Initialize(_session, _knockbackLinkEnabled, slotName);
+
 
 
                     if (loginResult.SlotData.ContainsKey("death_link"))
                     {
                         _deathLinkEnabled = ReadBoolOption(loginResult, "death_link", _deathLinkEnabled);
+                        if (loginResult.SlotData.ContainsKey("death_link_group"))
+                        {
+                            _deathLinkGroup = loginResult.SlotData["death_link_group"]?.ToString() ?? "";
+                        }
 
                         if (_deathLinkEnabled)
                         {
-                            tags.Add("DeathLink");
-                            _deathLinkService.EnableDeathLink();
+                            tags.Add("DeathLink" + _deathLinkGroup);
+                            if (string.IsNullOrEmpty(_deathLinkGroup))
+                            {
+                                _deathLinkService.EnableDeathLink();
+                            }
+                            else
+                            {
+                                _session.Socket.PacketReceived += OnGroupedDeathLinkPacket;
+                                _log.LogInfo($"[PeakPelago] Death Link using group tag: DeathLink{_deathLinkGroup}");
+                            }
                         }
                     }
 
@@ -4478,7 +4904,37 @@ namespace Peak.AP
                         _enabledTraps,
                         ApplyItemEffect
                     );
-                    _slotGoalType = ReadIntOption(loginResult, "goal", _slotGoalType);
+                    _goalNeedsAscent = false;
+                    _goalNeedsBadges = false;
+                    _goalNeedsIdol = false;
+                    _goalNeedsSoul = false;
+                    if (loginResult.SlotData.ContainsKey("goals"))
+                    {
+                        try
+                        {
+                            var goalsToken = JToken.FromObject(loginResult.SlotData["goals"]);
+                            foreach (var goalEntry in goalsToken)
+                            {
+                                switch (goalEntry.ToString())
+                                {
+                                    case "Reach Peak": _goalNeedsAscent = true; break;
+                                    case "Collect Badges": _goalNeedsBadges = true; break;
+                                    case "24 Karat Badge": _goalNeedsIdol = true; break;
+                                    case "Free The Soul": _goalNeedsSoul = true; break;
+                                }
+                            }
+                            _log.LogInfo($"[PeakPelago] Goals: ascent={_goalNeedsAscent}, badges={_goalNeedsBadges}, idol={_goalNeedsIdol}, soul={_goalNeedsSoul}");
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogError($"[PeakPelago] Error parsing goals: {ex.Message}");
+                            _goalNeedsAscent = true;
+                        }
+                    }
+                    else
+                    {
+                        _goalNeedsAscent = true;
+                    }
 
                     _slotRequiredAscent = ReadIntOption(loginResult, "ascent_count", _slotRequiredAscent);
 
@@ -4529,6 +4985,7 @@ namespace Peak.AP
                     RecoverAscentUnlocks();
                     RecoverProgressiveMountain();
                     RecoverEnduranceUpgrades();
+                    EvaluateGoalCompletion();
 
                     _staminaManager.Initialize(progressiveEnabled, additionalEnabled);
                     _mainThreadActions.Enqueue(() =>
@@ -4662,21 +5119,22 @@ namespace Peak.AP
                 
                 
                 
-                // ADD THIS: Check if we've completed the goal
-                if (_slotGoalType == 1 && _collectedBadges.Count >= _slotRequiredBadges)
+                if (_collectedBadges.Count >= _slotRequiredBadges)
                 {
-                    
-                    SendGoalComplete();
                     ReportCheckByName("All Badges Collected");
                 }
-                
-                // Also check for 24 Karat Badge goal
-                if (_slotGoalType == 2 && _collectedBadges.Contains(ACHIEVEMENTTYPE.TwentyFourKaratBadge))
+
+                if (_collectedBadges.Contains(ACHIEVEMENTTYPE.TwentyFourKaratBadge))
                 {
-                    
-                    SendGoalComplete();
+                    if (!_stateData.GoalIdolDunked)
+                    {
+                        _stateData.GoalIdolDunked = true;
+                        SaveState();
+                    }
                     ReportCheckByName("Idol Dunked");
                 }
+
+                EvaluateGoalCompletion();
             }
             catch (Exception ex)
             {
@@ -5016,6 +5474,11 @@ namespace Peak.AP
         {
             try
             {
+                if (RunEnded && LoadingScreenHandler.loading)
+                {
+                    RunEnded = false;
+                }
+
                 bool isCurrentlyConnected = _session != null && _session.Socket != null && _session.Socket.Connected;
                 if (_wasConnected && !isCurrentlyConnected)
                 {

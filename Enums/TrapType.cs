@@ -49,6 +49,7 @@ namespace Peak.AP
         ChaosControlTrap,
         EmergencyRescueTrap,
         ExplosionTrap,
+        FrogTrap,
     }
 
     public static class TrapTypeExtensions
@@ -97,6 +98,7 @@ namespace Peak.AP
             { TrapType.ChaosControlTrap, "Chaos Control Trap" },
             { TrapType.EmergencyRescueTrap, "Emergency Rescue Trap" },
             { TrapType.ExplosionTrap, "Explosion Trap" },
+            { TrapType.FrogTrap, "Frog Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

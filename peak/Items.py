@@ -49,6 +49,7 @@ progression_table = {
     "Progressive Ascent": ItemData(76019, ItemClassification.progression),
     "Progressive Endurance": ItemData(76026, ItemClassification.progression),
     "Progressive Mountain": ItemData(76050, ItemClassification.progression),
+    "Progressive Amulet Unlock": ItemData(77133, ItemClassification.progression),
     #"Ascent 2 Unlock": ItemData(76020, ItemClassification.progression),
     #"Ascent 3 Unlock": ItemData(76021, ItemClassification.progression),
     #"Ascent 4 Unlock": ItemData(76022, ItemClassification.progression),
@@ -208,6 +209,7 @@ trap_table = {
     "Emergency Rescue Trap":      ItemData(77128, ItemClassification.trap),
     "Explosion Trap":             ItemData(77129, ItemClassification.trap),
     "Turn To Stone Trap":         ItemData(77130, ItemClassification.trap),
+    "Frog Trap":                  ItemData(77132, ItemClassification.trap),
 }
 
 # All items that have "Acquire X" locations need unlock versions for logic

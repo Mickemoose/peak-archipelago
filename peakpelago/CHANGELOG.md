@@ -1,3 +1,16 @@
+## v0.6.1
+<ul>
+    <li>Bug fixes galore</li>
+    <li>Logic improvements</li>
+    <li>Gloom/Citadel support</li>
+    <li>New traps</li>
+    <li>Goals refactored to allow multiple goals</li>
+    <li>Item Tracker also allows spawning those items by clicking them if theyre unlocked</li>
+    <li>DamageLink/DamageLinkGroup support</li>
+    <li>DeathLinkGroup support</li>
+    <li>KnockbackLink support</li>
+</ul>
+
 ## v0.6.0
 <ul>
     <li>Stamina sync improvements</li>

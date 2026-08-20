@@ -1,34 +1,28 @@
 from dataclasses import dataclass
-from Options import Choice, PerGameCommonOptions, Range, Toggle, DeathLink, OptionGroup
+from Options import Choice, FreeText, OptionSet, PerGameCommonOptions, Range, Toggle, DeathLink, OptionGroup
 
 
-class Goal(Choice):
+class Goals(OptionSet):
     """
-    Determines the goal of the seed
+    The goals of the seed. Every selected goal must be completed.
 
-    Reach Peak: Reach the peak on the specified ascent level
+    Reach Peak: Reach the peak on the ascent level specified by Required Ascent Count
 
-    Complete All Badges: Collect the specified number of badges
+    Collect Badges: Collect the number of badges specified by Required Badge Count
 
-    24 Karat Badge: Toss the Ancient Idol into The Kiln's lava.
+    24 Karat Badge: Toss the Ancient Idol into The Kiln's lava
 
-    Peak and Badges: Reach the peak on the specified ascent level and collect the specified number of badges
-
-    Free The Soul: Free the Scoutmaster's soul in [REDACTED] in Ascent 8.
+    Free The Soul: Free the Scoutmaster's soul in [REDACTED]
     """
-    display_name = "Goal"
-    option_reach_peak = 0
-    option_complete_all_badges = 1
-    option_24_karat_badge = 2
-    option_peak_and_badges = 3
-    option_free_the_soul = 4
-    default = 0
+    display_name = "Goals"
+    valid_keys = ["Reach Peak", "Collect Badges", "24 Karat Badge", "Free The Soul"]
+    default = {"Reach Peak"}
 
 
 class AscentCount(Range):
     """
     The ascent level required to complete the Reach Peak goal (0-8)
-    
+
     Higher ascents add more difficulty modifiers and challenges
     """
     display_name = "Required Ascent Count"
@@ -177,6 +171,40 @@ class BreathLink(Toggle):
     When enabled, if any player in the lobby runs out of stamina, all players with Breath Link enabled get their stamina fully depleted.
     """
     display_name = "Breath Link"
+
+
+class DamageLink(Toggle):
+    """
+    When enabled, taking Injury damage sends a Damage Link to other games with Damage Link enabled.
+
+    Receiving a Damage Link applies Injury to all players in the lobby.
+    """
+    display_name = "Damage Link"
+
+
+class DamageLinkGroup(FreeText):
+    """Damage Link only applies to players with an identical Group name.
+    Games that don't support the Group option count as having an empty group name."""
+    display_name = "Damage Link Group"
+    rich_text_doc = True
+    default = ""
+
+
+class KnockbackLink(Toggle):
+    """
+    When enabled, strong knockback taken by any player is sent to other games with Knockback Link enabled.
+
+    Receiving a Knockback Link knocks back all players in the lobby.
+    """
+    display_name = "Knockback Link"
+
+
+class DeathLinkGroup(FreeText):
+    """Death Link only applies to players with an identical Group name.
+    Games that don't support the Group option count as having an empty group name."""
+    display_name = "Death Link Group"
+    rich_text_doc = True
+    default = ""
 
 
 class DeathLinkBehavior(Choice):
@@ -430,6 +458,12 @@ class ExplosionTrapWeight(BaseTrapWeight):
     """
     display_name = "Explosion Trap Weight"
 
+class FrogTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a frog that drags players around with its tongue
+    """
+    display_name = "Frog Trap Weight"
+
 class TrapPercentage(Range):
     """
     Replace a percentage of junk items in the item pool with random traps
@@ -489,7 +523,7 @@ class DisableBiomeBadges(Toggle):
 # Option Groups for better organization in the web UI
 peak_option_groups = [
     OptionGroup("General Options", [
-        Goal,
+        Goals,
         AscentCount,
         BadgeCount,
     ]),
@@ -509,7 +543,11 @@ peak_option_groups = [
         EnergyLink,
         TrapLink,
         BreathLink,
+        DamageLink,
+        DamageLinkGroup,
+        KnockbackLink,
         DeathLink,
+        DeathLinkGroup,
         DeathLinkBehavior,
         DeathLinkSendBehavior,
     ]),
@@ -557,6 +595,7 @@ peak_option_groups = [
         ChaosControlTrapWeight,
         EmergencyRescueTrapWeight,
         ExplosionTrapWeight,
+        FrogTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,
@@ -568,7 +607,7 @@ peak_option_groups = [
 
 @dataclass
 class PeakOptions(PerGameCommonOptions):
-    goal: Goal
+    goals: Goals
     ascent_count: AscentCount
     badge_count: BadgeCount
     progressive_stamina: ProgressiveStamina
@@ -588,7 +627,11 @@ class PeakOptions(PerGameCommonOptions):
     energy_link: EnergyLink
     trap_link: TrapLink
     breath_link: BreathLink
+    damage_link: DamageLink
+    damage_link_group: DamageLinkGroup
+    knockback_link: KnockbackLink
     death_link: DeathLink
+    death_link_group: DeathLinkGroup
     death_link_behavior: DeathLinkBehavior
     death_link_send_behavior: DeathLinkSendBehavior
 
@@ -635,3 +678,4 @@ class PeakOptions(PerGameCommonOptions):
     chaos_control_trap_weight: ChaosControlTrapWeight
     emergency_rescue_trap_weight: EmergencyRescueTrapWeight
     explosion_trap_weight: ExplosionTrapWeight
+    frog_trap_weight: FrogTrapWeight

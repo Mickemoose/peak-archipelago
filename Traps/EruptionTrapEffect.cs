@@ -3,16 +3,29 @@ using System.Linq;
 using BepInEx.Logging;
 using Photon.Pun;
 using UnityEngine;
+using Zorro.Core;
 
 namespace Peak.AP
 {
     public static class EruptionTrapEffect
     {
         private static ManualLogSource _log;
+        private static GameObject _cachedEruptionPrefab;
 
         public static void Initialize(ManualLogSource log)
         {
             _log = log;
+        }
+
+        public static bool HasCachedPrefab => _cachedEruptionPrefab != null;
+
+        public static void SetCachedPrefab(GameObject prefab)
+        {
+            if (prefab != null && _cachedEruptionPrefab == null)
+            {
+                _cachedEruptionPrefab = prefab;
+                _log?.LogInfo("[PeakPelago] Eruption prefab cached");
+            }
         }
 
         public static void ApplyEruptionTrap(ManualLogSource log)
@@ -51,35 +64,36 @@ namespace Peak.AP
             }
         }
 
+        private static GameObject ResolveEruptionPrefab(ManualLogSource log)
+        {
+            if (_cachedEruptionPrefab != null) return _cachedEruptionPrefab;
+
+            var loaded = Resources.Load<GameObject>("Eruption");
+            if (loaded != null)
+            {
+                _cachedEruptionPrefab = loaded;
+                return _cachedEruptionPrefab;
+            }
+
+            var activeSpawner = UnityEngine.Object.FindFirstObjectByType<EruptionSpawner>();
+            if (activeSpawner != null && activeSpawner.eruption != null)
+            {
+                _cachedEruptionPrefab = activeSpawner.eruption;
+                return _cachedEruptionPrefab;
+            }
+
+            return null;
+        }
+
         public static void SpawnEruptionLocal(Vector3 position, ManualLogSource log)
         {
             try
             {
 
-                // Find an EruptionSpawner in the scene to get the eruption prefab
-                EruptionSpawner spawner = UnityEngine.Object.FindFirstObjectByType<EruptionSpawner>();
-                
-                if (spawner == null)
-                {
-                    log.LogError("[PeakPelago] Could not find EruptionSpawner in scene - might not be in Caldera");
-                    return;
-                }
-
-                // Access the eruption field via reflection
-                var eruptionField = typeof(EruptionSpawner).GetField("eruption", 
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                
-                if (eruptionField == null)
-                {
-                    log.LogError("[PeakPelago] Could not find eruption field");
-                    return;
-                }
-
-                GameObject eruptionPrefab = eruptionField.GetValue(spawner) as GameObject;
-                
+                GameObject eruptionPrefab = ResolveEruptionPrefab(log);
                 if (eruptionPrefab == null)
                 {
-                    log.LogError("[PeakPelago] Eruption prefab is null");
+                    log.LogError("[PeakPelago] Resources.Load(\"Eruption\") returned null - eruption asset missing from game data");
                     return;
                 }
 

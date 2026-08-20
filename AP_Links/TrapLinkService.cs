@@ -56,6 +56,7 @@ namespace Peak.AP
             public const string Banana = "Banana Trap";
             public const string Banner = "Banner Trap";
             public const string Bee = "Bee Trap";
+            public const string Blastoad = "Blastoad";
             public const string BlueBalls = "Blue Balls Curse";
             public const string Bomb = "Bomb";
             public const string BombTrap = "Bomb Trap";
@@ -191,6 +192,7 @@ namespace Peak.AP
             public const string ScreenFlip = "Screen Flip Trap";
             public const string Shake = "Shake Trap";
             public const string Sleep = "Sleep Trap";
+            public const string Sleeptoad = "Sleeptoad";
             public const string Slip = "Slip Trap";
             public const string Slow = "Slow Trap";
             public const string Slowness = "Slowness Trap";
@@ -204,6 +206,7 @@ namespace Peak.AP
             public const string StickyFloor = "Sticky Floor Trap";
             public const string StickyHands = "Sticky Hands Trap";
             public const string Stun = "Stun Trap";
+            public const string Summon = "Summon Trap";
             public const string SvCEffect = "SvC Effect";
             public const string Swap = "Swap Trap";
             public const string Tarr = "Tarr Trap";
@@ -398,6 +401,9 @@ namespace Peak.AP
 
             Register("Explosion Trap", StandardTraps.Explosion,
                 StandardTraps.Explosion, StandardTraps.EnemyBall);
+
+            Register("Frog Trap", StandardTraps.Frog,
+                StandardTraps.Frog, StandardTraps.Blastoad, StandardTraps.Sleeptoad, StandardTraps.Summon);
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
         }
@@ -629,6 +635,7 @@ namespace Peak.AP
             if (Character.localCharacter.data.fullyPassedOut) return false;
             if (Character.localCharacter.data.passedOutOnTheBeach > 0f) return false;
             if (LoadingScreenHandler.loading) return false;
+            if (TrapHelpers.TrapsSuppressed()) return false;
 
             return true;
         }
