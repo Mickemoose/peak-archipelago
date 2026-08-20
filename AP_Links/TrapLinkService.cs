@@ -77,6 +77,8 @@ namespace Peak.AP
             public const string ControlBall = "Control Ball Trap";
             public const string ControllerDrift = "Controller Drift Trap";
             public const string Crystal = "Crystal Trap";
+            public const string Curse = "Curse Trap";
+            public const string Cursed = "Cursed Trap";
             public const string CursedBall = "Cursed Ball Trap";
             public const string Cutscene = "Cutscene Trap";
             public const string Damage = "Damage Trap";
@@ -220,6 +222,7 @@ namespace Peak.AP
             public const string Tiny = "Tiny Trap";
             public const string Tip = "Tip Trap";
             public const string TNTBarrel = "TNT Barrel Trap";
+            public const string Toxin = "Toxin Trap";
             public const string TNT = "TNT Trap";
             public const string ToolSwap = "Tool Swap Trap";
             public const string Trivia = "Trivia Trap";
@@ -230,6 +233,9 @@ namespace Peak.AP
             public const string Void = "Void Trap";
             public const string WarpBall = "Warp Ball Trap";
             public const string WarpPipe = "Warp Pipe Trap";
+            public const string WeatherCloudy = "Weather Cloudy Trap";
+            public const string WeatherRainy = "Weather Rainy Trap";
+            public const string WeatherStormy = "Weather Stormy Trap";
             public const string Whirlpool = "Whirlpool Trap";
             public const string Whoops = "Whoops! Trap";
             public const string WIDE = "W I D E Trap";
@@ -322,7 +328,7 @@ namespace Peak.AP
                 StandardTraps.Damage, StandardTraps.DoubleDamage, StandardTraps.Electrocution);
 
             Register("Cactus Ball Trap", StandardTraps.SpikeBall,
-                StandardTraps.SpikeBall, StandardTraps.CursedBall, StandardTraps.StickyHands);
+                StandardTraps.SpikeBall, StandardTraps.StickyHands);
 
             Register("Instant Death Trap", StandardTraps.InstantDeath,
                 StandardTraps.InstantDeath, StandardTraps.OneHitKO);
@@ -337,7 +343,7 @@ namespace Peak.AP
                 StandardTraps.Spooky, StandardTraps.Army, StandardTraps.Police);
 
             Register("Gust Trap", StandardTraps.GetOut,
-                StandardTraps.GetOut, StandardTraps.Resistance);
+                StandardTraps.GetOut, StandardTraps.Resistance, StandardTraps.WeatherCloudy);
 
             Register("Mandrake Trap", StandardTraps.Omo,
                 StandardTraps.Omo);
@@ -364,7 +370,7 @@ namespace Peak.AP
                 StandardTraps.Fear);
 
             Register("Scoutmaster Trap", StandardTraps.MyTurn,
-                StandardTraps.MyTurn, StandardTraps.FishinBoo, StandardTraps.DisableTag, StandardTraps.Chaser);
+                StandardTraps.MyTurn, StandardTraps.DisableTag, StandardTraps.Chaser);
 
             Register("Zoom Trap", StandardTraps.Zoom,
                 StandardTraps.Zoom, StandardTraps.WIDE, StandardTraps.ZoomIn, StandardTraps.ZoomOut);
@@ -400,10 +406,34 @@ namespace Peak.AP
                 StandardTraps.Tutorial, StandardTraps.Home);
 
             Register("Explosion Trap", StandardTraps.Explosion,
-                StandardTraps.Explosion, StandardTraps.EnemyBall);
+                StandardTraps.Explosion);
 
             Register("Frog Trap", StandardTraps.Frog,
                 StandardTraps.Frog, StandardTraps.Blastoad, StandardTraps.Sleeptoad, StandardTraps.Summon);
+
+            Register("Ghost Trap", StandardTraps.Ghost,
+                StandardTraps.Ghost, StandardTraps.FishinBoo, StandardTraps.EnemyBall);
+
+            Register("Rain Trap", StandardTraps.WeatherRainy,
+                StandardTraps.WeatherRainy, StandardTraps.WeatherStormy, StandardTraps.Underwater);
+
+            Register("Poison Cloud Trap", StandardTraps.Toxin,
+                StandardTraps.Toxin);
+
+            Register("Frost Cloud Trap", StandardTraps.Frost,
+                StandardTraps.Frost);
+
+            Register("Sleep Trap", StandardTraps.Sleep,
+                StandardTraps.Sleep);
+
+            Register("Instant Crystal Trap", StandardTraps.InstantCrystal,
+                StandardTraps.InstantCrystal);
+
+            Register("Curse Trap", StandardTraps.Curse,
+                StandardTraps.Curse, StandardTraps.Cursed);
+
+            Register("Cursed Ball Trap", StandardTraps.CursedBall,
+                StandardTraps.CursedBall);
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
         }

@@ -53,10 +53,26 @@ namespace Peak.AP
 
         private static IEnumerator GustCoroutine(ManualLogSource log)
         {
+            GameObject spawnedZone = null;
             var zone = WindChillZone.instance;
+            if ((zone == null || !zone.isActiveAndEnabled) &&
+                HarvestedTemplates.WindZone != null &&
+                RunSettings.GetValue(RunSettings.SETTINGTYPE.Hazard_Wind) != 0)
+            {
+                spawnedZone = UnityEngine.Object.Instantiate(HarvestedTemplates.WindZone);
+                spawnedZone.name = "AP_GustWindZone";
+                spawnedZone.transform.position = Character.localCharacter != null
+                    ? Character.localCharacter.Center
+                    : Vector3.zero;
+                spawnedZone.SetActive(true);
+                zone = spawnedZone.GetComponentInChildren<WindChillZone>(true);
+                log.LogInfo("[PeakPelago] No WindChillZone in this map - spawned harvested wind zone template");
+            }
+
             if (zone == null || !zone.isActiveAndEnabled)
             {
                 log.LogWarning("[PeakPelago] WindChillZone is unavailable or disabled by run settings, applying force-only gust");
+                if (spawnedZone != null) UnityEngine.Object.Destroy(spawnedZone);
                 yield return PeakArchipelagoPlugin._instance.StartCoroutine(ForceOnlyCoroutine(log));
                 yield break;
             }
@@ -114,7 +130,15 @@ namespace Peak.AP
             SetUntilSwitch(zone, origUntilSwitch);
             SetTimeUntilNextWind(zone, origTimeUntilNextWind);
 
-            log.LogInfo("[PeakPelago] Gust Trap complete, WindChillZone restored");
+            if (spawnedZone != null)
+            {
+                UnityEngine.Object.Destroy(spawnedZone);
+                log.LogInfo("[PeakPelago] Gust Trap complete, temporary wind zone removed");
+            }
+            else
+            {
+                log.LogInfo("[PeakPelago] Gust Trap complete, WindChillZone restored");
+            }
         }
 
         private static IEnumerator ForceOnlyCoroutine(ManualLogSource log)

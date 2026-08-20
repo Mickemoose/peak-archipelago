@@ -464,6 +464,60 @@ class FrogTrapWeight(BaseTrapWeight):
     """
     display_name = "Frog Trap Weight"
 
+class GhostTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which spawns a ghost that hunts a player
+    """
+    display_name = "Ghost Trap Weight"
+
+class RainTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which makes it rain for a while
+    """
+    display_name = "Rain Trap Weight"
+
+class PoisonCloudTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which pops a poisonous pink cloud on a player
+    """
+    display_name = "Poison Cloud Trap Weight"
+
+class FrostCloudTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which pops a freezing frost cloud on a player
+    """
+    display_name = "Frost Cloud Trap Weight"
+
+class SleepTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which pops a drowsy purple cloud on a player
+    """
+    display_name = "Sleep Trap Weight"
+
+class WellDoneTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which cooks every item players are carrying
+    """
+    display_name = "Well Done Trap Weight"
+
+class InstantCrystalTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which instantly petrifies a random player
+    """
+    display_name = "Instant Crystal Trap Weight"
+
+class CurseTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which pops a black curse cloud on a player
+    """
+    display_name = "Curse Trap Weight"
+
+class CursedBallTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which pops a black curse cloud with a heavy blast on a player
+    """
+    display_name = "Cursed Ball Trap Weight"
+
 class TrapPercentage(Range):
     """
     Replace a percentage of junk items in the item pool with random traps
@@ -596,6 +650,15 @@ peak_option_groups = [
         EmergencyRescueTrapWeight,
         ExplosionTrapWeight,
         FrogTrapWeight,
+        GhostTrapWeight,
+        RainTrapWeight,
+        PoisonCloudTrapWeight,
+        FrostCloudTrapWeight,
+        SleepTrapWeight,
+        WellDoneTrapWeight,
+        InstantCrystalTrapWeight,
+        CurseTrapWeight,
+        CursedBallTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,
@@ -679,3 +742,12 @@ class PeakOptions(PerGameCommonOptions):
     emergency_rescue_trap_weight: EmergencyRescueTrapWeight
     explosion_trap_weight: ExplosionTrapWeight
     frog_trap_weight: FrogTrapWeight
+    ghost_trap_weight: GhostTrapWeight
+    rain_trap_weight: RainTrapWeight
+    poison_cloud_trap_weight: PoisonCloudTrapWeight
+    frost_cloud_trap_weight: FrostCloudTrapWeight
+    sleep_trap_weight: SleepTrapWeight
+    well_done_trap_weight: WellDoneTrapWeight
+    instant_crystal_trap_weight: InstantCrystalTrapWeight
+    curse_trap_weight: CurseTrapWeight
+    cursed_ball_trap_weight: CursedBallTrapWeight

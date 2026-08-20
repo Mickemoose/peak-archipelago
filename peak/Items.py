@@ -210,6 +210,15 @@ trap_table = {
     "Explosion Trap":             ItemData(77129, ItemClassification.trap),
     "Turn To Stone Trap":         ItemData(77130, ItemClassification.trap),
     "Frog Trap":                  ItemData(77132, ItemClassification.trap),
+    "Ghost Trap":                 ItemData(77134, ItemClassification.trap),
+    "Rain Trap":                  ItemData(77135, ItemClassification.trap),
+    "Poison Cloud Trap":          ItemData(77136, ItemClassification.trap),
+    "Frost Cloud Trap":           ItemData(77137, ItemClassification.trap),
+    "Sleep Trap":                 ItemData(77138, ItemClassification.trap),
+    "Well Done Trap":             ItemData(77139, ItemClassification.trap),
+    "Instant Crystal Trap":       ItemData(77140, ItemClassification.trap),
+    "Curse Trap":                 ItemData(77141, ItemClassification.trap),
+    "Cursed Ball Trap":           ItemData(77142, ItemClassification.trap),
 }
 
 # All items that have "Acquire X" locations need unlock versions for logic

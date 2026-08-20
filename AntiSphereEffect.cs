@@ -7,7 +7,7 @@ namespace Peak.AP
 {
     public static class AntiSphereEffect
     {
-        public const float DEFAULT_LIFETIME = 0f;
+        public const float DEFAULT_LIFETIME = 60f;
 
         public static void SpawnAntiSphereOnPlayer(ManualLogSource log, PhotonView view, float lifetime = DEFAULT_LIFETIME)
         {

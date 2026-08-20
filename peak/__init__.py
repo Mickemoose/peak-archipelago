@@ -54,6 +54,15 @@ TRAP_DEFINITIONS = [
     ("Emergency Rescue Trap", "emergency_rescue_trap_weight"),
     ("Explosion Trap", "explosion_trap_weight"),
     ("Frog Trap", "frog_trap_weight"),
+    ("Ghost Trap", "ghost_trap_weight"),
+    ("Rain Trap", "rain_trap_weight"),
+    ("Poison Cloud Trap", "poison_cloud_trap_weight"),
+    ("Frost Cloud Trap", "frost_cloud_trap_weight"),
+    ("Sleep Trap", "sleep_trap_weight"),
+    ("Well Done Trap", "well_done_trap_weight"),
+    ("Instant Crystal Trap", "instant_crystal_trap_weight"),
+    ("Curse Trap", "curse_trap_weight"),
+    ("Cursed Ball Trap", "cursed_ball_trap_weight"),
 ]
 
 class PeakWeb(WebWorld):

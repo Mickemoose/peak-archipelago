@@ -50,6 +50,15 @@ namespace Peak.AP
         EmergencyRescueTrap,
         ExplosionTrap,
         FrogTrap,
+        GhostTrap,
+        RainTrap,
+        PoisonCloudTrap,
+        FrostCloudTrap,
+        SleepTrap,
+        WellDoneTrap,
+        InstantCrystalTrap,
+        CurseTrap,
+        CursedBallTrap,
     }
 
     public static class TrapTypeExtensions
@@ -99,6 +108,15 @@ namespace Peak.AP
             { TrapType.EmergencyRescueTrap, "Emergency Rescue Trap" },
             { TrapType.ExplosionTrap, "Explosion Trap" },
             { TrapType.FrogTrap, "Frog Trap" },
+            { TrapType.GhostTrap, "Ghost Trap" },
+            { TrapType.RainTrap, "Rain Trap" },
+            { TrapType.PoisonCloudTrap, "Poison Cloud Trap" },
+            { TrapType.FrostCloudTrap, "Frost Cloud Trap" },
+            { TrapType.SleepTrap, "Sleep Trap" },
+            { TrapType.WellDoneTrap, "Well Done Trap" },
+            { TrapType.InstantCrystalTrap, "Instant Crystal Trap" },
+            { TrapType.CurseTrap, "Curse Trap" },
+            { TrapType.CursedBallTrap, "Cursed Ball Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

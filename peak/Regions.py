@@ -36,7 +36,8 @@ def create_peak_regions(world: "PeakWorld"):
         "Applied Esoterica Badge",
         "Needlepoint Badge",
         "Happy Camper Badge",
-        "Mentorship Badge"
+        "Mentorship Badge",
+        "Last Resort Badge"
     }
 
     biome_badges = {
@@ -57,6 +58,9 @@ def create_peak_regions(world: "PeakWorld"):
         "Lone Wolf Badge",
         "Balloon Badge",
         "Bing Bong Badge",
+        "Medieval History Badge",
+        "Hang Gliding Badge",
+        "Exorcist Badge",
         "Competitive Eating Badge"
     }
     

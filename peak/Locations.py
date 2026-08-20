@@ -150,6 +150,14 @@ LOCATION_TABLE: Dict[str, int] = {
     "Nomad VIII Badge (Ascent 8)": 76450,
     "Forestry VIII Badge (Ascent 8)": 76451,
     "Wanderer VIII Badge (Ascent 8)": 76452,
+    "Rule Zero Badge": 76453,
+    "Medieval History Badge": 76454,
+    "Hang Gliding Badge": 76455,
+    "Exorcist Badge": 76456,
+    "Well Rested Badge": 76457,
+    "Jester Badge": 76458,
+    "Archery Badge": 76459,
+    "Last Resort Badge": 76460,
         
     # Acquire Item Locations
     "Acquire Rope Spool": 76200,

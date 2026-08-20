@@ -64,10 +64,27 @@ def _get_vanilla_biome_level(location_name):
     return 0
 
 
+MYSTICAL_MIN_LEVELS = {
+    "Acquire Ritual Dagger": 2,
+    "Acquire Faerie Lantern": 2,
+    "Acquire Pandora's Lunchbox": 2,
+    "Acquire Anti-Zooka": 3,
+    "Acquire Book of Bones": 3,
+    "Acquire Pirate's Compass": 3,
+}
+
+
+def _apply_mystical_minimums(assignments):
+    for loc, min_level in MYSTICAL_MIN_LEVELS.items():
+        if loc in assignments and assignments[loc] < min_level:
+            assignments[loc] = min_level
+    return assignments
+
+
 def generate_loot_biome_assignments(acquire_locations, random_source, loot_sanity_mode):
     vanilla = {loc: _get_vanilla_biome_level(loc) for loc in acquire_locations}
     if loot_sanity_mode == 0:
-        return vanilla
+        return _apply_mystical_minimums(vanilla)
 
     shuffleable_names = []
     shuffleable_levels = []
@@ -84,7 +101,7 @@ def generate_loot_biome_assignments(acquire_locations, random_source, loot_sanit
 
     result = dict(zip(shuffleable_names, shuffleable_levels))
     result.update(fixed)
-    return result
+    return _apply_mystical_minimums(result)
 
 
 def set_rule(spot: Location | Entrance, rule):
@@ -484,6 +501,34 @@ def apply_rules(world: "PeakWorld"):
     _apply_single_item_badge("Applied Esoterica Badge", "Book of Bones Unlock")
 
     _apply_single_item_badge("Mentorship Badge", "Scoutmaster's Bugle Unlock")
+    _apply_single_item_badge("Hang Gliding Badge", "Glider Unlock")
+    _apply_single_item_badge("Last Resort Badge", "Ritual Dagger Unlock")
+
+    try:
+        set_rule(world.get_location("Medieval History Badge"),
+                 lambda state: state.has("Kiln Access", player))
+    except KeyError:
+        pass
+    try:
+        set_rule(world.get_location("Exorcist Badge"),
+                 lambda state: state.has("Caldera Access", player))
+    except KeyError:
+        pass
+    try:
+        set_rule(world.get_location("Jester Badge"),
+                 lambda state: state.has("Caldera Access", player))
+    except KeyError:
+        pass
+    try:
+        set_rule(world.get_location("Archery Badge"),
+                 lambda state: state.has("Kiln Access", player))
+    except KeyError:
+        pass
+    try:
+        set_rule(world.get_location("Well Rested Badge"),
+                 lambda state: state.has("Caldera Access", player))
+    except KeyError:
+        pass
 
     try:
         set_rule(world.get_location("First Aid Badge"),
@@ -856,6 +901,13 @@ def apply_rules(world: "PeakWorld"):
     # Freeing the Scoutmaster's soul needs Scout's Honor (the amulet chain) and Kiln access
     try:
         set_rule(world.get_location("Soul Freed"),
+                 lambda state: state.has("Kiln Access", player) and _amulet_chain_rule(state))
+    except KeyError:
+        pass
+
+    # Rule Zero Badge is awarded for winning a run through the Nadir
+    try:
+        set_rule(world.get_location("Rule Zero Badge"),
                  lambda state: state.has("Kiln Access", player) and _amulet_chain_rule(state))
     except KeyError:
         pass

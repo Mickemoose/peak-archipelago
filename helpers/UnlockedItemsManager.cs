@@ -342,9 +342,20 @@ namespace Peak.AP
             });
         }
 
+        private static readonly Dictionary<ushort, ushort> VariantAliases = new Dictionary<ushort, ushort>
+        {
+            { 153, 154 },
+            { 164, 98 },
+        };
+
         public static bool IsItemUnlocked(ushort itemId)
         {
             if (_session == null) return true;
+
+            if (VariantAliases.TryGetValue(itemId, out ushort canonicalId))
+            {
+                itemId = canonicalId;
+            }
 
             int chainIndex = Array.IndexOf(AmuletChainOrder, itemId);
             if (chainIndex >= 0 && GetProgressiveAmuletCount() > chainIndex) return true;
@@ -392,6 +403,14 @@ namespace Peak.AP
             for (int i = 0; i < progressiveAmulets && i < AmuletChainOrder.Length; i++)
             {
                 unlocked.Add(AmuletChainOrder[i]);
+            }
+
+            foreach (var alias in VariantAliases)
+            {
+                if (unlocked.Contains(alias.Value))
+                {
+                    unlocked.Add(alias.Key);
+                }
             }
 
             return unlocked;

@@ -1267,6 +1267,14 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.MycoacrobaticsBadge, "Mycoacrobatics Badge" },
                 { ACHIEVEMENTTYPE.CryptogastronomyBadge, "Cryptogastronomy Badge" },
                 { ACHIEVEMENTTYPE.WandererBadge, "Wanderer Badge" },
+                { ACHIEVEMENTTYPE.RuleZeroBadge, "Rule Zero Badge" },
+                { ACHIEVEMENTTYPE.MedievalHistoryBadge, "Medieval History Badge" },
+                { ACHIEVEMENTTYPE.HangGlidingBadge, "Hang Gliding Badge" },
+                { ACHIEVEMENTTYPE.ExorcistBadge, "Exorcist Badge" },
+                { ACHIEVEMENTTYPE.WellRestedBadge, "Well Rested Badge" },
+                { ACHIEVEMENTTYPE.JesterBadge, "Jester Badge" },
+                { ACHIEVEMENTTYPE.ArcheryBadge, "Archery Badge" },
+                { ACHIEVEMENTTYPE.LastResortBadge, "Last Resort Badge" },
             };
 
             return _badgeToLocationMapping;
@@ -1648,6 +1656,7 @@ namespace Peak.AP
                 { 104, "Acquire Sunscreen" },
                 { 46, "Acquire Marshmallow" },
                 { 154, "Acquire Glizzy" },
+                { 153, "Acquire Glizzy" },
                 { 152, "Acquire Fortified Milk" },
                 
                 // Special objects
@@ -1929,6 +1938,15 @@ namespace Peak.AP
                 { "Zombie Horde Trap", () => ZombieHordeTrapEffect.ApplyZombieHordeTrap(_log) },
                 { "Beetle Horde Trap", () => BeetleHordeTrapEffect.ApplyBeetleHordeTrap(_log) },
                 { "Frog Trap", () => FrogTrapEffect.ApplyFrogTrap(_log) },
+                { "Ghost Trap", () => GhostTrapEffect.ApplyGhostTrap(_log) },
+                { "Rain Trap", () => RainTrapEffect.ApplyRainTrap(_log) },
+                { "Poison Cloud Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Poison Cloud Trap", CharacterAfflictions.STATUSTYPE.Poison, 0.3f, new UnityEngine.Color(1f, 0.35f, 0.75f)) },
+                { "Frost Cloud Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Frost Cloud Trap", CharacterAfflictions.STATUSTYPE.Cold, 0.4f, new UnityEngine.Color(0.75f, 0.9f, 1f)) },
+                { "Sleep Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Sleep Trap", CharacterAfflictions.STATUSTYPE.Drowsy, 0.5f, new UnityEngine.Color(0.65f, 0.35f, 0.9f)) },
+                { "Curse Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Curse Trap", CharacterAfflictions.STATUSTYPE.Curse, 0.2f, new UnityEngine.Color(0.08f, 0.05f, 0.1f)) },
+                { "Cursed Ball Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Cursed Ball Trap", CharacterAfflictions.STATUSTYPE.Curse, 0.2f, new UnityEngine.Color(0.08f, 0.05f, 0.1f), 25f, 5f) },
+                { "Well Done Trap", () => WellDoneTrapEffect.ApplyWellDoneTrap(_log) },
+                { "Instant Crystal Trap", () => InstantCrystalTrapEffect.ApplyInstantCrystalTrap(_log) },
                 { "Zoom Trap", () => ZoomTrapEffect.ApplyZoomTrap(_log) },
                 { "Pixel Trap", () => PixelTrapEffect.ApplyPixelTrap(_log) },
                 { "Screen Flip Trap", () => ScreenFlipTrapEffect.ApplyScreenFlipTrap(_log) },
@@ -2365,22 +2383,45 @@ namespace Peak.AP
             {
                 foreach (var root in scene.GetRootGameObjects())
                 {
-                    var spawners = root.GetComponentsInChildren<EruptionSpawner>(true);
-                    foreach (var spawner in spawners)
+                    if (!EruptionTrapEffect.HasCachedPrefab)
                     {
-                        if (spawner != null && spawner.eruption != null)
+                        var spawners = root.GetComponentsInChildren<EruptionSpawner>(true);
+                        foreach (var spawner in spawners)
                         {
-                            EruptionTrapEffect.SetCachedPrefab(spawner.eruption);
+                            if (spawner != null && spawner.eruption != null)
+                            {
+                                EruptionTrapEffect.SetCachedPrefab(spawner.eruption);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (HarvestedTemplates.WindZone == null)
+                    {
+                        var windZone = root.GetComponentInChildren<WindChillZone>(true);
+                        if (windZone != null)
+                        {
+                            HarvestedTemplates.WindZone = HarvestedTemplates.Keep(windZone.gameObject, "WindZone", _log);
+                        }
+                    }
+
+                    if (HarvestedTemplates.RainStorm == null)
+                    {
+                        foreach (var storm in root.GetComponentsInChildren<StormVisual>(true))
+                        {
+                            if (storm == null || storm.stormType != StormVisual.StormType.Rain) continue;
+                            var rainZone = storm.GetComponentInParent<WindChillZone>(true);
+                            if (rainZone == null) continue;
+                            HarvestedTemplates.RainStorm = HarvestedTemplates.Keep(rainZone.gameObject, "RainStorm", _log);
                             break;
                         }
                     }
-                    if (EruptionTrapEffect.HasCachedPrefab) break;
                 }
-                _log.LogInfo($"[PeakPelago] Eruption harvest result: {(EruptionTrapEffect.HasCachedPrefab ? "prefab captured" : "no EruptionSpawner found in WilIsland")}");
+                _log.LogInfo($"[PeakPelago] Harvest result: eruption={(EruptionTrapEffect.HasCachedPrefab ? "yes" : "no")}, windZone={(HarvestedTemplates.WindZone != null ? "yes" : "no")}, rainStorm={(HarvestedTemplates.RainStorm != null ? "yes" : "no")}");
             }
             catch (Exception ex)
             {
-                _log.LogError($"[PeakPelago] Eruption harvest error: {ex.Message}");
+                _log.LogError($"[PeakPelago] Template harvest error: {ex.Message}");
             }
 
             yield return UnityEngine.SceneManagement.SceneManager.UnloadSceneAsync(scene);
@@ -2405,6 +2446,60 @@ namespace Peak.AP
             else
             {
                 RPC_ApplyFakeAmuletStates(hide, show);
+            }
+        }
+
+        [PunRPC]
+        private void SpawnCloudTrapRPC(Vector3 position, int statusType, float amount, float r, float g, float b, float knockback, float verticalKnockback)
+        {
+            try
+            {
+                CloudTrapEffect.SpawnCloudLocal(position, (CharacterAfflictions.STATUSTYPE)statusType, amount, new UnityEngine.Color(r, g, b), _log, knockback, verticalKnockback);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in SpawnCloudTrapRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void StartWellDoneTrapRPC()
+        {
+            try
+            {
+                WellDoneTrapEffect.CookLocalInventory(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartWellDoneTrapRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void PetrifyPlayerRPC(int targetActorNumber)
+        {
+            try
+            {
+                if (Character.localCharacter?.photonView?.Owner == null) return;
+                if (Character.localCharacter.photonView.Owner.ActorNumber != targetActorNumber) return;
+                InstantCrystalTrapEffect.PetrifyLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in PetrifyPlayerRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
+        private void StartRainTrapRPC()
+        {
+            try
+            {
+                RainTrapEffect.ActivateRainLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartRainTrapRPC: {ex.Message}");
             }
         }
 
