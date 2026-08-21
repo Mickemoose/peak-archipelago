@@ -134,7 +134,6 @@ def create_peak_regions(world: "PeakWorld"):
         ("Ascent 6 Completed", "Ascent 6 Completed"),
         ("Ascent 7 Completed", "Ascent 7 Completed"),
         ("Ascent 8 Completed", "Ascent 8 Completed"),
-        ("Soul Freed", "Soul Freed"),
         ("Idol Dunked", "Idol Dunked"),
         ("All Badges Collected", "All Badges Collected"),
         ("Mesa Access", "Mesa Access"),

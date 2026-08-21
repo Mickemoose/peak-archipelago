@@ -119,6 +119,7 @@ namespace Peak.AP
         public Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
         private bool _logicalScoutStatue = false;
         private bool _scoutAmuletSanity = false;
+        private bool _trackerItemSpawning = false;
         public int _progressiveMountainCount = 0;
         public static int TrackerVersion = 0;
 
@@ -162,6 +163,8 @@ namespace Peak.AP
         private const float NOTIFICATION_COOLDOWN = 0.1f;
         private ConcurrentQueue<Action> _mainThreadActions = new();
         private List<MountainHint> _mountainHints = [];
+        private MountainHint _soulHint;
+        private bool _soulHintAnnounced;
 
         public Dictionary<string, string> _activeHints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public event Action OnHintsChanged;
@@ -226,6 +229,7 @@ namespace Peak.AP
                 ScoutStatueHonorGatePatch.Log = _log;
                 AmuletSpawnerGatePatch.Log = _log;
                 FakeAmuletGatePatch.Log = _log;
+                SoulOrbiterManager.Log = _log;
                 FearTrapEffect.Initialize(_log, this);
                 EruptionTrapEffect.Initialize(_log);
                 _ui = gameObject.AddComponent<ArchipelagoUI>();
@@ -1275,6 +1279,7 @@ namespace Peak.AP
                 { ACHIEVEMENTTYPE.JesterBadge, "Jester Badge" },
                 { ACHIEVEMENTTYPE.ArcheryBadge, "Archery Badge" },
                 { ACHIEVEMENTTYPE.LastResortBadge, "Last Resort Badge" },
+                { ACHIEVEMENTTYPE.BellringerBadge, "Bellringer Badge" },
             };
 
             return _badgeToLocationMapping;
@@ -1690,6 +1695,8 @@ namespace Peak.AP
                 { 71, "Acquire Sports Drink" },
                 { 44, "Acquire Big Lollipop" },
                 { 57, "Acquire Big Egg" },
+                { 178, "Acquire Big Egg" },
+                { 177, "Acquire Small Egg" },
                 { 26, "Acquire Egg" },
                 { 114, "Acquire Cooked Bird" },
                 { 38, "Acquire Honeycomb" },
@@ -1753,6 +1760,7 @@ namespace Peak.AP
                 { 169, "Acquire Rocketpack"},
                 { 168, "Acquire Jetpack"},
                 { 166, "Acquire Fanny Pack"},
+                { 6, "Acquire Backpack"},
                 { 185, "Acquire Frog Legs"},
 
                 { 182, "Acquire Scout's Tenacity"},
@@ -1944,7 +1952,10 @@ namespace Peak.AP
                 { "Frost Cloud Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Frost Cloud Trap", CharacterAfflictions.STATUSTYPE.Cold, 0.4f, new UnityEngine.Color(0.75f, 0.9f, 1f)) },
                 { "Sleep Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Sleep Trap", CharacterAfflictions.STATUSTYPE.Drowsy, 0.5f, new UnityEngine.Color(0.65f, 0.35f, 0.9f)) },
                 { "Curse Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Curse Trap", CharacterAfflictions.STATUSTYPE.Curse, 0.2f, new UnityEngine.Color(0.08f, 0.05f, 0.1f)) },
-                { "Cursed Ball Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Cursed Ball Trap", CharacterAfflictions.STATUSTYPE.Curse, 0.2f, new UnityEngine.Color(0.08f, 0.05f, 0.1f), 25f, 5f) },
+                { "Cursed Ball Trap", () => CloudTrapEffect.ApplyCloudTrap(_log, "Cursed Ball Trap", CharacterAfflictions.STATUSTYPE.Curse, 0.2f, new UnityEngine.Color(0.08f, 0.05f, 0.1f), 25f, 0f) },
+                { "Storm Trap", () => StormTrapEffect.ApplyStormTrap(_log) },
+                { "Skeleton Trap", () => SkeletonTrapEffect.ApplySkeletonTrap(_log) },
+                { "Scoutmaster's Soul", () => OnSoulItemReceived() },
                 { "Well Done Trap", () => WellDoneTrapEffect.ApplyWellDoneTrap(_log) },
                 { "Instant Crystal Trap", () => InstantCrystalTrapEffect.ApplyInstantCrystalTrap(_log) },
                 { "Zoom Trap", () => ZoomTrapEffect.ApplyZoomTrap(_log) },
@@ -2336,7 +2347,11 @@ namespace Peak.AP
         {
             try
             {
+                FakeAmuletGatePatch.ResetForScene();
+                ScoutStatueGemGatePatch.ResetForScene();
                 StartCoroutine(ApplyFakeAmuletGatesDelayed());
+                SoulOrbiterManager.ResetForScene();
+                StartCoroutine(RefreshSoulOrbiterDelayed());
 
                 if (scene.name == "Title" && !_eruptionHarvestAttempted &&
                     !EruptionTrapEffect.HasCachedPrefab && !PhotonNetwork.InRoom)
@@ -2428,6 +2443,16 @@ namespace Peak.AP
             _log.LogInfo("[PeakPelago] Eruption harvest scene unloaded");
         }
 
+        private System.Collections.IEnumerator RefreshSoulOrbiterDelayed()
+        {
+            yield return new WaitForSeconds(3f);
+            SoulOrbiterManager.RefreshOrbiter();
+            if (PhotonNetwork.IsMasterClient || !PhotonNetwork.IsConnected)
+            {
+                BroadcastSoulOwned(SoulOrbiterManager.SoulItemOwned());
+            }
+        }
+
         private System.Collections.IEnumerator ApplyFakeAmuletGatesDelayed()
         {
             yield return new WaitForSeconds(2f);
@@ -2491,6 +2516,19 @@ namespace Peak.AP
         }
 
         [PunRPC]
+        private void StartStormTrapRPC()
+        {
+            try
+            {
+                StormTrapEffect.ActivateStormLocal(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error in StartStormTrapRPC: {ex.Message}");
+            }
+        }
+
+        [PunRPC]
         private void StartRainTrapRPC()
         {
             try
@@ -2513,6 +2551,80 @@ namespace Peak.AP
             catch (Exception ex)
             {
                 _log.LogError($"[PeakPelago] Error applying fake amulet states: {ex.Message}");
+            }
+        }
+
+        private void OnSoulItemReceived()
+        {
+            try
+            {
+                _log.LogInfo("[PeakPelago] Scoutmaster's Soul received!");
+                _notifications?.ShowHeroTitle("The Scoutmaster's soul is with you");
+                SoulOrbiterManager.RefreshOrbiter();
+                BroadcastSoulOwned(true);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error handling soul item: {ex.Message}");
+            }
+        }
+
+        public void BroadcastSoulOwned(bool owned)
+        {
+            if (_photonView != null && PhotonNetwork.IsConnected)
+            {
+                _photonView.RPC("RPC_SetSoulOwned", RpcTarget.All, owned);
+            }
+            else
+            {
+                RPC_SetSoulOwned(owned);
+            }
+        }
+
+        [PunRPC]
+        private void RPC_SetSoulOwned(bool owned)
+        {
+            try
+            {
+                SoulPillarPatch.SoulOwnedSynced = owned;
+                SoulPillarPatch.ApplyPillarVisuals();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error syncing soul ownership: {ex.Message}");
+            }
+        }
+
+        public void OnPillarBreakBlocked(bool isLocalInteractor)
+        {
+            try
+            {
+                _notifications?.ShowWarningMessage("The Scoutmaster's soul is lost in the multiworld - the climb cannot begin");
+                if (_soulHint != null)
+                {
+                    _notifications?.ShowSimpleMessage($"Scoutmaster's Soul: {_soulHint.Location} ({_soulHint.Player}'s {_soulHint.Game})");
+                    if (!_soulHintAnnounced && _session != null && _soulHint.LocationId > 0)
+                    {
+                        try
+                        {
+                            _session.Hints.CreateHints(_soulHint.PlayerSlot, HintStatus.Unspecified, _soulHint.LocationId);
+                            _soulHintAnnounced = true;
+                            _log.LogInfo("[PeakPelago] Free hint released for the Scoutmaster's Soul");
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogDebug($"[PeakPelago] Could not create soul hint: {ex.Message}");
+                        }
+                    }
+                }
+                if (isLocalInteractor)
+                {
+                    ReportCheckByName("Soul Freed");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError($"[PeakPelago] Error handling blocked pillar break: {ex.Message}");
             }
         }
 
@@ -2909,6 +3021,12 @@ namespace Peak.AP
             message = null;
             try
             {
+                if (!_trackerItemSpawning)
+                {
+                    message = "Tracker spawning is disabled in this seed";
+                    return false;
+                }
+
                 float remaining = GetTrackerSpawnCooldownRemaining();
                 if (remaining > 0f)
                 {
@@ -2949,6 +3067,12 @@ namespace Peak.AP
                 if (_itemSanityEnabled && !UnlockedItemsManager.IsItemUnlocked(itemId))
                 {
                     message = "Not unlocked";
+                    return false;
+                }
+
+                if (itemId == 183)
+                {
+                    message = "Must be earned at the statue";
                     return false;
                 }
 
@@ -3142,28 +3266,16 @@ namespace Peak.AP
                 _lastReceivedItemTime = DateTime.Now;
 
                 // Unlock items just add to the loot pool - no physical spawn needed
-                if (itemName.EndsWith(" Unlock"))
+                if (itemName.EndsWith(" Unlock") || itemName.Equals("Progressive Pack", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (itemName.Equals("Scout's Honor Unlock", StringComparison.OrdinalIgnoreCase))
+                    if (itemName.Equals("Scout's Honor Unlock", StringComparison.OrdinalIgnoreCase) ||
+                        itemName.Equals("Progressive Amulet Unlock", StringComparison.OrdinalIgnoreCase))
                     {
                         ScoutStatueHonorGatePatch.RetriggerStatues();
                     }
-                    if (itemName.Equals("Strange Gem Unlock", StringComparison.OrdinalIgnoreCase))
-                    {
-                        ScoutStatueGemGatePatch.RetriggerGemSpawns();
-                    }
-                    if (itemName.Equals("Progressive Amulet Unlock", StringComparison.OrdinalIgnoreCase))
-                    {
-                        ScoutStatueGemGatePatch.RetriggerGemSpawns();
-                        ScoutStatueHonorGatePatch.RetriggerStatues();
-                    }
-                    if (itemName.StartsWith("Scout's", StringComparison.OrdinalIgnoreCase) ||
-                        itemName.Equals("Progressive Amulet Unlock", StringComparison.OrdinalIgnoreCase) ||
-                        itemName.Equals("Strange Gem Unlock", StringComparison.OrdinalIgnoreCase))
-                    {
-                        AmuletSpawnerGatePatch.RetriggerBlockedSpawners();
-                        FakeAmuletGatePatch.ApplyGates(null);
-                    }
+                    ScoutStatueGemGatePatch.RetriggerGemSpawns();
+                    FakeAmuletGatePatch.ApplyGates(null);
+                    AmuletSpawnerGatePatch.RetriggerBlockedSpawners();
                     BumpTrackerVersion();
                     return;
                 }
@@ -4826,6 +4938,29 @@ namespace Peak.AP
                         }
                     }
 
+                    if (loginResult.SlotData.ContainsKey("soul_hint"))
+                    {
+                        try
+                        {
+                            _soulHint = null;
+                            if (loginResult.SlotData["soul_hint"] is JObject soulHintData)
+                            {
+                                _soulHint = new MountainHint
+                                {
+                                    Location = soulHintData["location"]?.ToString() ?? "Unknown",
+                                    Player = soulHintData["player"]?.ToString() ?? "Unknown",
+                                    Game = soulHintData["game"]?.ToString() ?? "Unknown",
+                                    LocationId = soulHintData["location_id"]?.ToObject<long>() ?? 0,
+                                    PlayerSlot = soulHintData["player_slot"]?.ToObject<int>() ?? 0,
+                                };
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.LogError($"[PeakPelago] Error parsing soul_hint: {ex.Message}");
+                        }
+                    }
+
                     SeedHintCache();
 
                     if (loginResult.SlotData.ContainsKey("breath_link"))
@@ -5068,6 +5203,7 @@ namespace Peak.AP
                     }
                     _logicalScoutStatue = ReadBoolOption(loginResult, "logical_scout_statue", _logicalScoutStatue);
                     _scoutAmuletSanity = ReadBoolOption(loginResult, "scout_amulet_sanity", _scoutAmuletSanity);
+                    _trackerItemSpawning = ReadBoolOption(loginResult, "tracker_item_spawning", _trackerItemSpawning);
 
                     LoadOfflineChecks();
                     if (_stateData.OfflineChecks.Count > 0)
@@ -5759,7 +5895,8 @@ namespace Peak.AP
 
             // Fast-track unlock items - they don't spawn anything, so process them all immediately
             bool processedAnyUnlocks = false;
-            while (_itemQueue.TryPeek(out var unlockPeek) && unlockPeek.itemName.EndsWith(" Unlock"))
+            while (_itemQueue.TryPeek(out var unlockPeek) &&
+                   (unlockPeek.itemName.EndsWith(" Unlock") || unlockPeek.itemName.Equals("Progressive Pack", StringComparison.OrdinalIgnoreCase)))
             {
                 if (!_itemQueue.TryDequeue(out var unlockItem)) break;
                 try

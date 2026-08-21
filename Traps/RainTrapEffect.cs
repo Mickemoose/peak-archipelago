@@ -81,10 +81,15 @@ namespace Peak.AP
             }
 
             zone.windActive = false;
-            yield return new WaitForSeconds(2f);
+            yield return new WaitForSeconds(8f);
 
             UnityEngine.Object.Destroy(stormObj);
             WindChillZone.instance = previousInstance;
+            Shader.SetGlobalFloat("_WeatherBlend", 0f);
+            if (DayNightManager.instance != null)
+            {
+                DayNightManager.instance.rainstormWindFactor = 0f;
+            }
             log.LogInfo("[PeakPelago] Rain Trap complete");
         }
     }

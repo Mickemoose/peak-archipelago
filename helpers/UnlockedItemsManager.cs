@@ -143,7 +143,8 @@ namespace Peak.AP
             { 0, new HashSet<SpawnPool> { SpawnPool.LuggageBeach } },
             { 1, new HashSet<SpawnPool> { SpawnPool.LuggageJungle, SpawnPool.LuggageRoots } },
             { 2, new HashSet<SpawnPool> { SpawnPool.LuggageTundra, SpawnPool.LuggageMesa } },
-            { 3, new HashSet<SpawnPool> { SpawnPool.LuggageCaldera } },
+            { 3, new HashSet<SpawnPool> { SpawnPool.LuggageCaldera, SpawnPool.LuggageGloom, SpawnPool.LuggageClown } },
+            { 4, new HashSet<SpawnPool> { SpawnPool.LuggageCitadel } },
         };
 
         private static readonly Dictionary<int, HashSet<SpawnPool>> BiomeLevelToNaturalPools = new Dictionary<int, HashSet<SpawnPool>>
@@ -158,6 +159,23 @@ namespace Peak.AP
         {
             SpawnPool.LuggageClimber, SpawnPool.LuggageAncient, SpawnPool.LuggageCursed,
         };
+
+        public static SpawnPool GetLuggagePoolForBiome(global::Biome.BiomeType biomeType)
+        {
+            switch (biomeType)
+            {
+                case global::Biome.BiomeType.Shore: return SpawnPool.LuggageBeach;
+                case global::Biome.BiomeType.Tropics: return SpawnPool.LuggageJungle;
+                case global::Biome.BiomeType.Alpine: return SpawnPool.LuggageTundra;
+                case global::Biome.BiomeType.Mesa: return SpawnPool.LuggageMesa;
+                case global::Biome.BiomeType.Volcano: return SpawnPool.LuggageCaldera;
+                case global::Biome.BiomeType.Swamp: return SpawnPool.LuggageGloom;
+                case global::Biome.BiomeType.Temple: return SpawnPool.LuggageCitadel;
+                case global::Biome.BiomeType.Roots: return SpawnPool.LuggageRoots;
+                case global::Biome.BiomeType.Peak: return SpawnPool.LuggageAncient;
+                default: return SpawnPool.LuggageBeach;
+            }
+        }
 
         private static HashSet<SpawnPool> GetPoolsForBiomeLevel(int biomeLevel)
         {
@@ -285,7 +303,10 @@ namespace Peak.AP
 
         public static string GetTrackerSpawnCategory(ushort itemId)
         {
-            if (ScoutAmuletItemIds.Contains(itemId) || itemId == STRANGE_GEM_ITEM_ID) return "Statues";
+            if (ScoutAmuletItemIds.Contains(itemId) || itemId == STRANGE_GEM_ITEM_ID)
+            {
+                if (itemId == SCOUTS_HONOR_ITEM_ID || !ScoutAmuletsFreelyPlaced) return "Statues";
+            }
 
             switch (_lootSanityMode)
             {
@@ -310,6 +331,17 @@ namespace Peak.AP
         public static bool IsAmuletChainItem(ushort itemId)
         {
             return ScoutAmuletItemIds.Contains(itemId) || itemId == STRANGE_GEM_ITEM_ID;
+        }
+
+        public static bool LootSanityActive => _lootSanityMode != 0;
+        public static bool ScoutAmuletsFreelyPlaced => _itemSanityEnabled && _scoutAmuletSanity;
+
+        public static bool CanSpawnGatedItem(ushort itemId)
+        {
+            if (itemId == 0) return true;
+            if (IsAmuletChainItem(itemId)) return CanSpawnScoutAmulet(itemId);
+            if (!_itemSanityEnabled) return true;
+            return IsItemUnlocked(itemId);
         }
 
         public static bool CanSpawnScoutAmulet(ushort itemId)
@@ -342,10 +374,25 @@ namespace Peak.AP
             });
         }
 
+        private const string ProgressivePackName = "Progressive Pack";
+
+        public static readonly ushort[] PackChainOrder = { 166, 6 };
+
+        public static int GetProgressivePackCount()
+        {
+            if (_session == null) return 0;
+            return _session.Items.AllItemsReceived.Count(item =>
+            {
+                string name = _session.Items.GetItemName(item.ItemId, item.ItemGame);
+                return name != null && name.Equals(ProgressivePackName, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+
         private static readonly Dictionary<ushort, ushort> VariantAliases = new Dictionary<ushort, ushort>
         {
             { 153, 154 },
             { 164, 98 },
+            { 178, 57 },
         };
 
         public static bool IsItemUnlocked(ushort itemId)
@@ -359,6 +406,9 @@ namespace Peak.AP
 
             int chainIndex = Array.IndexOf(AmuletChainOrder, itemId);
             if (chainIndex >= 0 && GetProgressiveAmuletCount() > chainIndex) return true;
+
+            int packIndex = Array.IndexOf(PackChainOrder, itemId);
+            if (packIndex >= 0) return GetProgressivePackCount() > packIndex;
 
             string apItemName = null;
             foreach (var kvp in ItemIdMappings.ApNameToInternalName)
@@ -385,6 +435,7 @@ namespace Peak.AP
             if (_session == null) return unlocked;
 
             int progressiveAmulets = 0;
+            int progressivePacks = 0;
             foreach (var item in _session.Items.AllItemsReceived)
             {
                 string itemName = _session.Items.GetItemName(item.ItemId, item.ItemGame);
@@ -392,6 +443,11 @@ namespace Peak.AP
                 if (itemName.Equals(ProgressiveAmuletUnlockName, StringComparison.OrdinalIgnoreCase))
                 {
                     progressiveAmulets++;
+                    continue;
+                }
+                if (itemName.Equals(ProgressivePackName, StringComparison.OrdinalIgnoreCase))
+                {
+                    progressivePacks++;
                     continue;
                 }
                 if (ItemIdMappings.TryGetIdFromApName(itemName, out ushort gameItemId))
@@ -403,6 +459,11 @@ namespace Peak.AP
             for (int i = 0; i < progressiveAmulets && i < AmuletChainOrder.Length; i++)
             {
                 unlocked.Add(AmuletChainOrder[i]);
+            }
+
+            for (int i = 0; i < progressivePacks && i < PackChainOrder.Length; i++)
+            {
+                unlocked.Add(PackChainOrder[i]);
             }
 
             foreach (var alias in VariantAliases)

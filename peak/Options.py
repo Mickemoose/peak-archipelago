@@ -97,6 +97,13 @@ class ScoutAmuletSanity(Toggle):
     """
     display_name = "Scout Amulet Sanity"
 
+class TrackerItemSpawning(Toggle):
+    """
+    When enabled, clicking an unlocked item in the in-game tracker spawns it in front of you
+    (with a cooldown). When disabled, the tracker is display-only.
+    """
+    display_name = "Tracker Item Spawning"
+
 class LogicalScoutStatue(Toggle):
     """
     When enabled, the Scout Statue will only drop items that
@@ -518,6 +525,18 @@ class CursedBallTrapWeight(BaseTrapWeight):
     """
     display_name = "Cursed Ball Trap Weight"
 
+class StormTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which unleashes a full wind and rain storm for a while
+    """
+    display_name = "Storm Trap Weight"
+
+class SkeletonTrapWeight(BaseTrapWeight):
+    """
+    Likelihood of receiving a trap which permanently turns a random player into a living skeleton
+    """
+    display_name = "Skeleton Trap Weight"
+
 class TrapPercentage(Range):
     """
     Replace a percentage of junk items in the item pool with random traps
@@ -586,6 +605,7 @@ peak_option_groups = [
         LootSanity,
         LogicalScoutStatue,
         ScoutAmuletSanity,
+        TrackerItemSpawning,
     ]),
     OptionGroup("Stamina", [
         ProgressiveStamina,
@@ -659,6 +679,8 @@ peak_option_groups = [
         InstantCrystalTrapWeight,
         CurseTrapWeight,
         CursedBallTrapWeight,
+        StormTrapWeight,
+        SkeletonTrapWeight,
     ]),
     OptionGroup("Badge Settings", [
         DisableMultiplayerBadges,
@@ -680,6 +702,7 @@ class PeakOptions(PerGameCommonOptions):
     loot_sanity: LootSanity
     logical_scout_statue: LogicalScoutStatue
     scout_amulet_sanity: ScoutAmuletSanity
+    tracker_item_spawning: TrackerItemSpawning
 
     disable_multiplayer_badges: DisableMultiplayerBadges
     disable_hard_badges: DisableHardBadges
@@ -751,3 +774,5 @@ class PeakOptions(PerGameCommonOptions):
     instant_crystal_trap_weight: InstantCrystalTrapWeight
     curse_trap_weight: CurseTrapWeight
     cursed_ball_trap_weight: CursedBallTrapWeight
+    storm_trap_weight: StormTrapWeight
+    skeleton_trap_weight: SkeletonTrapWeight

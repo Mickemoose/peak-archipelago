@@ -63,6 +63,8 @@ TRAP_DEFINITIONS = [
     ("Instant Crystal Trap", "instant_crystal_trap_weight"),
     ("Curse Trap", "curse_trap_weight"),
     ("Cursed Ball Trap", "cursed_ball_trap_weight"),
+    ("Storm Trap", "storm_trap_weight"),
+    ("Skeleton Trap", "skeleton_trap_weight"),
 ]
 
 class PeakWeb(WebWorld):
@@ -158,6 +160,8 @@ class PeakWorld(World):
         self.multiworld.early_items[self.player]["Progressive Mountain"] = 1
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 4 Progressive Mountain items (1 early)")
     
+        item_pool.append(self.create_item("Scoutmaster's Soul"))
+
         for _ in range(8):
             item_pool.append(self.create_item("Progressive Endurance"))
         logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 8 Progressive Endurance items")
@@ -197,6 +201,9 @@ class PeakWorld(World):
                 for _ in range(6):
                     item_pool.append(self.create_item("Progressive Amulet Unlock"))
                 logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Replaced amulet chain unlocks with 6 Progressive Amulet Unlock items (Free The Soul goal)")
+            for _ in range(2):
+                item_pool.append(self.create_item("Progressive Pack"))
+            logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added 2 Progressive Pack items (Fanny Pack, then Backpack)")
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {len(unlock_table)} unlock items (ItemSanity enabled)")
         else:
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Skipping unlock items (ItemSanity disabled)")
@@ -405,7 +412,8 @@ class PeakWorld(World):
         if "24 Karat Badge" in goals:
             required_events.append("Idol Dunked")
         if "Free The Soul" in goals:
-            required_events.append("Soul Freed")
+            required_events.append("Scoutmaster's Soul")
+            required_events.append("Kiln Access")
 
         if not required_events:
             return
@@ -473,6 +481,21 @@ class PeakWorld(World):
             }
             for location in mountain_locations
         ]
+
+        soul_hint = None
+        for location in self.multiworld.get_locations():
+            if (location.item
+                    and location.item.name == "Scoutmaster's Soul"
+                    and location.item.player == self.player
+                    and location.address is not None):
+                soul_hint = {
+                    "location": location.name,
+                    "player": self.multiworld.get_player_name(location.player),
+                    "game": self.multiworld.game[location.player],
+                    "location_id": location.address,
+                    "player_slot": location.player
+                }
+                break
         
         slot_data = {
             "goals": sorted(self.options.goals.value),
@@ -498,8 +521,10 @@ class PeakWorld(World):
             "loot_sanity": self.options.loot_sanity.value,
             "logical_scout_statue": self.options.logical_scout_statue.value,
             "scout_amulet_sanity": self.options.scout_amulet_sanity.value,
+            "tracker_item_spawning": self.options.tracker_item_spawning.value,
             "session_id": session_id,
             "mountain_hints": mountain_hints,
+            "soul_hint": soul_hint,
             "loot_biome_assignments": getattr(self, "loot_biome_assignments", {})
         }
         

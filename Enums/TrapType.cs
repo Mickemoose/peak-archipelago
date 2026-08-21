@@ -59,6 +59,8 @@ namespace Peak.AP
         InstantCrystalTrap,
         CurseTrap,
         CursedBallTrap,
+        StormTrap,
+        SkeletonTrap,
     }
 
     public static class TrapTypeExtensions
@@ -117,6 +119,8 @@ namespace Peak.AP
             { TrapType.InstantCrystalTrap, "Instant Crystal Trap" },
             { TrapType.CurseTrap, "Curse Trap" },
             { TrapType.CursedBallTrap, "Cursed Ball Trap" },
+            { TrapType.StormTrap, "Storm Trap" },
+            { TrapType.SkeletonTrap, "Skeleton Trap" },
         };
         private static readonly Dictionary<string, TrapType> _nameToTrap = 
             _trapNames.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);

@@ -11,7 +11,7 @@ CALDERA_LOCATIONS = [
     "Acquire Frog", "Acquire Ritual Dagger", "Acquire Frog Legs", "Acquire Rocketpack",
     "Acquire Jetpack", "Acquire Fanny Pack",
     "Acquire Scout's Tenacity", "Acquire Scout's Generosity", "Acquire Scout's Ambition",
-    "Acquire Scout's Initiative",
+    "Acquire Scout's Initiative", "Acquire Small Egg",
 ]
 
 KILN_LOCATIONS = [
@@ -65,12 +65,22 @@ def _get_vanilla_biome_level(location_name):
 
 
 MYSTICAL_MIN_LEVELS = {
+    "Acquire Fanny Pack": 1,
+    "Acquire Balloon": 1,
     "Acquire Ritual Dagger": 2,
     "Acquire Faerie Lantern": 2,
     "Acquire Pandora's Lunchbox": 2,
+    "Acquire Rocketpack": 2,
+    "Acquire Bugle of Friendship": 2,
+    "Acquire Portable Stove": 2,
+    "Acquire Sports Drink": 2,
     "Acquire Anti-Zooka": 3,
     "Acquire Book of Bones": 3,
     "Acquire Pirate's Compass": 3,
+    "Acquire Scout Effigy": 3,
+    "Acquire Jetpack": 3,
+    "Acquire Warp Fungus": 3,
+    "Acquire Checkpoint Flag": 3,
 }
 
 
@@ -284,13 +294,15 @@ def apply_rules(world: "PeakWorld"):
         "Acquire Frog": "Frog Unlock",
         "Acquire Rocketpack": "Rocketpack Unlock",
         "Acquire Jetpack": "Jetpack Unlock",
-        "Acquire Fanny Pack": "Fanny Pack Unlock",
+        "Acquire Fanny Pack": "Progressive Pack",
+        "Acquire Backpack": "Progressive Pack",
         "Acquire Frog Legs": "Frog Legs Unlock",
         "Acquire Scout's Tenacity": "Scout's Tenacity Unlock",
         "Acquire Scout's Generosity": "Scout's Generosity Unlock",
         "Acquire Scout's Ambition": "Scout's Ambition Unlock",
         "Acquire Scout's Initiative": "Scout's Initiative Unlock",
         "Acquire Scout's Honor": "Scout's Honor Unlock",
+        "Acquire Small Egg": "Small Egg Unlock",
     }
 
     scout_amulet_sanity = world.options.scout_amulet_sanity.value
@@ -386,6 +398,17 @@ def apply_rules(world: "PeakWorld"):
         try:
             add_rule(world.get_location("Acquire Scout's Honor"),
                      lambda state: state.has("Strange Gem Unlock", player))
+        except KeyError:
+            pass
+
+    # Backpack is the second Progressive Pack
+    if item_sanity:
+        try:
+            _pack_lvl = loot_biome.get("Acquire Backpack", 0)
+            set_rule(world.get_location("Acquire Backpack"),
+                     lambda state, lvl=_pack_lvl: (
+                         state.has("Progressive Pack", player, 2) and
+                         (lvl == 0 or state.has("Progressive Mountain", player, lvl))))
         except KeyError:
             pass
 
@@ -516,6 +539,11 @@ def apply_rules(world: "PeakWorld"):
         pass
     try:
         set_rule(world.get_location("Jester Badge"),
+                 lambda state: state.has("Caldera Access", player))
+    except KeyError:
+        pass
+    try:
+        set_rule(world.get_location("Bellringer Badge"),
                  lambda state: state.has("Caldera Access", player))
     except KeyError:
         pass
@@ -905,10 +933,13 @@ def apply_rules(world: "PeakWorld"):
     except KeyError:
         pass
 
-    # Rule Zero Badge is awarded for winning a run through the Nadir
+    # Rule Zero Badge is awarded for winning a run through the Nadir,
+    # which requires the Scoutmaster's Soul item to begin the climb
     try:
         set_rule(world.get_location("Rule Zero Badge"),
-                 lambda state: state.has("Kiln Access", player) and _amulet_chain_rule(state))
+                 lambda state: state.has("Kiln Access", player) and
+                               state.has("Scoutmaster's Soul", player) and
+                               _amulet_chain_rule(state))
     except KeyError:
         pass
 

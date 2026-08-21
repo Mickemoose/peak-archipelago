@@ -57,11 +57,12 @@ namespace Peak.AP
                 aoe.auto = false;
                 aoe.onEnable = false;
                 aoe.mask = HelperFunctions.LayerType.AllPhysical;
-                aoe.range = 6f;
+                bool hasBlast = knockback > 0f;
+                aoe.range = hasBlast ? 5f : 6f;
                 aoe.knockback = knockback;
                 aoe.additionalVerticalKnockback = verticalKnockback;
-                aoe.fallTime = knockback > 0f ? 0.4f : 0f;
-                aoe.minFactor = 0.4f;
+                aoe.fallTime = hasBlast ? 0.5f : 0f;
+                aoe.minFactor = hasBlast ? 0.2f : 0.4f;
                 aoe.statusType = status;
                 aoe.statusAmount = amount;
                 aoe.Explode();

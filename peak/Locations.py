@@ -158,6 +158,10 @@ LOCATION_TABLE: Dict[str, int] = {
     "Jester Badge": 76458,
     "Archery Badge": 76459,
     "Last Resort Badge": 76460,
+    "Acquire Small Egg": 76461,
+    "Bellringer Badge": 76462,
+    "Soul Freed": 76463,
+    "Acquire Backpack": 76464,
         
     # Acquire Item Locations
     "Acquire Rope Spool": 76200,

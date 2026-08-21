@@ -42,11 +42,44 @@ namespace Peak.AP
         }
     }
 
+    [HarmonyPatch(typeof(ScoutStatue), nameof(ScoutStatue.RPC_InsertAmulet))]
+    public static class ScoutStatueInsertPatch
+    {
+        static void Prefix(int amuletType)
+        {
+            if (amuletType == 99)
+            {
+                ScoutStatueGemGatePatch.AllowNextGemSpawn = true;
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(ScoutStatue), nameof(ScoutStatue.SpawnGem_Master))]
     public static class ScoutStatueGemGatePatch
     {
-        static bool Prefix()
+        public static bool AllowNextGemSpawn;
+        private static readonly System.Collections.Generic.HashSet<int> _lootReplacedStatues = new System.Collections.Generic.HashSet<int>();
+
+        static bool Prefix(ScoutStatue __instance)
         {
+            if (AllowNextGemSpawn)
+            {
+                AllowNextGemSpawn = false;
+                return true;
+            }
+
+            if (UnlockedItemsManager.ScoutAmuletsFreelyPlaced)
+            {
+                if (PhotonNetwork.IsMasterClient && __instance != null &&
+                    __instance.gemSpot != null && _lootReplacedStatues.Add(__instance.GetInstanceID()))
+                {
+                    AmuletSpawnerGatePatch.SpawnLootAt(AmuletSpawnerGatePatch.ResolveBiomePool(__instance),
+                        __instance.gemSpot.position + Vector3.up * 0.1f, __instance.gemSpot.rotation,
+                        true, null, "Scout Statue gem spot");
+                }
+                return false;
+            }
+
             if (UnlockedItemsManager.CanSpawnStrangeGem())
             {
                 return true;
@@ -56,10 +89,15 @@ namespace Peak.AP
             return false;
         }
 
+        public static void ResetForScene()
+        {
+            _lootReplacedStatues.Clear();
+        }
+
         public static void RetriggerGemSpawns()
         {
             if (!PhotonNetwork.IsMasterClient) return;
-            if (!UnlockedItemsManager.CanSpawnStrangeGem()) return;
+            if (!UnlockedItemsManager.ScoutAmuletsFreelyPlaced && !UnlockedItemsManager.CanSpawnStrangeGem()) return;
 
             var statues = Object.FindObjectsByType<ScoutStatue>(FindObjectsSortMode.None);
             foreach (var statue in statues)

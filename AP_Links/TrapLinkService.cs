@@ -64,6 +64,7 @@ namespace Peak.AP
             public const string Breakout = "Breakout Trap";
             public const string Bubble = "Bubble Trap";
             public const string BulletTime = "Bullet Time Trap";
+            public const string BurgerHat = "Burger Hat Trap";
             public const string Burn = "Burn Trap";
             public const string Buyon = "Buyon Trap";
             public const string CameraRotate = "Camera Rotate Trap";
@@ -82,6 +83,7 @@ namespace Peak.AP
             public const string CursedBall = "Cursed Ball Trap";
             public const string Cutscene = "Cutscene Trap";
             public const string Damage = "Damage Trap";
+            public const string DeadRinger = "Dead Ringer Trap";
             public const string Deisometric = "Deisometric Trap";
             public const string Depletion = "Depletion Trap";
             public const string DisableA = "Disable A Trap";
@@ -370,7 +372,7 @@ namespace Peak.AP
                 StandardTraps.Fear);
 
             Register("Scoutmaster Trap", StandardTraps.MyTurn,
-                StandardTraps.MyTurn, StandardTraps.DisableTag, StandardTraps.Chaser);
+                StandardTraps.MyTurn, StandardTraps.DisableTag, StandardTraps.Chaser, StandardTraps.DeadRinger);
 
             Register("Zoom Trap", StandardTraps.Zoom,
                 StandardTraps.Zoom, StandardTraps.WIDE, StandardTraps.ZoomIn, StandardTraps.ZoomOut);
@@ -434,6 +436,9 @@ namespace Peak.AP
 
             Register("Cursed Ball Trap", StandardTraps.CursedBall,
                 StandardTraps.CursedBall);
+
+            Register("Skeleton Trap", StandardTraps.BlueBalls,
+                StandardTraps.BlueBalls, StandardTraps.Bald, StandardTraps.BurgerHat);
 
             _log.LogInfo($"[PeakPelago] Initialized trap mappings: {_peakToStandardMapping.Count} outgoing, {_standardToPeakMapping.Count} incoming");
         }

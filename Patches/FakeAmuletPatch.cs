@@ -29,6 +29,13 @@ namespace Peak.AP
         }
 
 
+        private static readonly HashSet<int> _lootReplacedFakes = new HashSet<int>();
+
+        public static void ResetForScene()
+        {
+            _lootReplacedFakes.Clear();
+        }
+
         public static void ApplyGates(FakeItemManager manager)
         {
             if (manager == null) manager = FakeItemManager.Instance;
@@ -36,6 +43,7 @@ namespace Peak.AP
 
             Log?.LogInfo($"[PeakPelago] Gating {manager.allFakeItems.Count} fake items (master={PhotonNetwork.IsMasterClient})");
 
+            bool freelyPlaced = UnlockedItemsManager.ScoutAmuletsFreelyPlaced;
             var hide = new List<int>();
             var show = new List<int>();
             foreach (var fake in manager.allFakeItems)
@@ -43,6 +51,18 @@ namespace Peak.AP
                 if (fake == null) continue;
                 ushort itemId = ResolveItemId(fake.realItemPrefab);
                 if (itemId == 0 || !UnlockedItemsManager.IsAmuletChainItem(itemId)) continue;
+
+                if (freelyPlaced)
+                {
+                    hide.Add(fake.index);
+                    if (PhotonNetwork.IsMasterClient && _lootReplacedFakes.Add(fake.GetInstanceID()))
+                    {
+                        AmuletSpawnerGatePatch.SpawnLootAt(AmuletSpawnerGatePatch.ResolveBiomePool(fake),
+                            fake.transform.position + UnityEngine.Vector3.up * 0.1f, fake.transform.rotation,
+                            true, null, $"Amulet statue '{fake.itemName}'");
+                    }
+                    continue;
+                }
 
                 bool allowed = UnlockedItemsManager.CanSpawnScoutAmulet(itemId);
                 Log?.LogInfo($"[PeakPelago] Fake amulet [{fake.index}] '{fake.itemName}' prefab='{fake.realItemPrefab?.name}' (id {itemId}): {(allowed ? "shown" : "hidden")}");
@@ -107,7 +127,8 @@ namespace Peak.AP
                 if (fake == null || fake.index != fakeItemIndex) continue;
                 ushort itemId = ResolveItemId(fake.realItemPrefab);
                 if (itemId == 0) return false;
-                bool locked = !UnlockedItemsManager.CanSpawnScoutAmulet(itemId);
+                bool locked = (UnlockedItemsManager.IsAmuletChainItem(itemId) && UnlockedItemsManager.ScoutAmuletsFreelyPlaced)
+                    || !UnlockedItemsManager.CanSpawnScoutAmulet(itemId);
                 if (locked)
                 {
                     Log?.LogInfo($"[PeakPelago] Blocked fake amulet pickup '{fake.itemName}' - unlock not yet received");

@@ -279,6 +279,7 @@ namespace Peak.AP
             { "Big Egg Unlock", "NestEgg" },
             { "Egg Unlock", "Egg" },
             { "Cooked Bird Unlock", "EggTurkey" },
+            { "Small Egg Unlock", "EggRaven" },
             { "Honeycomb Unlock", "Item_Honeycomb" },
             { "Beehive Unlock", "Beehive" },
             { "Scorpion Unlock", "Scorpion" },

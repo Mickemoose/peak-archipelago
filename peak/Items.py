@@ -50,6 +50,8 @@ progression_table = {
     "Progressive Endurance": ItemData(76026, ItemClassification.progression),
     "Progressive Mountain": ItemData(76050, ItemClassification.progression),
     "Progressive Amulet Unlock": ItemData(77133, ItemClassification.progression),
+    "Scoutmaster's Soul": ItemData(77144, ItemClassification.progression),
+    "Progressive Pack": ItemData(77145, ItemClassification.progression),
     #"Ascent 2 Unlock": ItemData(76020, ItemClassification.progression),
     #"Ascent 3 Unlock": ItemData(76021, ItemClassification.progression),
     #"Ascent 4 Unlock": ItemData(76022, ItemClassification.progression),
@@ -219,6 +221,8 @@ trap_table = {
     "Instant Crystal Trap":       ItemData(77140, ItemClassification.trap),
     "Curse Trap":                 ItemData(77141, ItemClassification.trap),
     "Cursed Ball Trap":           ItemData(77142, ItemClassification.trap),
+    "Storm Trap":                 ItemData(77143, ItemClassification.trap),
+    "Skeleton Trap":              ItemData(77146, ItemClassification.trap),
 }
 
 # All items that have "Acquire X" locations need unlock versions for logic
@@ -266,6 +270,7 @@ _unlock_items = [
     "Scout's Ambition",
     "Scout's Initiative",
     "Scout's Honor",
+    "Small Egg",
 ]
 
 _UNLOCK_ID_START = 78100
@@ -273,6 +278,7 @@ unlock_table = {
     f"{name} Unlock": ItemData(_UNLOCK_ID_START + i, ItemClassification.progression)
     for i, name in enumerate(_unlock_items)
 }
+unlock_table.pop("Fanny Pack Unlock")
 
 item_table = {
     **progression_table,
