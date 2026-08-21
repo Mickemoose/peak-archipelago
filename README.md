@@ -20,7 +20,7 @@ In multiplayer, only the Host's AP slot is affected. Any player who joins that h
 
 ## Features
 
-- **Ascent Progression**: Unlock ascents (1-7) by receiving Archipelago items
+- **Ascent Progression**: Unlock ascents (1-8) by receiving Archipelago items
 - **Mountain Progression**: Unlock each biome (The swapping biomes are considered 1 biome together) in order to light the campfire
 - **Stamina Upgrades**: Unlock progressive Stamina Bar capacity upgrades and usage upgrades.
 - **Badge Randomization**: Badges are tracked and managed through Archipelago
@@ -31,6 +31,9 @@ In multiplayer, only the Host's AP slot is affected. Any player who joins that h
 - **EnergyLink Support**: Optional support for using the shared energy pool to purchase random bundles from a vendor at each campsite
 - **TrapLink Support**: Optional support for sending/receiving traps linked with participating games.
 - **BreathLink Support**: Optional support for linking complete loss of Stamina with other participating games.
+- **DamageLink Support**: Optional support for sharing Injury damage with other participating games, with group support.
+- **KnockbackLink Support**: Optional support for sharing strong knockback with other participating games.
+- **In-Game Item Tracker**: Track your unlocks from the pause menu, with optional clicking to spawn unlocked items
 - **Auto-Reconnect**: Automatically reconnects to the Archipelago server if disconnected
 - **Persistent State**: Tracks received items and checked locations across game sessions
 - **Real-time Integration**: Seamlessly integrates with PEAK's gameplay
@@ -85,23 +88,27 @@ This mod consists of two main components:
 
 When generating an Archipelago game, the following PEAK-specific options are available:
 
-- **Goal**: Choose between "Reach Peak", "Complete All Badges", "24 Karat Badge" or "Reach Peak and Complete All Badges"
-- **Required Ascent Count**: Number of ascents needed to complete (0-7, default: 4)
-- **Required Badge Count**: Number of badges needed for badge completion goal (10-50, default: 20)
+- **Goals**: Pick any combination of "Reach Peak", "Collect Badges", "24 Karat Badge" and "Free The Soul". Every selected goal must be completed
+- **Required Ascent Count**: Ascent level needed for the Reach Peak goal (0-8, default: 4)
+- **Required Badge Count**: Number of badges needed for the Collect Badges goal (1-54, default: 20)
 - **Item Sanity**: When enabled, items must be unlocked via Archipelago before they can appear in loot pools. "Acquire" checks require the unlock item. Works independently from Loot Sanity.
 - **Loot Sanity**: Controls which loot pools get shuffled (None, Luggage, Trees and Bushes, or All). Affected pools have all available items added at equal weight. Does not affect the Scout Statue.
+- **Scout Amulet Sanity**: When enabled, the four Scout amulets and Scout's Honor take part in Item Sanity and Loot Sanity like any other item.
 - **Logical Scout Statue**: When enabled, the Scout Statue only drops items you haven't sent an "Acquire" check for, filtered by biome access and item unlocks.
+- **Tracker Item Spawning**: Allow clicking unlocked items in the in-game tracker to spawn them (with a cooldown).
 - **Progressive Stamina**: Start with 25% Stamina and require finding Progressive Stamina Bars to reach 100%
-- **Additional Stamina**: With Progressive Stamina enabled, find 4 extra Stamina Bars to reach a total of 200% Stamina
-- **Trap Weigh Percent**: Determine the amount of filler items to get replaced with traps.
+- **Additional Stamina Bars**: With Progressive Stamina enabled, find 4 extra Stamina Bars to reach a total of 200% Stamina
+- **Trap Fill Percentage**: Determine the amount of filler items to get replaced with traps. Individual trap weights can also be configured.
 - **Ring Link**: Enable RingLink with other linked players.
 - **Hard Ring Link**: Enable HardRingLink with other linked players.
 - **Trap Link**: Enable TrapLink with other linked players.
 - **Breath Link**: Enable BreathLink with other linked players.
+- **Damage Link**: Enable DamageLink with other linked players, optionally limited to a named group.
+- **Knockback Link**: Enable KnockbackLink with other linked players.
 - **Energy Link**: Enable EnergyLink to utilize a linked Energy bank with other linked players.
-- **Death Link**: Enable death synchronization with other players
-- **Death Link Behavior**: Choose between full run reset or checkpoint reset
-- **Death Link Send Behavior**: Choose between sending on any players death or on failed run
+- **Death Link**: Enable death synchronization with other players, optionally limited to a named group.
+- **Death Link Behavior**: Choose between killing a random player or resetting to the last checkpoint
+- **Death Link Send Behavior**: Choose between sending on any players death or when all players are dead
 
 ## How to Play
 

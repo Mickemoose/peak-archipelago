@@ -2,13 +2,15 @@
 <ul>
     <li>Bug fixes galore</li>
     <li>Logic improvements</li>
-    <li>Gloom/Citadel support</li>
+    <li>Gloom/Citadel support of newly added items & badges</li>
     <li>New traps</li>
     <li>Goals refactored to allow multiple goals</li>
-    <li>Item Tracker also allows spawning those items by clicking them if theyre unlocked</li>
+    <li>Item Tracker also allows toggleable spawning items by clicking them if theyre unlocked</li>
     <li>DamageLink/DamageLinkGroup support</li>
     <li>DeathLinkGroup support</li>
     <li>KnockbackLink support</li>
+    <li>Backpack moved with Fannypack into Progressive Pack</li>
+    <li>
 </ul>
 
 ## v0.6.0
