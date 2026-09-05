@@ -3,6 +3,7 @@ using System.Linq;
 using BepInEx.Logging;
 using Photon.Pun;
 using UnityEngine;
+using Zorro.Core;
 
 namespace Peak.AP
 {
@@ -10,6 +11,7 @@ namespace Peak.AP
     {
         public static ManualLogSource Log;
         private static int _orbiterViewId = -1;
+        private static float _nextTick;
         private static readonly HashSet<int> _ourOrbiterViews = new HashSet<int>();
 
         public static bool SoulItemOwned()
@@ -25,15 +27,58 @@ namespace Peak.AP
 
         public static bool IsOurs(int viewId) => _ourOrbiterViews.Contains(viewId);
 
+        public static bool InNadir()
+        {
+            try
+            {
+                if (VoidBiome.VoidBiomeActive) return true;
+                var mapHandler = Singleton<MapHandler>.Instance;
+                if (mapHandler == null) return false;
+                return mapHandler.inNadir;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool ShouldOrbit() => InNadir() && SoulItemOwned();
+
         public static void ResetForScene()
         {
             _orbiterViewId = -1;
         }
 
+        public static void Tick()
+        {
+            if (Time.unscaledTime < _nextTick) return;
+            _nextTick = Time.unscaledTime + 1f;
+            if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom) return;
+            if (ShouldOrbit())
+            {
+                RefreshOrbiter();
+            }
+            else
+            {
+                DespawnOrbiter();
+            }
+        }
+
+        public static void DespawnOrbiter()
+        {
+            if (_orbiterViewId == -1) return;
+            var existing = PhotonView.Find(_orbiterViewId);
+            _orbiterViewId = -1;
+            if (existing == null) return;
+            if (!PhotonNetwork.IsMasterClient || !existing.IsMine) return;
+            PhotonNetwork.Destroy(existing.gameObject);
+            Log?.LogInfo("[PeakPelago] Scoutmaster's soul orbiter dismissed outside the Nadir");
+        }
+
         public static void RefreshOrbiter()
         {
             if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom) return;
-            if (!SoulItemOwned()) return;
+            if (!ShouldOrbit()) return;
             if (_orbiterViewId != -1)
             {
                 var existing = PhotonView.Find(_orbiterViewId);
@@ -63,7 +108,7 @@ namespace Peak.AP
             {
                 orbiter.SetOrbitCharacter(host);
             }
-            Log?.LogInfo("[PeakPelago] Scoutmaster's soul now orbits the host");
+            Log?.LogInfo("[PeakPelago] Scoutmaster's soul now orbits the host in the Nadir");
         }
     }
 }

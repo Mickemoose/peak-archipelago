@@ -30,6 +30,7 @@ namespace Peak.AP
             67,  // Scout Effigy
             16,  // Bugle of Friendship (Bugle_Magic)
             173, // Ritual Dagger
+            166,
         };
 
         private const ushort SCOUTS_TENACITY_ITEM_ID = 182;

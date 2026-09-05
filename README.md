@@ -200,7 +200,7 @@ The Python world code follows Archipelago's world API:
 
 ## Version
 
-Current Version: **0.6.1**
+Current Version: **0.6.2**
 
 ## Links
 

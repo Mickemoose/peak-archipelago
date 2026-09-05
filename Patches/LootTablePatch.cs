@@ -28,6 +28,7 @@ namespace PeakArchipelago
                 var multiplayerItems = new Dictionary<ushort, int>
                 {
                     { 70, 1 },  // Blowgun
+                    { 166, 1 },
                 };
 
                 var multiplayerSpecialItems = new Dictionary<ushort, int>

@@ -27,7 +27,7 @@ using UnityEngine.UI;
 
 namespace Peak.AP
 {
-    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.6.1")]
+    [BepInPlugin("com.mickemoose.peak.ap", "Peak Archipelago", "0.6.2")]
     public class PeakArchipelagoPlugin : BaseUnityPlugin, IInRoomCallbacks
     {
         // ===== BepInEx / logging =====
@@ -1893,6 +1893,23 @@ namespace Peak.AP
                 { "Red Clusterberry", () => SpawnPhysicalItem("Clusterberry Red") },
                 { "Yellow Clusterberry", () => SpawnPhysicalItem("Clusterberry Yellow") },
                 { "Scoutmaster's Bugle", () => SpawnPhysicalItem("Bugle_Scoutmaster Variant") },
+                { "Scorchberry", () => SpawnPhysicalItem("Pepper Berry") },
+                { "Small Egg", () => SpawnPhysicalItem("EggRaven") },
+                { "Anti-Zooka", () => SpawnPhysicalItem("AntiZooka") },
+                { "The Early Worm", () => SpawnPhysicalItem("EarlyWorm") },
+                { "Warp Fungus", () => SpawnPhysicalItem("WarpFungus") },
+                { "Glider", () => SpawnPhysicalItem("Glider") },
+                { "Ritual Dagger", () => SpawnPhysicalItem("RitualDagger") },
+                { "Candlestick", () => SpawnPhysicalItem("Candle") },
+                { "Frog", () => SpawnPhysicalItem("Frog") },
+                { "Rocketpack", () => SpawnPhysicalItem("Rocketpack") },
+                { "Jetpack", () => SpawnPhysicalItem("Jetpack") },
+                { "Fanny Pack", () => SpawnPhysicalItem("Fannypack") },
+                { "Frog Legs", () => SpawnPhysicalItem("FrogLegs") },
+                { "Scout's Tenacity", () => SpawnPhysicalItem("Amulet_Healing") },
+                { "Scout's Generosity", () => SpawnPhysicalItem("Amulet_Clone") },
+                { "Scout's Ambition", () => SpawnPhysicalItem("Amulet_InfiniteStamina") },
+                { "Scout's Initiative", () => SpawnPhysicalItem("Amulet_SuperJump") },
 
                 // Progression Items (76019-76025) - Unlock ascents
                 { "Progressive Ascent", () => UnlockAscent() },
@@ -4197,8 +4214,8 @@ namespace Peak.AP
                 }
             }
         }
-        [HarmonyPatch(typeof(ItemCooking), "FinishCookingRPC")]
-        public static class ItemCookingFinishCookingRPCPatch
+        [HarmonyPatch(typeof(ItemCooking), "FinishCookingImpl")]
+        public static class ItemCookingFinishCookingPatch
         {
             static void Postfix(ItemCooking __instance)
             {
@@ -4225,7 +4242,7 @@ namespace Peak.AP
                 {
                     if (_instance != null)
                     {
-                        _instance._log.LogError($"[PeakPelago] FinishCookingRPC patch error: {ex.Message}");
+                        _instance._log.LogError($"[PeakPelago] FinishCookingImpl patch error: {ex.Message}");
                     }
                 }
             }
@@ -4620,6 +4637,30 @@ namespace Peak.AP
                 }
 
                 return true; // Allow normal processing
+            }
+        }
+
+        [HarmonyPatch(typeof(RunSettings), "blockingAchievements", MethodType.Getter)]
+        public static class RunSettingsBlockingAchievementsPatch
+        {
+            static bool Prefix(ref bool __result)
+            {
+                try
+                {
+                    if (_instance == null || !_instance._badgesHidden) return true;
+
+                    __result = false;
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    if (_instance != null)
+                    {
+                        _instance._log.LogError("[PeakPelago] blockingAchievements patch error: " + ex.Message);
+                    }
+                }
+
+                return true;
             }
         }
 
@@ -5752,6 +5793,7 @@ namespace Peak.AP
                 _trapLinkService?.Update();
                 ProcessItemQueue();
                 CampfireModelSpawner.CleanupDestroyedCampfires();
+                SoulOrbiterManager.Tick();
 
                 {
                     string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;

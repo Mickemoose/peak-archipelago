@@ -113,6 +113,14 @@ When disabled, all items are available from the start and "Acquire" checks only 
 
 Item Sanity works independently from Loot Sanity - it controls **whether** items need to be unlocked, while Loot Sanity controls **where** items can appear.
 
+### Item Spawns
+
+Only used when **Item Sanity** is disabled. When enabled, every item that has an "Acquire" check gets one copy added to the Archipelago item pool as a useful item. Receiving one spawns that item in front of you.
+
+Items that are also sent as filler (berries, snacks, Bing Bong, etc.) are guaranteed one copy but stay classified as filler. Items that exist as traps (Scorpion, Mandrake, Dynamite) and Scout's Honor are excluded.
+
+This option has no effect when Item Sanity is enabled.
+
 ### Loot Sanity
 
 **Loot Sanity** controls which loot pools have their contents shuffled. Affected pools will have every available AP-tracked item added at equal drop weight, meaning any item can appear from any affected source.

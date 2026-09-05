@@ -413,6 +413,21 @@ namespace Peak.AP
             { "Sugar Rush Alt", new BundleDefinition([
                 ("Lollipop", 2),
                 ("Energy Drink", 4)
+            ]) },
+            { "Light In The Gloom", new BundleDefinition("Candle", 4) },
+            { "Light In The Gloom Alt", new BundleDefinition([
+                ("Candle", 2),
+                ("Torch", 4)
+            ]) },
+            { "Flight School", new BundleDefinition("Glider", 2) },
+            { "Flight School Alt", new BundleDefinition([
+                ("Jetpack", 1),
+                ("Rocketpack", 1)
+            ]) },
+            { "Leap Day", new BundleDefinition("FrogLegs", 4) },
+            { "Leap Day Alt", new BundleDefinition([
+                ("Frog", 2),
+                ("EarlyWorm", 2)
             ]) }
         };
         

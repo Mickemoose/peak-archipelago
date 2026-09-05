@@ -1,3 +1,14 @@
+## v0.6.2
+<ul>
+    <li>Badges and their checks should now work in custom runs, including stat-based badges</li>
+    <li>EnergyLink conversion values for the new Gloom/Citadel items</li>
+    <li>Amulets, Scout's Honor and Scoutmaster's Soul can no longer be converted into EnergyLink energy</li>
+    <li>Three new EnergyLink store bundles featuring the new items</li>
+    <li>New option Item Spawns: when Item Sanity is off, every item with an Acquire check is added to the pool as a useful item that spawns in front of you when received (Scout's Honor excluded)</li>
+    <li>The Scoutmaster's Soul only orbits you while you are in the Nadir if received</li>
+    <li>Support fixes for the latest patch</li>
+</ul>
+
 ## v0.6.1
 <ul>
     <li>Bug fixes galore</li>
@@ -10,7 +21,6 @@
     <li>DeathLinkGroup support</li>
     <li>KnockbackLink support</li>
     <li>Backpack moved with Fannypack into Progressive Pack</li>
-    <li>
 </ul>
 
 ## v0.6.0

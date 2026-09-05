@@ -259,6 +259,7 @@ namespace Peak.AP
                 case "honeycomb":
                     megajoules = 30;
                     break;
+                case "cattail":
                 case "hot dog":
                 case "marshmallow":
                     megajoules = 29.95f;
@@ -273,6 +274,15 @@ namespace Peak.AP
                 case "tick":
                     megajoules = 7.5f;
                     break;
+                case "frog":
+                    megajoules = 10;
+                    break;
+                case "frog legs":
+                    megajoules = 30;
+                    break;
+                case "the early worm":
+                    megajoules = 40;
+                    break;
                 // Balloon and Balloon Bunch
                 case "balloon bunch":
                     megajoules = 15;
@@ -284,10 +294,14 @@ namespace Peak.AP
                 case "anti-rope cannon":
                     megajoules = 77.5f;
                     break;
+                case "anti-zooka":
                 case "chain launcher":
+                case "jetpack":
                 case "rescue claw":
+                case "rocketpack":
                     megajoules = 75;
                     break;
+                case "glider":
                 case "rope cannon":
                 case "scout cannon":
                     megajoules = 60;
@@ -361,11 +375,21 @@ namespace Peak.AP
                 case "pirate's compass":
                     megajoules = 33;
                     break;
+                case "candlestick":
+                    megajoules = 35;
+                    break;
+                case "fanny pack":
+                    megajoules = 30;
+                    break;
                 case "piton":
                 case "rope spool":
                 case "torch":
                     megajoules = 25;
                     break;
+                case "ritual dagger":
+                    megajoules = 50;
+                    break;
+                case "guidebook page":
                 case "scroll":
                     megajoules = 8;
                     break;
@@ -527,7 +551,14 @@ namespace Peak.AP
             if (currentScene.Contains("Airport")) return false;
             // Check if it's a special item that shouldn't be converted
             string itemName = item.GetName().ToLower();
-            
+
+            string prefabName = item.gameObject.name;
+            if (prefabName.Contains("Amulet") || prefabName.Contains("ScoutsHonor") ||
+                prefabName.Contains("ScoutmasterSoul") || prefabName.Contains("RescueHook_Infinite"))
+            {
+                return false;
+            }
+
             // Exclude Airport and highly dangerous items
             switch (itemName)
             {

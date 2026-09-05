@@ -280,12 +280,22 @@ unlock_table = {
 }
 unlock_table.pop("Fanny Pack Unlock")
 
+_SPAWN_ID_START = 78300
+spawn_table = {
+    name: ItemData(_SPAWN_ID_START + i, ItemClassification.useful)
+    for i, name in enumerate(_unlock_items)
+    if name != "Scout's Honor" and name not in filler_table and name not in trap_table
+}
+
+spawn_filler_items = [name for name in _unlock_items if name in filler_table]
+
 item_table = {
     **progression_table,
     **useful_table,
     **filler_table,
     **trap_table,
     **unlock_table,
+    **spawn_table,
 }
 
 lookup_id_to_name: typing.Dict[int, str] = {
@@ -298,6 +308,7 @@ item_groups: typing.Dict[str, typing.List[str]] = {
     "Filler":           list(filler_table.keys()),
     "Traps":            list(trap_table.keys()),
     "Unlocks":          list(unlock_table.keys()),
+    "Item Spawns":      list(spawn_table.keys()),
 }
 
 try:

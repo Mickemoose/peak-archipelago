@@ -58,6 +58,21 @@ class ItemSanity(Toggle):
     """
     display_name = "Item Sanity"
 
+class ItemSpawns(Toggle):
+    """
+    Only used when Item Sanity is disabled.
+
+    Adds one copy of every item that has an Acquire check to the item pool as a useful item.
+    Receiving one spawns that item in front of you.
+
+    Items that are also sent as filler (berries, snacks, Bing Bong, etc.) are guaranteed one copy
+    but stay classified as filler. Items that exist as traps (Scorpion, Mandrake, Dynamite)
+    and Scout's Honor are excluded.
+
+    Has no effect when Item Sanity is enabled.
+    """
+    display_name = "Item Spawns"
+
 class LootSanity(Choice):
     """
     Controls which loot pools have their contents shuffled with all available items.
@@ -602,6 +617,7 @@ peak_option_groups = [
     ]),
     OptionGroup("Item Settings", [
         ItemSanity,
+        ItemSpawns,
         LootSanity,
         LogicalScoutStatue,
         ScoutAmuletSanity,
@@ -699,6 +715,7 @@ class PeakOptions(PerGameCommonOptions):
     additional_stamina_bars: AdditionalStaminaBars
 
     item_sanity: ItemSanity
+    item_spawns: ItemSpawns
     loot_sanity: LootSanity
     logical_scout_statue: LogicalScoutStatue
     scout_amulet_sanity: ScoutAmuletSanity

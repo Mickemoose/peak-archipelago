@@ -5,7 +5,7 @@ import typing
 
 from BaseClasses import ItemClassification, CollectionState, LocationProgressType, Tutorial
 from worlds.AutoWorld import World, WebWorld
-from .Items import PeakItem, item_table, progression_table, useful_table, filler_table, trap_table, unlock_table, lookup_id_to_name, item_groups
+from .Items import PeakItem, item_table, progression_table, useful_table, filler_table, trap_table, unlock_table, spawn_table, spawn_filler_items, lookup_id_to_name, item_groups
 from .Locations import LOCATION_TABLE, EXCLUDED_LOCATIONS
 from .Options import PeakOptions, peak_option_groups
 from .Rules import apply_rules, TROPICS_LOCATIONS, MESA_LOCATIONS, ALPINE_LOCATIONS, ROOTS_LOCATIONS, CALDERA_LOCATIONS, KILN_LOCATIONS
@@ -207,6 +207,14 @@ class PeakWorld(World):
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {len(unlock_table)} unlock items (ItemSanity enabled)")
         else:
             logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Skipping unlock items (ItemSanity disabled)")
+            if self.options.item_spawns.value:
+                for item_name in spawn_table:
+                    item_pool.append(self.create_item(item_name))
+                for item_name in spawn_filler_items:
+                    if wants_soul and item_name == "Strange Gem":
+                        continue
+                    item_pool.append(self.create_item(item_name))
+                logging.debug(f"[Player {self.multiworld.player_name[self.player]}] Added {len(spawn_table)} spawnable Acquire items (ItemSpawns enabled)")
         # Calculate how many slots are left for traps and fillers
         remaining_slots = total_locations - len(item_pool)
         
@@ -242,7 +250,7 @@ class PeakWorld(World):
             raise Exception(
                 f"[PEAK] Item pool ({len(item_pool)}) exceeds fillable locations ({total_locations}) for "
                 f"player {self.multiworld.player_name[self.player]}. Too many locations are excluded "
-                f"(exclude_locations / disable_*_badges / low ascent goal); reduce exclusions or disable item_sanity."
+                f"(exclude_locations / disable_*_badges / low ascent goal); reduce exclusions or disable item_sanity / item_spawns."
             )
 
         self.multiworld.itempool.extend(item_pool)
@@ -518,6 +526,7 @@ class PeakWorld(World):
             "death_link_send_behavior": self.options.death_link_send_behavior.value,
             "active_traps": self.output_active_traps(),
             "item_sanity": self.options.item_sanity.value,
+            "item_spawns": self.options.item_spawns.value,
             "loot_sanity": self.options.loot_sanity.value,
             "logical_scout_statue": self.options.logical_scout_statue.value,
             "scout_amulet_sanity": self.options.scout_amulet_sanity.value,
