@@ -94,6 +94,7 @@ When generating an Archipelago game, the following PEAK-specific options are ava
 - **Item Sanity**: When enabled, items must be unlocked via Archipelago before they can appear in loot pools. "Acquire" checks require the unlock item. Works independently from Loot Sanity.
 - **Loot Sanity**: Controls which loot pools get shuffled (None, Luggage, Trees and Bushes, or All). Affected pools have all available items added at equal weight. Does not affect the Scout Statue.
 - **Scout Amulet Sanity**: When enabled, the four Scout amulets and Scout's Honor take part in Item Sanity and Loot Sanity like any other item.
+- **Multiplayer Only Items**: Include the multiplayer-only items (Blowgun, Cursed Skull, Scout Effigy, Bugle of Friendship, Ritual Dagger) in the randomizer. When disabled they behave like vanilla and their Unlock items and Acquire checks are removed. The Fanny Pack is unaffected since it is part of Progressive Pack.
 - **Logical Scout Statue**: When enabled, the Scout Statue only drops items you haven't sent an "Acquire" check for, filtered by biome access and item unlocks.
 - **Tracker Item Spawning**: Allow clicking unlocked items in the in-game tracker to spawn them (with a cooldown).
 - **Progressive Stamina**: Start with 25% Stamina and require finding Progressive Stamina Bars to reach 100%

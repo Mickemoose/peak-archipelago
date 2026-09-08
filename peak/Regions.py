@@ -8,6 +8,7 @@ from .Locations import (
     EXCLUDED_LOCATIONS,
     LOCATION_TABLE
 )
+from .Items import multiplayer_only_items
 
 if TYPE_CHECKING:
     from . import PeakWorld
@@ -50,7 +51,10 @@ def create_peak_regions(world: "PeakWorld"):
         "Daredevil Badge",
         "Megaentomology Badge",
         "Tread Lightly Badge",
-        "Advanced Mycology Badge"
+        "Advanced Mycology Badge",
+        "Medieval History Badge",
+        "Exorcist Badge",
+        "Bellringer Badge"
     }
 
     hard_badges = {
@@ -58,11 +62,12 @@ def create_peak_regions(world: "PeakWorld"):
         "Lone Wolf Badge",
         "Balloon Badge",
         "Bing Bong Badge",
-        "Medieval History Badge",
         "Hang Gliding Badge",
-        "Exorcist Badge",
-        "Competitive Eating Badge"
+        "Competitive Eating Badge",
+        "Rule Zero Badge"
     }
+
+    multiplayer_only_acquires = {f"Acquire {name}" for name in multiplayer_only_items}
     
     logging.info(f"[Player {world.multiworld.player_name[world.player]}] Goals: {sorted(goals)}, Required Ascent: {required_ascent}")
     
@@ -93,6 +98,10 @@ def create_peak_regions(world: "PeakWorld"):
             should_skip = True
             excluded_location_count += 1
             logging.info(f"[Player {world.multiworld.player_name[world.player]}] SKIPPING MULTIPLAYER BADGE: {name}")
+        if not world.options.multiplayer_only_items.value and name in multiplayer_only_acquires:
+            should_skip = True
+            excluded_location_count += 1
+            logging.info(f"[Player {world.multiworld.player_name[world.player]}] SKIPPING MULTIPLAYER-ONLY ITEM CHECK: {name}")
         # Check if biome badges should be excluded
         if world.options.disable_biome_badges.value and name in biome_badges:
             should_skip = True

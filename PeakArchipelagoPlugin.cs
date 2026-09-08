@@ -119,6 +119,7 @@ namespace Peak.AP
         public Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
         private bool _logicalScoutStatue = false;
         private bool _scoutAmuletSanity = false;
+        private bool _multiplayerOnlyItems = true;
         private bool _trackerItemSpawning = false;
         public int _progressiveMountainCount = 0;
         public static int TrackerVersion = 0;
@@ -2105,11 +2106,9 @@ namespace Peak.AP
         {
             try
             {
-                if (Zorro.Core.Singleton<PeakHandler>.Instance != null && !Zorro.Core.Singleton<PeakHandler>.Instance.summonedHelicopter)
-                {
-                    _log.LogInfo("[PeakPelago] Emergency Rescue RPC - summoning helicopter!");
-                    EmergencyRescueTrapEffect.RepositionAndSummon(position);
-                }
+                if (EmergencyRescueTrapEffect.HelicopterAlreadySummoned()) return;
+                _log.LogInfo("[PeakPelago] Emergency Rescue RPC - summoning helicopter!");
+                EmergencyRescueTrapEffect.RepositionAndSummon(position, _log);
             }
             catch (Exception ex)
             {
@@ -5244,6 +5243,7 @@ namespace Peak.AP
                     }
                     _logicalScoutStatue = ReadBoolOption(loginResult, "logical_scout_statue", _logicalScoutStatue);
                     _scoutAmuletSanity = ReadBoolOption(loginResult, "scout_amulet_sanity", _scoutAmuletSanity);
+                    _multiplayerOnlyItems = ReadBoolOption(loginResult, "multiplayer_only_items", true);
                     _trackerItemSpawning = ReadBoolOption(loginResult, "tracker_item_spawning", _trackerItemSpawning);
 
                     LoadOfflineChecks();
@@ -5276,7 +5276,7 @@ namespace Peak.AP
                 SaveState();
                 _status = "Connected";
                 _wantReconnect = false;
-                UnlockedItemsManager.Initialize(_log, _session, _itemSanityEnabled, _lootSanityMode, _logicalScoutStatue, _progressiveMountainCount, _stateData, _lootBiomeAssignments, _scoutAmuletSanity);
+                UnlockedItemsManager.Initialize(_log, _session, _itemSanityEnabled, _lootSanityMode, _logicalScoutStatue, _progressiveMountainCount, _stateData, _lootBiomeAssignments, _scoutAmuletSanity, _multiplayerOnlyItems);
                 _notifications.ShowConnected();
                 if (LootData.AllSpawnWeightData != null)
                 {

@@ -8,17 +8,44 @@ namespace Peak.AP
 {
     public static class EmergencyRescueTrapEffect
     {
+        private static PeakHandler _cachedHandler;
+
+        public static PeakHandler ResolvePeakHandler()
+        {
+            var active = Singleton<PeakHandler>.Instance;
+            if (active != null) return active;
+
+            if (_cachedHandler != null && _cachedHandler.gameObject.scene.isLoaded) return _cachedHandler;
+            _cachedHandler = null;
+
+            foreach (var handler in Resources.FindObjectsOfTypeAll<PeakHandler>())
+            {
+                if (handler == null || !handler.gameObject.scene.isLoaded) continue;
+                _cachedHandler = handler;
+                break;
+            }
+
+            return _cachedHandler;
+        }
+
+        public static bool HelicopterAlreadySummoned()
+        {
+            var handler = ResolvePeakHandler();
+            return handler != null && handler.summonedHelicopter;
+        }
+
         public static void ApplyEmergencyRescueTrap(ManualLogSource log)
         {
             try
             {
-                if (Singleton<PeakHandler>.Instance == null)
+                var handler = ResolvePeakHandler();
+                if (handler == null)
                 {
-                    log.LogWarning("[PeakPelago] Cannot apply Emergency Rescue Trap - PeakHandler not found");
+                    log.LogWarning("[PeakPelago] Cannot apply Emergency Rescue Trap - PeakHandler not found in the loaded level");
                     return;
                 }
 
-                if (Singleton<PeakHandler>.Instance.summonedHelicopter)
+                if (handler.summonedHelicopter)
                 {
                     log.LogInfo("[PeakPelago] Emergency Rescue Trap - helicopter already summoned, skipping");
                     return;
@@ -42,7 +69,7 @@ namespace Peak.AP
                 }
                 else
                 {
-                    RepositionAndSummon(abovePlayer);
+                    RepositionAndSummon(abovePlayer, log);
                 }
             }
             catch (Exception ex)
@@ -51,11 +78,25 @@ namespace Peak.AP
             }
         }
 
-        public static void RepositionAndSummon(Vector3 position)
+        public static void RepositionAndSummon(Vector3 position, ManualLogSource log)
         {
-            var handler = Singleton<PeakHandler>.Instance;
-            handler.peakSequence.transform.position = position;
-            var seq = handler.peakSequence.GetComponent<PeakSequence>();
+            var handler = ResolvePeakHandler();
+            if (handler == null || handler.peakSequence == null)
+            {
+                log?.LogWarning("[PeakPelago] Emergency Rescue - no PeakHandler or peak sequence in the loaded level, cannot summon helicopter");
+                return;
+            }
+
+            var sequence = handler.peakSequence;
+            var parent = sequence.transform.parent;
+            if (parent != null && !parent.gameObject.activeInHierarchy)
+            {
+                sequence.transform.SetParent(null, true);
+                log?.LogInfo("[PeakPelago] Emergency Rescue - detached the peak sequence from the inactive peak segment");
+            }
+
+            sequence.transform.position = position;
+            var seq = sequence.GetComponent<PeakSequence>();
             if (seq != null)
                 seq.totalWinningSeconds = seq.totalSeconds;
             // Ascent 8+ requires a Nadir win, so don't hand out a plain forced win there

@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING
 
 from BaseClasses import Location, Entrance
 
+from .Items import multiplayer_only_items
+
 if TYPE_CHECKING:
     from . import PeakWorld
 
@@ -332,6 +334,15 @@ def apply_rules(world: "PeakWorld"):
             if _name in loot_biome:
                 loot_biome[_name] = _get_vanilla_biome_level(_name)
 
+    multiplayer_only_items_enabled = world.options.multiplayer_only_items.value
+    disabled_unlocks = set()
+    if not multiplayer_only_items_enabled:
+        for _name in multiplayer_only_items:
+            _loc = f"Acquire {_name}"
+            if _loc in loot_biome:
+                loot_biome[_loc] = _get_vanilla_biome_level(_loc)
+            disabled_unlocks.add(f"{_name} Unlock")
+
     world.loot_biome_assignments = loot_biome
 
     # Apply acquire item rules using the (possibly shuffled) biome assignments
@@ -525,7 +536,14 @@ def apply_rules(world: "PeakWorld"):
 
     _apply_single_item_badge("Mentorship Badge", "Scoutmaster's Bugle Unlock")
     _apply_single_item_badge("Hang Gliding Badge", "Glider Unlock")
-    _apply_single_item_badge("Last Resort Badge", "Ritual Dagger Unlock")
+    if "Ritual Dagger Unlock" in disabled_unlocks:
+        try:
+            set_rule(world.get_location("Last Resort Badge"),
+                     _biome_rule(_get_vanilla_biome_level("Acquire Ritual Dagger")))
+        except KeyError:
+            pass
+    else:
+        _apply_single_item_badge("Last Resort Badge", "Ritual Dagger Unlock")
 
     try:
         set_rule(world.get_location("Medieval History Badge"),
@@ -587,7 +605,7 @@ def apply_rules(world: "PeakWorld"):
             "Faerie Lantern Unlock", "Pandora's Lunchbox Unlock", "Scout Effigy Unlock",
             "Scoutmaster's Bugle Unlock", "Book of Bones Unlock",
         ]
-        eso_biome = min(unlock_to_biome.get(u, 0) for u in eso_unlocks)
+        eso_biome = min(unlock_to_biome.get(u, 0) for u in eso_unlocks if u not in disabled_unlocks)
         if item_sanity:
             set_rule(world.get_location("Esoterica Badge"),
                      lambda state, lvl=eso_biome:
@@ -727,7 +745,7 @@ def apply_rules(world: "PeakWorld"):
                 if alpine_item == "Animal Serenading Badge" and item_sanity:
                     serenade_unlocks = ["Bugle Unlock", "Scoutmaster's Bugle Unlock",
                                         "Bugle of Friendship Unlock"]
-                    serenade_biome = min(unlock_to_biome.get(u, 0) for u in serenade_unlocks)
+                    serenade_biome = min(unlock_to_biome.get(u, 0) for u in serenade_unlocks if u not in disabled_unlocks)
                     set_rule(world.get_location(alpine_item),
                              lambda state, lvl=serenade_biome:
                              (state.has("Bugle Unlock", player) or

@@ -7,6 +7,10 @@
     <li>New option Item Spawns: when Item Sanity is off, every item with an Acquire check is added to the pool as a useful item that spawns in front of you when received (Scout's Honor excluded)</li>
     <li>The Scoutmaster's Soul only orbits you while you are in the Nadir if received</li>
     <li>Support fixes for the latest patch</li>
+    <li>New option Multiplayer Only Items: choose whether the multiplayer-only items (Blowgun, Cursed Skull, Scout Effigy, Bugle of Friendship, Ritual Dagger) take part in the randomizer; the Fanny Pack stays in Progressive Pack either way</li>
+    <li>Rule Zero Badge is now a hard badge; Medieval History, Exorcist and Bellringer are now biome badges</li>
+    <li>Eruption Trap keeps a persistent copy of the eruption effect so it works in every biome</li>
+    <li>Emergency Rescue Trap can summon the helicopter from anywhere on the mountain</li>
 </ul>
 
 ## v0.6.1

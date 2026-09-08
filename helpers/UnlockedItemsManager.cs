@@ -15,6 +15,7 @@ namespace Peak.AP
         private static int _lootSanityMode = 0; // 0=None, 1=Luggage, 2=Trees/Bushes, 3=All
         private static bool _logicalScoutStatue = false;
         private static bool _scoutAmuletSanity = false;
+        private static bool _multiplayerOnlyItems = true;
         private static int _progressiveMountainCount = 0;
         private static StateData _stateData;
         private static Dictionary<string, int> _lootBiomeAssignments = new Dictionary<string, int>();
@@ -32,6 +33,17 @@ namespace Peak.AP
             173, // Ritual Dagger
             166,
         };
+
+        public static readonly HashSet<ushort> OptionalMultiplayerOnlyItemIds = new HashSet<ushort>
+        {
+            70,
+            25,
+            67,
+            16,
+            173,
+        };
+
+        public static bool MultiplayerOnlyItemsEnabled => _multiplayerOnlyItems;
 
         private const ushort SCOUTS_TENACITY_ITEM_ID = 182;
         private const ushort SCOUTS_GENEROSITY_ITEM_ID = 180;
@@ -226,7 +238,7 @@ namespace Peak.AP
             bool itemSanityEnabled = false, int lootSanityMode = 0,
             bool logicalScoutStatue = false, int progressiveMountainCount = 0,
             StateData stateData = null, Dictionary<string, int> lootBiomeAssignments = null,
-            bool scoutAmuletSanity = false)
+            bool scoutAmuletSanity = false, bool multiplayerOnlyItems = true)
         {
             _log = log;
             _session = session;
@@ -234,10 +246,11 @@ namespace Peak.AP
             _lootSanityMode = lootSanityMode;
             _logicalScoutStatue = logicalScoutStatue;
             _scoutAmuletSanity = scoutAmuletSanity;
+            _multiplayerOnlyItems = multiplayerOnlyItems;
             _progressiveMountainCount = progressiveMountainCount;
             _stateData = stateData;
             _lootBiomeAssignments = lootBiomeAssignments ?? new Dictionary<string, int>();
-            _log?.LogInfo($"[PeakPelago] UnlockedItemsManager initialized (ItemSanity: {(_itemSanityEnabled ? "ON" : "OFF")}, LootSanity: {_lootSanityMode}, LogicalScoutStatue: {(_logicalScoutStatue ? "ON" : "OFF")}, ScoutAmuletSanity: {(_scoutAmuletSanity ? "ON" : "OFF")})");
+            _log?.LogInfo($"[PeakPelago] UnlockedItemsManager initialized (ItemSanity: {(_itemSanityEnabled ? "ON" : "OFF")}, LootSanity: {_lootSanityMode}, LogicalScoutStatue: {(_logicalScoutStatue ? "ON" : "OFF")}, ScoutAmuletSanity: {(_scoutAmuletSanity ? "ON" : "OFF")}, MultiplayerOnlyItems: {(_multiplayerOnlyItems ? "ON" : "OFF")})");
 
             if (LootData.AllSpawnWeightData != null && OriginalLootWeights.HasCaptured)
             {
@@ -533,6 +546,11 @@ namespace Peak.AP
                 int removedCount = 0;
                 int restoredCount = 0;
 
+                if (!_multiplayerOnlyItems)
+                {
+                    removedCount += PeakArchipelago.LootTablePatch.RemoveInjectedOptionalEntries();
+                }
+
                 foreach (var pool in LootData.AllSpawnWeightData.Keys.ToList())
                 {
                     // RespawnCoffin is owned by RefreshScoutStatuePool when LogicalScoutStatue is on, and left
@@ -544,6 +562,7 @@ namespace Peak.AP
                     // Always process multiplayer-only items regardless of settings
                     foreach (ushort itemId in MultiplayerOnlyItemIds)
                     {
+                        if (!_multiplayerOnlyItems && OptionalMultiplayerOnlyItemIds.Contains(itemId)) continue;
                         if (unlockedItems.Contains(itemId) || !_itemSanityEnabled)
                         {
                             const int equalWeight = 1;
@@ -723,6 +742,8 @@ namespace Peak.AP
 
                     // Skip if already acquired
                     if (reportedAcquires.Contains(locationName)) continue;
+
+                    if (!_multiplayerOnlyItems && OptionalMultiplayerOnlyItemIds.Contains(itemId)) continue;
 
                     // Check biome access
                     if (AcquireBiomeRequirements.TryGetValue(locationName, out int requiredMountain))

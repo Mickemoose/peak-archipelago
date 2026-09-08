@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from Options import Choice, FreeText, OptionSet, PerGameCommonOptions, Range, Toggle, DeathLink, OptionGroup
+from Options import Choice, DefaultOnToggle, FreeText, OptionSet, PerGameCommonOptions, Range, Toggle, DeathLink, OptionGroup
 
 
 class Goals(OptionSet):
@@ -111,6 +111,21 @@ class ScoutAmuletSanity(Toggle):
     Their Acquire checks exist either way.
     """
     display_name = "Scout Amulet Sanity"
+
+class MultiplayerOnlyItems(DefaultOnToggle):
+    """
+    Include the multiplayer-only items (Blowgun, Cursed Skull, Scout Effigy, Bugle of Friendship
+    and Ritual Dagger) in the randomizer. When enabled they can spawn in solo runs too, their
+    Unlock items join the pool under Item Sanity (or their Item Spawns when Item Sanity is off),
+    and their Acquire checks exist.
+
+    When disabled they behave exactly like vanilla (they only spawn in multiplayer sessions),
+    no Unlock or Item Spawn items are created for them, and their Acquire checks are removed.
+    The Last Resort Badge then only requires reaching the Caldera.
+
+    The Fanny Pack is not affected by this option since it is part of Progressive Pack.
+    """
+    display_name = "Multiplayer Only Items"
 
 class TrackerItemSpawning(Toggle):
     """
@@ -578,6 +593,8 @@ class DisableMultiplayerBadges(Toggle):
         Applied Esoterica Badge
         Needlepoint Badge
         Happy Camper Badge
+        Mentorship Badge
+        Last Resort Badge
     """
     display_name = "Disable Multiplayer Badges"
 class DisableHardBadges(Toggle):
@@ -587,7 +604,9 @@ class DisableHardBadges(Toggle):
         Lone Wolf Badge
         Balloon Badge
         Bing Bong Badge
+        Hang Gliding Badge
         Competitive Eating Badge
+        Rule Zero Badge
     """
     display_name = "Disable Hard Badges"
 class DisableBiomeBadges(Toggle):
@@ -604,6 +623,9 @@ class DisableBiomeBadges(Toggle):
         Megaentomology Badge
         Tread Lightly Badge
         Advanced Mycology Badge
+        Medieval History Badge
+        Exorcist Badge
+        Bellringer Badge
     """
     display_name = "Disable Biome Specific Badges"
 
@@ -621,6 +643,7 @@ peak_option_groups = [
         LootSanity,
         LogicalScoutStatue,
         ScoutAmuletSanity,
+        MultiplayerOnlyItems,
         TrackerItemSpawning,
     ]),
     OptionGroup("Stamina", [
@@ -719,6 +742,7 @@ class PeakOptions(PerGameCommonOptions):
     loot_sanity: LootSanity
     logical_scout_statue: LogicalScoutStatue
     scout_amulet_sanity: ScoutAmuletSanity
+    multiplayer_only_items: MultiplayerOnlyItems
     tracker_item_spawning: TrackerItemSpawning
 
     disable_multiplayer_badges: DisableMultiplayerBadges

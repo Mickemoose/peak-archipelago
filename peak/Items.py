@@ -273,6 +273,11 @@ _unlock_items = [
     "Small Egg",
 ]
 
+multiplayer_only_items = [
+    "Blowgun", "Cursed Skull", "Scout Effigy", "Bugle of Friendship", "Ritual Dagger",
+]
+multiplayer_only_unlocks = {f"{name} Unlock" for name in multiplayer_only_items}
+
 _UNLOCK_ID_START = 78100
 unlock_table = {
     f"{name} Unlock": ItemData(_UNLOCK_ID_START + i, ItemClassification.progression)
@@ -309,6 +314,7 @@ item_groups: typing.Dict[str, typing.List[str]] = {
     "Traps":            list(trap_table.keys()),
     "Unlocks":          list(unlock_table.keys()),
     "Item Spawns":      list(spawn_table.keys()),
+    "Multiplayer Only Unlocks": [f"{name} Unlock" for name in multiplayer_only_items],
 }
 
 try:

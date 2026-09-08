@@ -4,6 +4,7 @@ using System.Linq;
 using BepInEx.Logging;
 using HarmonyLib;
 using Peak.AP;
+using Photon.Pun;
 using UnityEngine;
 
 namespace PeakArchipelago
@@ -12,16 +13,49 @@ namespace PeakArchipelago
     public static class LootTablePatch
     {
         private static ManualLogSource _log => PeakArchipelagoPlugin._instance?._log;
+        private static readonly List<KeyValuePair<SpawnPool, ushort>> _injectedOptionalEntries = new List<KeyValuePair<SpawnPool, ushort>>();
+
+        public static int RemoveInjectedOptionalEntries()
+        {
+            int removed = 0;
+            if (LootData.AllSpawnWeightData != null)
+            {
+                foreach (var entry in _injectedOptionalEntries)
+                {
+                    if (LootData.AllSpawnWeightData.TryGetValue(entry.Key, out var pool) && pool.Remove(entry.Value))
+                    {
+                        removed++;
+                    }
+                }
+            }
+            _injectedOptionalEntries.Clear();
+            return removed;
+        }
+
+        private static void Inject(SpawnPool pool, ushort itemId, int weight)
+        {
+            if (!LootData.AllSpawnWeightData.ContainsKey(pool)) return;
+            var entries = LootData.AllSpawnWeightData[pool];
+            if (entries.ContainsKey(itemId) && entries[itemId] != 0) return;
+            entries[itemId] = weight;
+            if (UnlockedItemsManager.OptionalMultiplayerOnlyItemIds.Contains(itemId))
+            {
+                _injectedOptionalEntries.Add(new KeyValuePair<SpawnPool, ushort>(pool, itemId));
+            }
+        }
 
         static void Postfix()
         {
             try
             {
+                _injectedOptionalEntries.Clear();
                 if (LootData.AllSpawnWeightData == null)
                 {
                     _log?.LogWarning("[PeakPelago] LootData.AllSpawnWeightData is null");
                     return;
                 }
+
+                bool includeOptional = UnlockedItemsManager.MultiplayerOnlyItemsEnabled;
 
                 // Add multiplayer only items BEFORE capturing original weights
                 // so they get proper original weights for unlock/lock cycling
@@ -49,31 +83,19 @@ namespace PeakArchipelago
 
                 foreach (var item in multiplayerSpecialItems)
                 {
+                    if (!includeOptional && UnlockedItemsManager.OptionalMultiplayerOnlyItemIds.Contains(item.Key)) continue;
                     foreach (SpawnPool pool in specialPools)
                     {
-                        if (LootData.AllSpawnWeightData.ContainsKey(pool))
-                        {
-                            if (!LootData.AllSpawnWeightData[pool].ContainsKey(item.Key) ||
-                                LootData.AllSpawnWeightData[pool][item.Key] == 0)
-                            {
-                                LootData.AllSpawnWeightData[pool][item.Key] = item.Value;
-                            }
-                        }
+                        Inject(pool, item.Key, item.Value);
                     }
                 }
 
                 foreach (var item in multiplayerItems)
                 {
+                    if (!includeOptional && UnlockedItemsManager.OptionalMultiplayerOnlyItemIds.Contains(item.Key)) continue;
                     foreach (SpawnPool pool in luggagePools)
                     {
-                        if (LootData.AllSpawnWeightData.ContainsKey(pool))
-                        {
-                            if (!LootData.AllSpawnWeightData[pool].ContainsKey(item.Key) ||
-                                LootData.AllSpawnWeightData[pool][item.Key] == 0)
-                            {
-                                LootData.AllSpawnWeightData[pool][item.Key] = item.Value;
-                            }
-                        }
+                        Inject(pool, item.Key, item.Value);
                     }
                 }
 
@@ -129,6 +151,15 @@ namespace PeakArchipelago
             if (PeakArchipelagoPlugin._instance?.Session == null) return true;
 
             var lootData = __instance.GetComponent<LootData>();
+
+            if (!UnlockedItemsManager.MultiplayerOnlyItemsEnabled && lootData != null && lootData.banInSolo &&
+                UnlockedItemsManager.OptionalMultiplayerOnlyItemIds.Contains(__instance.itemID) &&
+                (PhotonNetwork.OfflineMode || (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.PlayerCount <= 1)))
+            {
+                __result = false;
+                return false;
+            }
+
             string validityName = (lootData != null && lootData.useOtherItemForSpawningValidity != null)
                 ? lootData.useOtherItemForSpawningValidity.gameObject.name
                 : __instance.gameObject.name;
